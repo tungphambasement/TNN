@@ -5,7 +5,7 @@
 #include <iostream>
 
 signed main() {
-  Tensor<float> tensor(16, 16, 1024, 1024);
+  Tensor<float> tensor({16, 16, 1024, 1024});
   tensor.fill_random_normal(0.0f, 1.0f);
   [[maybe_unused]] float *original_data = tensor.data();
   auto naive_serialize_start = std::chrono::high_resolution_clock::now();

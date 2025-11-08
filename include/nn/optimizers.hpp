@@ -142,9 +142,9 @@ public:
       v_[i] *= beta2_;
       v_[i] += grad_sq * one_minus_beta2;
 
-      T *param_data = params[i]->data();
-      const T *m_data = m_[i].data();
-      const T *v_data = v_[i].data();
+      T *param_data = params[i]->data_ptr().get();
+      const T *m_data = m_[i].data_ptr().get();
+      const T *v_data = v_[i].data_ptr().get();
 
       for (size_t j = 0; j < params[i]->size(); ++j) {
         param_data[j] -=

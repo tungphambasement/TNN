@@ -1,8 +1,9 @@
-#include "cuda/kernels.hpp"
+#include "ops/cuda/kernels.hpp"
 
 #ifdef USE_CUDA
 
 #include <cuda_runtime.h>
+#include <curand_kernel.h>
 #include <device_launch_parameters.h>
 
 namespace cuda {
@@ -994,6 +995,76 @@ void cuda_mul_add_scalar(const double *a, double mul_scalar, double add_scalar, 
                          size_t size) {
   int num_blocks = get_num_blocks(size);
   mul_add_scalar_kernel<<<num_blocks, BLOCK_SIZE>>>(a, mul_scalar, add_scalar, c, size);
+}
+
+// Random number generation kernels for float
+__global__ void fill_random_uniform_kernel(float *data, size_t size, float min_val, float max_val,
+                                           unsigned long long seed) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < size) {
+    curandState state;
+    curand_init(seed, idx, 0, &state);
+    float random_val = curand_uniform(&state);
+    data[idx] = min_val + random_val * (max_val - min_val);
+  }
+}
+
+__global__ void fill_random_normal_kernel(float *data, size_t size, float mean, float stddev,
+                                          unsigned long long seed) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < size) {
+    curandState state;
+    curand_init(seed, idx, 0, &state);
+    data[idx] = mean + stddev * curand_normal(&state);
+  }
+}
+
+// Random number generation kernels for double
+__global__ void fill_random_uniform_kernel(double *data, size_t size, double min_val,
+                                           double max_val, unsigned long long seed) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < size) {
+    curandState state;
+    curand_init(seed, idx, 0, &state);
+    double random_val = curand_uniform_double(&state);
+    data[idx] = min_val + random_val * (max_val - min_val);
+  }
+}
+
+__global__ void fill_random_normal_kernel(double *data, size_t size, double mean, double stddev,
+                                          unsigned long long seed) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < size) {
+    curandState state;
+    curand_init(seed, idx, 0, &state);
+    data[idx] = mean + stddev * curand_normal_double(&state);
+  }
+}
+
+// Host wrapper functions - Random number generation for float
+void cuda_fill_random_uniform(float *data, size_t size, float min_val, float max_val,
+                              unsigned long long seed) {
+  int num_blocks = get_num_blocks(size);
+  fill_random_uniform_kernel<<<num_blocks, BLOCK_SIZE>>>(data, size, min_val, max_val, seed);
+}
+
+void cuda_fill_random_normal(float *data, size_t size, float mean, float stddev,
+                             unsigned long long seed) {
+  int num_blocks = get_num_blocks(size);
+  fill_random_normal_kernel<<<num_blocks, BLOCK_SIZE>>>(data, size, mean, stddev, seed);
+}
+
+// Host wrapper functions - Random number generation for double
+void cuda_fill_random_uniform(double *data, size_t size, double min_val, double max_val,
+                              unsigned long long seed) {
+  int num_blocks = get_num_blocks(size);
+  fill_random_uniform_kernel<<<num_blocks, BLOCK_SIZE>>>(data, size, min_val, max_val, seed);
+}
+
+void cuda_fill_random_normal(double *data, size_t size, double mean, double stddev,
+                             unsigned long long seed) {
+  int num_blocks = get_num_blocks(size);
+  fill_random_normal_kernel<<<num_blocks, BLOCK_SIZE>>>(data, size, mean, stddev, seed);
 }
 
 } // namespace cuda

@@ -211,10 +211,10 @@ public:
     const int num_classes = use_coarse_labels_ ? cifar100_constants::NUM_COARSE_CLASSES
                                                : cifar100_constants::NUM_CLASSES;
 
-    batch_data = Tensor<T>(actual_batch_size, cifar100_constants::NUM_CHANNELS,
-                           cifar100_constants::IMAGE_HEIGHT, cifar100_constants::IMAGE_WIDTH);
+    batch_data = Tensor<T>({actual_batch_size, cifar100_constants::NUM_CHANNELS,
+                            cifar100_constants::IMAGE_HEIGHT, cifar100_constants::IMAGE_WIDTH});
 
-    batch_labels = Tensor<T>(actual_batch_size, static_cast<size_t>(num_classes), 1, 1);
+    batch_labels = Tensor<T>({actual_batch_size, static_cast<size_t>(num_classes), 1, 1});
     batch_labels.fill(static_cast<T>(0.0));
 #if defined(_OPENMP)
 #pragma omp parallel for if (actual_batch_size > 16)
@@ -391,29 +391,24 @@ public:
     for (size_t batch_idx = 0; batch_idx < num_batches; ++batch_idx) {
       const size_t start_idx = batch_idx * batch_size;
       const size_t end_idx = std::min(start_idx + batch_size, num_samples);
-      const int actual_batch_size = static_cast<int>(end_idx - start_idx);
+      const size_t actual_batch_size = end_idx - start_idx;
 
-      Tensor<T> batch_data(static_cast<size_t>(actual_batch_size), cifar100_constants::NUM_CHANNELS,
-                           cifar100_constants::IMAGE_HEIGHT, cifar100_constants::IMAGE_WIDTH);
+      Tensor<T> batch_data({actual_batch_size, cifar100_constants::NUM_CHANNELS,
+                            cifar100_constants::IMAGE_HEIGHT, cifar100_constants::IMAGE_WIDTH});
 
-      Tensor<T> batch_fine_labels(static_cast<size_t>(actual_batch_size),
-                                  static_cast<size_t>(num_fine_classes), 1, 1);
+      Tensor<T> batch_fine_labels({actual_batch_size, num_fine_classes, 1, 1});
       batch_fine_labels.fill(static_cast<T>(0.0));
 
-      Tensor<T> batch_coarse_labels(std::vector<size_t>{
-          static_cast<size_t>(actual_batch_size), static_cast<size_t>(num_coarse_classes), 1, 1});
+      Tensor<T> batch_coarse_labels({actual_batch_size, num_coarse_classes, 1, 1});
       batch_coarse_labels.fill(static_cast<T>(0.0));
 
-#if defined(_OPENMP)
-#pragma omp parallel for if (actual_batch_size > 16)
-#endif
-      for (int i = 0; i < actual_batch_size; ++i) {
+      for (size_t i = 0; i < actual_batch_size; ++i) {
         const size_t sample_idx = start_idx + i;
         const auto &image_data = data_[sample_idx];
 
-        for (int c = 0; c < static_cast<int>(cifar100_constants::NUM_CHANNELS); ++c) {
-          for (int h = 0; h < static_cast<int>(cifar100_constants::IMAGE_HEIGHT); ++h) {
-            for (int w = 0; w < static_cast<int>(cifar100_constants::IMAGE_WIDTH); ++w) {
+        for (size_t c = 0; c < cifar100_constants::NUM_CHANNELS; ++c) {
+          for (size_t h = 0; h < cifar100_constants::IMAGE_HEIGHT; ++h) {
+            for (size_t w = 0; w < cifar100_constants::IMAGE_WIDTH; ++w) {
               size_t pixel_idx =
                   c * cifar100_constants::IMAGE_HEIGHT * cifar100_constants::IMAGE_WIDTH +
                   h * cifar100_constants::IMAGE_WIDTH + w;

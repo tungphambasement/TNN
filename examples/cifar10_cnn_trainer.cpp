@@ -7,7 +7,6 @@
 #include "nn/train.hpp"
 #include "tensor/tensor.hpp"
 #include "utils/env.hpp"
-#include "utils/ops.hpp"
 
 #include <algorithm>
 #include <chrono>

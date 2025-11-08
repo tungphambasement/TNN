@@ -1,56 +1,5 @@
 # TNN CMakeLists.txt
 
-# Matrix library
-file(GLOB_RECURSE TNN_MATRIX_SOURCES 
-    "matrix/*.cpp"
-)
-add_library(tnn_matrix STATIC ${TNN_MATRIX_SOURCES})
-target_include_directories(tnn_matrix PUBLIC 
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
-)
-if(NOT MSVC)
-    target_link_libraries(tnn_matrix PUBLIC m)
-endif()
-
-# Tensor library
-file(GLOB_RECURSE TNN_TENSOR_SOURCES 
-    "tensor/*.cpp"
-)
-add_library(tnn_tensor STATIC ${TNN_TENSOR_SOURCES})
-target_include_directories(tnn_tensor PUBLIC 
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
-)
-if(NOT MSVC)
-    target_link_libraries(tnn_tensor PUBLIC tnn_matrix m)
-else()
-    target_link_libraries(tnn_tensor PUBLIC tnn_matrix)
-endif()
-
-# Utilities library
-file(GLOB_RECURSE TNN_UTILS_SOURCES 
-    "utils/*.cpp"
-)
-add_library(tnn_utils STATIC ${TNN_UTILS_SOURCES})
-target_include_directories(tnn_utils PUBLIC 
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
-)
-
-# Device library
-file(GLOB_RECURSE TNN_DEVICE_SOURCES 
-    "device/*.cpp"
-)
-add_library(tnn_device STATIC ${TNN_DEVICE_SOURCES})
-target_include_directories(tnn_device PUBLIC 
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
-)
-if(ENABLE_CUDA)
-    target_link_libraries(tnn_device PUBLIC CUDA::cudart)
-endif()
-
 # CUDA library
 if(ENABLE_CUDA)
     file(GLOB_RECURSE TNN_CUDA_SOURCES 
@@ -65,8 +14,74 @@ if(ENABLE_CUDA)
         CUDA_ARCHITECTURES "89"
         CUDA_STANDARD 17
     )
-    target_link_libraries(tnn_cuda PUBLIC CUDA::cudart)
+    target_link_libraries(tnn_cuda PUBLIC CUDA::cudart CUDA::cublas)
 endif()
+
+# Device library
+file(GLOB_RECURSE TNN_DEVICE_SOURCES 
+    "device/*.cpp"
+)
+add_library(tnn_device STATIC ${TNN_DEVICE_SOURCES})
+target_include_directories(tnn_device PUBLIC 
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+if(ENABLE_CUDA)
+    target_link_libraries(tnn_device PUBLIC CUDA::cudart CUDA::cublas)
+endif()
+
+# Operations library
+file(GLOB_RECURSE TNN_OPS_SOURCES 
+    "ops/*.cpp"
+    "ops/*.cu"
+)
+add_library(tnn_ops STATIC ${TNN_OPS_SOURCES})
+target_include_directories(tnn_ops PUBLIC 
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(tnn_ops PUBLIC tnn_device)
+if(ENABLE_CUDA)
+    target_link_libraries(tnn_ops PUBLIC CUDA::cudart CUDA::cublas)
+endif()
+
+# Matrix library
+file(GLOB_RECURSE TNN_MATRIX_SOURCES 
+    "matrix/*.cpp"
+)
+add_library(tnn_matrix STATIC ${TNN_MATRIX_SOURCES})
+target_include_directories(tnn_matrix PUBLIC 
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(tnn_matrix PUBLIC tnn_device tnn_ops)
+if(NOT MSVC)
+    target_link_libraries(tnn_matrix PUBLIC m)
+endif()
+
+# Tensor library
+file(GLOB_RECURSE TNN_TENSOR_SOURCES 
+    "tensor/*.cpp"
+)
+add_library(tnn_tensor STATIC ${TNN_TENSOR_SOURCES})
+target_include_directories(tnn_tensor PUBLIC 
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(tnn_tensor PUBLIC tnn_matrix tnn_ops tnn_device)
+if(NOT MSVC)
+    target_link_libraries(tnn_tensor PUBLIC m)
+endif()
+
+# Utilities library
+file(GLOB_RECURSE TNN_UTILS_SOURCES 
+    "utils/*.cpp"
+)
+add_library(tnn_utils STATIC ${TNN_UTILS_SOURCES})
+target_include_directories(tnn_utils PUBLIC 
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
 
 # add assembly optimizations for x86_64
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
@@ -119,18 +134,35 @@ target_link_libraries(tnn_data_loading PUBLIC tnn_utils tnn_tensor tnn_matrix)
 file(GLOB_RECURSE TNN_MATH_SOURCES 
     "math/*.cpp"
 )
-add_library(tnn_math STATIC ${TNN_MATH_SOURCES})
+if(ENABLE_CUDA)
+    file(GLOB_RECURSE TNN_MATH_CUDA_SOURCES 
+        "math/*.cu"
+    )
+    add_library(tnn_math STATIC ${TNN_MATH_SOURCES} ${TNN_MATH_CUDA_SOURCES})
+else()
+    add_library(tnn_math STATIC ${TNN_MATH_SOURCES})
+endif()
 target_include_directories(tnn_math PUBLIC 
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(tnn_math PUBLIC tnn_utils)
+if(ENABLE_CUDA)
+    set_target_properties(tnn_math PROPERTIES 
+        CUDA_ARCHITECTURES "89"
+        CUDA_STANDARD 17
+    )
+    target_link_libraries(tnn_math PUBLIC CUDA::cudart CUDA::cublas)
+endif()
 
 # Neural Network library
 file(GLOB_RECURSE TNN_NN_SOURCES 
     "nn/*.cpp"
 )
-add_library(tnn_nn STATIC ${TNN_NN_SOURCES})
+file(GLOB_RECURSE TNN_NN_CUDA_SOURCES 
+    "nn/*.cu"
+)
+add_library(tnn_nn STATIC ${TNN_NN_SOURCES} ${TNN_NN_CUDA_SOURCES})
 target_include_directories(tnn_nn PUBLIC 
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
@@ -141,7 +173,9 @@ else()
     target_link_libraries(tnn_nn PUBLIC tnn_tensor tnn_utils tnn_data_loading tnn_math)
 endif()
 target_link_libraries(tnn_nn PUBLIC nlohmann_json::nlohmann_json)
-
+if(ENABLE_CUDA)
+    target_link_libraries(tnn_nn PUBLIC CUDA::cudart CUDA::cublas)
+endif()
 # Pipeline library
 file(GLOB_RECURSE TNN_PIPELINE_SOURCES 
     "pipeline/*.cpp"

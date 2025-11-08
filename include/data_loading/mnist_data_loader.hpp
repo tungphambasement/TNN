@@ -143,10 +143,10 @@ public:
 
     const size_t actual_batch_size = std::min(batch_size, data_.size() - this->current_index_);
 
-    batch_data = Tensor<T>(actual_batch_size, mnist_constants::NUM_CHANNELS,
-                           mnist_constants::IMAGE_HEIGHT, mnist_constants::IMAGE_WIDTH);
+    batch_data = Tensor<T>({actual_batch_size, mnist_constants::NUM_CHANNELS,
+                            mnist_constants::IMAGE_HEIGHT, mnist_constants::IMAGE_WIDTH});
 
-    batch_labels = Tensor<T>(actual_batch_size, mnist_constants::NUM_CLASSES, 1UL, 1UL);
+    batch_labels = Tensor<T>({actual_batch_size, mnist_constants::NUM_CLASSES, 1UL, 1UL});
     batch_labels.fill(static_cast<T>(0.0));
 
     for (size_t i = 0; i < actual_batch_size; ++i) {

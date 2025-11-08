@@ -9,20 +9,25 @@
 /**
  * This file provides a wrapper header for gemm functions
  */
-#include "dgemm.hpp"
-#include "sgemm.hpp"
+#include "cpu/gemm.hpp"
+#include "cuda/gemm.hpp"
+#include "device/device_ptr.hpp"
 
 namespace tmath {
+
 template <typename T>
-void gemm(const T *A, const T *B, T *C, const size_t M, const size_t N, const size_t K,
+void gemm(const tdevice::device_ptr<T[]> &A, const tdevice::device_ptr<T[]> &B,
+          const tdevice::device_ptr<T[]> &C, const size_t M, const size_t N, const size_t K,
           const bool trans_A = false, const bool trans_B = false) {
-  if constexpr (std::is_same<T, float>::value) {
-    sgemm(A, B, C, M, N, K, trans_A, trans_B);
-  } else if constexpr (std::is_same<T, double>::value) {
-    dgemm(A, B, C, M, N, K, trans_A, trans_B);
+  if (A.getDeviceType() != B.getDeviceType() || A.getDeviceType() != C.getDeviceType()) {
+    throw std::runtime_error("All device pointers must be on the same device type for gemm.");
+  }
+  if (A.getDeviceType() == tdevice::DeviceType::CPU) {
+    cpu::gemm<T>(A.get(), B.get(), C.get(), M, N, K, trans_A, trans_B);
+  } else if (A.getDeviceType() == tdevice::DeviceType::GPU) {
+    cuda::gemm<T>(A.get(), B.get(), C.get(), M, N, K, static_cast<T>(1.0), trans_A, trans_B);
   } else {
-    static_assert(std::is_same<T, float>::value || std::is_same<T, double>::value,
-                  "Unsupported data type for gemm. Only float and double are supported.");
+    throw std::runtime_error("Unsupported device type for gemm.");
   }
 }
 } // namespace tmath

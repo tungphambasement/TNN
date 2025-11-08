@@ -6,7 +6,7 @@
 #include "pipeline/distributed_coordinator.hpp"
 #include "tensor/tensor.hpp"
 #include "utils/env.hpp"
-#include "utils/ops.hpp"
+
 #include "utils/utils_extended.hpp"
 #include <chrono>
 #include <cstdlib>

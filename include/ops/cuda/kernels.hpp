@@ -95,4 +95,15 @@ void cuda_sub_mul_scalar(const double *a, double sub_scalar, double mul_scalar, 
 void cuda_mul_add_scalar(const double *a, double mul_scalar, double add_scalar, double *c,
                          size_t size);
 
+// Random number generation operations
+void cuda_fill_random_uniform(float *data, size_t size, float min_val, float max_val,
+                              unsigned long long seed);
+void cuda_fill_random_normal(float *data, size_t size, float mean, float stddev,
+                             unsigned long long seed);
+
+void cuda_fill_random_uniform(double *data, size_t size, double min_val, double max_val,
+                              unsigned long long seed);
+void cuda_fill_random_normal(double *data, size_t size, double mean, double stddev,
+                             unsigned long long seed);
+
 } // namespace cuda

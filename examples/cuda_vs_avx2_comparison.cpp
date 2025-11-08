@@ -1,6 +1,6 @@
-#include "cuda/kernels.hpp"
 #include "device/device_manager.hpp"
 #include "device/device_ptr.hpp"
+#include "ops/cuda/kernels.hpp"
 #include "threading/thread_handler.hpp"
 #include "threading/thread_wrapper.hpp"
 #include "utils/avx2.hpp"

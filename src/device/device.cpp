@@ -44,6 +44,12 @@ void *Device::allocateMemory(size_t size) const { return context_->allocateMemor
 
 void Device::deallocateMemory(void *ptr) const { context_->deallocateMemory(ptr); }
 
+void *Device::allocateAlignedMemory(size_t size, size_t alignment) const {
+  return context_->allocateAlignedMemory(size, alignment);
+}
+
+void Device::deallocateAlignedMemory(void *ptr) const { context_->deallocateAlignedMemory(ptr); }
+
 void Device::copyToDevice(void *dest, const void *src, size_t size) const {
   context_->copyToDevice(dest, src, size);
 }

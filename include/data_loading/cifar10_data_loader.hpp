@@ -159,10 +159,10 @@ public:
 
     const size_t actual_batch_size = std::min(batch_size, data_.size() - this->current_index_);
 
-    batch_data = Tensor<T>(actual_batch_size, cifar10_constants::NUM_CHANNELS,
-                           cifar10_constants::IMAGE_HEIGHT, cifar10_constants::IMAGE_WIDTH);
+    batch_data = Tensor<T>({actual_batch_size, cifar10_constants::NUM_CHANNELS,
+                            cifar10_constants::IMAGE_HEIGHT, cifar10_constants::IMAGE_WIDTH});
 
-    batch_labels = Tensor<T>(actual_batch_size, cifar10_constants::NUM_CLASSES, 1, 1);
+    batch_labels = Tensor<T>({actual_batch_size, cifar10_constants::NUM_CLASSES, 1, 1});
     batch_labels.fill(static_cast<T>(0.0));
 
     for (size_t i = 0; i < actual_batch_size; ++i) {
@@ -294,10 +294,10 @@ public:
       const size_t end_idx = std::min(start_idx + batch_size, num_samples);
       const size_t actual_batch_size = end_idx - start_idx;
 
-      Tensor<T> batch_data(actual_batch_size, cifar10_constants::NUM_CHANNELS,
-                           cifar10_constants::IMAGE_HEIGHT, cifar10_constants::IMAGE_WIDTH);
+      Tensor<T> batch_data({actual_batch_size, cifar10_constants::NUM_CHANNELS,
+                            cifar10_constants::IMAGE_HEIGHT, cifar10_constants::IMAGE_WIDTH});
 
-      Tensor<T> batch_labels(actual_batch_size, cifar10_constants::NUM_CLASSES, 1, 1);
+      Tensor<T> batch_labels({actual_batch_size, cifar10_constants::NUM_CLASSES, 1, 1});
       batch_labels.fill(static_cast<T>(0.0));
 
       for (size_t i = 0; i < actual_batch_size; ++i) {

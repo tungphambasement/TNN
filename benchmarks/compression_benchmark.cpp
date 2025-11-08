@@ -5,7 +5,7 @@
 #include <vector>
 
 int main() {
-  Tensor<float, NCHW> tensor(32, 3, 1028, 1028);
+  Tensor<float, NCHW> tensor({32, 3, 1028, 1028});
   tensor.fill(0.5f);
   std::cout << "Tensor created with shape: " << tensor.batch_size() << "x" << tensor.channels()
             << "x" << tensor.height() << "x" << tensor.width() << std::endl;

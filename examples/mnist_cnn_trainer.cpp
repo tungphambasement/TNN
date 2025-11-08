@@ -22,7 +22,6 @@
 #include "tensor/tensor.hpp"
 #include "utils/env.hpp"
 #include "utils/misc.hpp"
-#include "utils/ops.hpp"
 
 namespace mnist_constants {
 
@@ -95,14 +94,14 @@ int main() {
 
     auto model = tnn::SequentialBuilder<float>("mnist_cnn_model")
                      .input({1, ::mnist_constants::IMAGE_HEIGHT, ::mnist_constants::IMAGE_WIDTH})
-                     .conv2d(16, 5, 5, 1, 1, 0, 0, true, "conv1")
+                     .conv2d(8, 5, 5, 1, 1, 1, 1, true, "conv1")
                      .batchnorm(1e-5f, 0.1f, true, "bn1")
                      .activation("relu", "relu1")
                      .maxpool2d(3, 3, 3, 3, 0, 0, "pool1")
-                     .conv2d(32, 1, 1, 1, 1, 0, 0, true, "conv2_1x1")
+                     .conv2d(16, 1, 1, 1, 1, 1, 1, true, "conv2_1x1")
                      .batchnorm(1e-5f, 0.1f, true, "bn2")
                      .activation("relu", "relu2")
-                     .conv2d(128, 5, 5, 1, 1, 0, 0, true, "conv3")
+                     .conv2d(48, 5, 5, 1, 1, 1, 1, true, "conv3")
                      .batchnorm(1e-5f, 0.1f, true, "bn3")
                      .activation("relu", "relu3")
                      .maxpool2d(2, 2, 2, 2, 0, 0, "pool2")

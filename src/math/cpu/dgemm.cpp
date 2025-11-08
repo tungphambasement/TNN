@@ -1,8 +1,10 @@
-#include "math/dgemm.hpp"
+#include "math/cpu/dgemm.hpp"
 #include "threading/thread_handler.hpp"
 #include <cstring>
 
 namespace tmath {
+namespace cpu {
+
 constexpr size_t DEFAULT_BLOCK_SIZE = 32;
 
 #ifdef __AVX2__
@@ -604,4 +606,6 @@ void dgemm(const double *A, const double *B, double *C, const size_t M, const si
   }
 #endif
 }
+
+} // namespace cpu
 } // namespace tmath

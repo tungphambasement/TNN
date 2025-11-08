@@ -13,7 +13,7 @@
 #include "threading/thread_wrapper.hpp"
 #include "utils/env.hpp"
 #include "utils/mkl_utils.hpp"
-#include "utils/ops.hpp"
+
 #include "utils/utils_extended.hpp"
 #include <chrono>
 #include <cstdlib>

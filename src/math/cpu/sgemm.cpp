@@ -1,8 +1,10 @@
-#include "math/sgemm.hpp"
+#include "math/cpu/sgemm.hpp"
 #include "threading/thread_handler.hpp"
+
 #include <cstring>
 
 namespace tmath {
+namespace cpu {
 constexpr size_t DEFAULT_BLOCK_SIZE = 32;
 
 #ifdef __AVX2__
@@ -470,6 +472,23 @@ inline void sgemm_kernel_avx2_tn_aligned(const float *A, const float *B, float *
 }
 #endif
 
+void transpose_matrix(const float *src, float *dst, const size_t rows, const size_t cols) {
+  constexpr size_t block_size = 64;
+  tthreads::parallel_for_2d((rows + block_size - 1) / block_size,
+                            (cols + block_size - 1) / block_size,
+                            [&](size_t i_block, size_t j_block) {
+                              const size_t start_row = i_block * block_size;
+                              const size_t start_col = j_block * block_size;
+                              const size_t end_row = std::min(start_row + block_size, rows);
+                              const size_t end_col = std::min(start_col + block_size, cols);
+                              for (size_t i = start_row; i < end_row; ++i) {
+                                for (size_t j = start_col; j < end_col; ++j) {
+                                  dst[j * rows + i] = src[i * cols + j];
+                                }
+                              }
+                            });
+}
+
 void sgemm(const float *A, const float *B, float *C, const size_t M, const size_t N, const size_t K,
            const bool trans_A, const bool trans_B) {
 #ifdef __AVX2__
@@ -590,7 +609,7 @@ void sgemm(const float *A, const float *B, float *C, const size_t M, const size_
 
     float *D = (float *)aligned_alloc(32, sizeof(float) * N * M);
     sgemm(B, A, D, N, M, K, false, false);
-    utils::transpose_2d(D, C, N, M);
+    transpose_matrix(D, C, N, M);
     free(D);
   }
 #else
@@ -618,4 +637,5 @@ void sgemm(const float *A, const float *B, float *C, const size_t M, const size_
   }
 #endif
 }
+} // namespace cpu
 } // namespace tmath

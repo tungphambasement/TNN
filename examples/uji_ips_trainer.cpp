@@ -7,7 +7,6 @@
 #include "tensor/tensor.hpp"
 #include "utils/env.hpp"
 #include "utils/misc.hpp"
-#include "utils/ops.hpp"
 
 #include <algorithm>
 #include <atomic>

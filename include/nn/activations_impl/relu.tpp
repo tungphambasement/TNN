@@ -6,9 +6,9 @@
  */
 
 #include "nn/activations_impl/relu.hpp"
+#include "ops/ops.hpp"
 #include "tensor/tensor.hpp"
 #include "threading/thread_handler.hpp"
-#include "utils/avx2.hpp"
 #include <cassert>
 #include <memory>
 #include <stdexcept>
@@ -30,52 +30,12 @@ template <typename T> void ReLU<T>::apply(Tensor<T> &tensor) const {
     tthreads::parallel_for<size_t>(0, num_threads, [&](size_t i) {
       size_t start = i * block_size;
       size_t end = std::min(start + block_size, size);
-      utils::avx2_scalar_max(data + start, T(0), data + start, end - start);
+      ops::cpu::scalar_max(data + start, T(0), data + start, end - start);
     });
   } else {
     tthreads::parallel_for<size_t>(
         0, size, [&](size_t i) { data[i] = data[i] > T(0) ? data[i] : negative_slope_ * data[i]; });
   }
-}
-
-template <typename T>
-void ReLU<T>::apply_with_bias(Tensor<T> &tensor, const Tensor<T> &bias) const {
-  if (tensor.shape() != bias.shape()) {
-    throw std::invalid_argument("Tensor and bias must have the same shape");
-  }
-
-  T *data = tensor.data();
-  const T *bias_data = bias.data();
-  size_t size = tensor.size();
-
-  tthreads::parallel_for<size_t>(0, size, [&](size_t i) {
-    T val = data[i] + bias_data[i];
-    data[i] = val > T(0) ? val : negative_slope_ * val;
-  });
-}
-
-template <typename T> void ReLU<T>::apply_with_scalar_bias(Tensor<T> &tensor, T bias) const {
-  T *data = tensor.data();
-  size_t size = tensor.size();
-
-  tthreads::parallel_for<size_t>(0, size, [&](size_t i) {
-    T val = data[i] + bias;
-    data[i] = val > T(0) ? val : negative_slope_ * val;
-  });
-}
-
-template <typename T>
-Tensor<T> ReLU<T>::compute_gradient(const Tensor<T> &input,
-                                    const Tensor<T> *upstream_gradient) const {
-  Tensor<T> gradient;
-  if (upstream_gradient != nullptr) {
-    gradient = upstream_gradient->clone();
-  } else {
-    gradient = Tensor<T>(input.shape());
-    gradient.fill(T(1));
-  }
-  compute_gradient_inplace(input, gradient);
-  return gradient;
 }
 
 template <typename T>
@@ -93,87 +53,12 @@ void ReLU<T>::compute_gradient_inplace(const Tensor<T> &input, Tensor<T> &upstre
   });
 }
 
-template <typename T> void ReLU<T>::apply_channel_wise(Tensor<T> &tensor, int channel) const {
-  if (channel < 0 || channel >= static_cast<int>(tensor.channels())) {
-    throw std::invalid_argument("Channel index out of bounds");
-  }
-
-  size_t batch_size = tensor.batch_size();
-  size_t height = tensor.height();
-  size_t width = tensor.width();
-
-  const size_t total = batch_size * height * width;
-  tthreads::parallel_for<size_t>(0, total, [&](size_t idx) {
-    size_t n = idx / (height * width);
-    size_t rem = idx % (height * width);
-    size_t h = rem / width;
-    size_t w = rem % width;
-    T &val = tensor(n, channel, h, w);
-    val = val > T(0) ? val : negative_slope_ * val;
-  });
-}
-
-template <typename T>
-void ReLU<T>::apply_channel_wise_with_bias(Tensor<T> &tensor, int channel,
-                                           const std::vector<T> &bias) const {
-  if (channel < 0 || channel >= static_cast<int>(tensor.channels())) {
-    throw std::invalid_argument("Channel index out of bounds");
-  }
-
-  size_t batch_size = tensor.batch_size();
-  size_t height = tensor.height();
-  size_t width = tensor.width();
-  size_t spatial_size = height * width;
-
-  if (bias.size() != spatial_size) {
-    throw std::invalid_argument("Bias size must match spatial dimensions");
-  }
-
-  const size_t total = batch_size * height * width;
-  tthreads::parallel_for<size_t>(0, total, [&](size_t idx) {
-    size_t n = idx / (height * width);
-    size_t rem = idx % (height * width);
-    size_t h = rem / width;
-    size_t w = rem % width;
-    T val = tensor(n, channel, h, w) + bias[h * width + w];
-    tensor(n, channel, h, w) = val > T(0) ? val : negative_slope_ * val;
-  });
-}
-
-template <typename T> void ReLU<T>::apply_batch_wise(Tensor<T> &tensor, int batch_idx) const {
-  if (batch_idx < 0 || batch_idx >= static_cast<int>(tensor.batch_size())) {
-    throw std::invalid_argument("Batch index out of bounds");
-  }
-
-  size_t channels = tensor.channels();
-  size_t height = tensor.height();
-  size_t width = tensor.width();
-
-  const size_t total = channels * height * width;
-  tthreads::parallel_for<size_t>(0, total, [&](size_t idx) {
-    size_t c = idx / (height * width);
-    size_t rem = idx % (height * width);
-    size_t h = rem / width;
-    size_t w = rem % width;
-    T &val = tensor(batch_idx, c, h, w);
-    val = val > T(0) ? val : negative_slope_ * val;
-  });
-}
-
 template <typename T> std::string ReLU<T>::name() const {
   return negative_slope_ == T(0) ? "relu" : "leaky_relu";
 }
 
 template <typename T> std::unique_ptr<ActivationFunction<T>> ReLU<T>::clone() const {
   return std::make_unique<ReLU<T>>(*this);
-}
-
-template <typename T> void ReLU<T>::apply_single_value(T &value) const {
-  value = value > T(0) ? value : negative_slope_ * value;
-}
-
-template <typename T> T ReLU<T>::compute_single_gradient(T pre_activation_value) const {
-  return pre_activation_value > T(0) ? T(1) : negative_slope_;
 }
 
 // Explicit template instantiations

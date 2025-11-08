@@ -1,14 +1,15 @@
 #include "math/gemm.hpp"
+#include "matrix/matrix.hpp"
 #include "tensor/tensor.hpp"
 #include "utils/misc.hpp"
-#include "utils/ops.hpp"
+#include "utils/mkl_utils.hpp"
+
 #include <chrono>
 #include <iostream>
 #include <numeric>
-#include <utils/mkl_utils.hpp>
 #include <vector>
 
-using namespace tmath;
+using namespace tmath::cpu;
 using namespace utils;
 
 constexpr size_t N = 64;

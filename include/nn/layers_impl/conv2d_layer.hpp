@@ -46,23 +46,29 @@ private:
   mutable tdevice::device_ptr<T[]> temp_gradient_buffer_;
   mutable tdevice::device_ptr<T[]> temp_col_grad_matrix_buffer_;
 
-  void compute_conv_forward(const T *col_data, const T *weight_data, T *output_data,
-                            const size_t output_size, const size_t kernel_size,
-                            const size_t out_channels) const;
+  void compute_conv_forward(const tdevice::device_ptr<T[]> &col_data,
+                            const tdevice::device_ptr<T[]> &weight_data,
+                            tdevice::device_ptr<T[]> &output_data, const size_t output_size,
+                            const size_t kernel_size, const size_t out_channels) const;
 
-  void compute_weight_gradients(const T *col_data, const T *gradient_data, T *weight_grad_data,
+  void compute_weight_gradients(const tdevice::device_ptr<T[]> &col_data,
+                                const tdevice::device_ptr<T[]> &gradient_data,
+                                tdevice::device_ptr<T[]> &weight_grad_data,
                                 const size_t output_size, const size_t kernel_size,
                                 const size_t out_channels) const;
 
-  void compute_input_gradients(const T *gradient_data, const T *weight_data, T *col_grad_data,
-                               const size_t output_size, const size_t kernel_size,
-                               const size_t out_channels) const;
+  void compute_input_gradients(const tdevice::device_ptr<T[]> &gradient_data,
+                               const tdevice::device_ptr<T[]> &weight_data,
+                               tdevice::device_ptr<T[]> &col_grad_data, const size_t output_size,
+                               const size_t kernel_size, const size_t out_channels) const;
 
-  void compute_bias_gradients(const T *gradient_data, T *bias_grad_data, const size_t batch_size,
+  void compute_bias_gradients(const tdevice::device_ptr<T[]> &gradient_data,
+                              tdevice::device_ptr<T[]> &bias_grad_data, const size_t batch_size,
                               const size_t output_h, const size_t output_w,
                               const size_t out_channels) const;
 
-  void add_bias_to_output(T *output_data, const T *bias_data, const size_t batch_size,
+  void add_bias_to_output(tdevice::device_ptr<T[]> &output_data,
+                          const tdevice::device_ptr<T[]> &bias_data, const size_t batch_size,
                           const size_t output_h, const size_t output_w,
                           const size_t out_channels) const;
 

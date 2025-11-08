@@ -30,6 +30,8 @@ public:
   size_t getAvailableMemory() const;
   void *allocateMemory(size_t size) const;
   void deallocateMemory(void *ptr) const;
+  void *allocateAlignedMemory(size_t size, size_t alignment) const;
+  void deallocateAlignedMemory(void *ptr) const;
   void copyToDevice(void *dest, const void *src, size_t size) const;
   void copyToHost(void *dest, const void *src, size_t size) const;
 

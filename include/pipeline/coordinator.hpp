@@ -13,7 +13,6 @@
 #include "communicator.hpp"
 #include "partitioner/partitioner.hpp"
 #include "pipeline_stage.hpp"
-#include "utils/avx2.hpp"
 #include <algorithm>
 #include <atomic>
 #include <chrono>

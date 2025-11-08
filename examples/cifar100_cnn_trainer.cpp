@@ -16,7 +16,6 @@
 #include "nn/train.hpp"
 #include "tensor/tensor.hpp"
 #include "utils/env.hpp"
-#include "utils/ops.hpp"
 
 using namespace tnn;
 using namespace data_loading;

@@ -22,6 +22,7 @@ endfunction()
 set(TEST_FILES 
     tensor_test.cpp
     device_manager_test.cpp
+    cuda_kernels_test.cpp
 )
 
 foreach(test_file IN LISTS TEST_FILES)
@@ -52,8 +53,7 @@ if(ENABLE_CUDA)
         # Discover tests automatically
         gtest_discover_tests(${test_name})
     endfunction()
-    
-    create_cuda_test(cuda_kernels_test)
+
     set(CUDA_TEST_TARGET cuda_kernels_test)
 else()
     set(CUDA_TEST_TARGET "")
