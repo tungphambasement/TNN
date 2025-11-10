@@ -9,22 +9,16 @@
 #include "concurrent_message_map.hpp"
 #include "endpoint.hpp"
 #include "message.hpp"
-#include "task.hpp"
 #include "utils/misc.hpp"
-#include <atomic>
-#include <condition_variable>
 #include <functional>
-#include <memory>
 #include <mutex>
-#include <optional>
 #include <queue>
 #include <stdexcept>
 #include <string>
-#include <thread>
 #include <unordered_map>
 #include <vector>
 
-namespace tpipeline {
+namespace tnn {
 /**
  * @brief Abstract base class for pipeline communication
  * Defines the interface for sending and receiving messages
@@ -173,4 +167,4 @@ protected:
 
   std::unordered_map<std::string, Endpoint> recipients_;
 };
-} // namespace tpipeline
+} // namespace tnn

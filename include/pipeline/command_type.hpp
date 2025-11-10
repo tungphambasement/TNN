@@ -9,7 +9,7 @@
 
 #include <cstdint>
 
-namespace tpipeline {
+namespace tnn {
 
 /**
  * @brief Enumeration of all possible command types in the pipeline system.
@@ -67,4 +67,4 @@ enum CommandType : uint16_t {
   _COUNT
 };
 
-} // namespace tpipeline
+} // namespace tnn

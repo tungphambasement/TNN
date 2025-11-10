@@ -9,7 +9,7 @@
 #include "tensor/tensor.hpp"
 #include <string>
 
-namespace tpipeline {
+namespace tnn {
 enum TaskType { FORWARD, BACKWARD };
 
 template <typename T = float> struct Task {
@@ -40,4 +40,4 @@ template <typename T = float> struct Task {
     return *this;
   }
 };
-} // namespace tpipeline
+} // namespace tnn

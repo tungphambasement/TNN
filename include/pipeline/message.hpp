@@ -19,7 +19,7 @@
 #include <variant>
 #include <vector>
 
-namespace tpipeline {
+namespace tnn {
 using PayloadType = std::variant<std::monostate, Task<float>, std::string, bool, LoadTracker>;
 
 struct FixedHeader {
@@ -136,4 +136,4 @@ struct Message {
   const uint64_t size() const { return header.size() + data.size(); }
 };
 
-} // namespace tpipeline
+} // namespace tnn

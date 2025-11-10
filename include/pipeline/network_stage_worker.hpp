@@ -20,7 +20,7 @@
 #include <iostream>
 #include <memory>
 
-namespace tpipeline {
+namespace tnn {
 
 /**
  * @brief Network-based pipeline stage worker
@@ -116,4 +116,4 @@ private:
   utils::HardwareInfo hw_info_;
   std::unique_ptr<utils::ThreadAffinity> thread_affinity_;
 };
-} // namespace tpipeline
+} // namespace tnn

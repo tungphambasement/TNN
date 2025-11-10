@@ -11,7 +11,7 @@
 #include "nn/train.hpp"
 #include "pipeline/distributed_coordinator.hpp"
 
-namespace tpipeline {
+namespace tnn {
 
 ClassResult train_semi_async_epoch(DistributedCoordinator &coordinator,
                                    data_loading::BaseDataLoader<float> &train_loader,
@@ -85,8 +85,7 @@ ClassResult validate_semi_async_epoch(DistributedCoordinator &coordinator,
 
     coordinator.join(CommandType::FORWARD_TASK, coordinator.num_microbatches(), 60);
 
-    std::vector<tpipeline::Message> all_messages =
-        coordinator.dequeue_all_messages(tpipeline::CommandType::FORWARD_TASK);
+    std::vector<Message> all_messages = coordinator.dequeue_all_messages(CommandType::FORWARD_TASK);
 
     if (all_messages.size() != static_cast<size_t>(coordinator.num_microbatches())) {
       throw std::runtime_error(
@@ -94,7 +93,7 @@ ClassResult validate_semi_async_epoch(DistributedCoordinator &coordinator,
           ", expected: " + std::to_string(coordinator.num_microbatches()));
     }
 
-    std::vector<tpipeline::Task<float>> forward_tasks;
+    std::vector<Task<float>> forward_tasks;
     for (const auto &message : all_messages) {
       if (message.header.command_type == CommandType::FORWARD_TASK) {
         forward_tasks.push_back(message.get<Task<float>>());
@@ -144,4 +143,4 @@ void train_model(DistributedCoordinator &coordinator,
   }
 }
 
-} // namespace tpipeline
+} // namespace tnn

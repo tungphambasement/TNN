@@ -21,7 +21,7 @@ template <typename VariantType, typename T, uint64_t index = 0> constexpr uint64
  * type to ensure compatibility across different platforms. Here, we use uint64_t for sizes
  * and counts, which is 8 bytes on all platforms.
  */
-namespace tpipeline {
+namespace tnn {
 class BinarySerializer {
 public:
   template <typename T = float> static void serialize(const Tensor<T> &tensor, TBuffer &buffer) {
@@ -175,4 +175,4 @@ public:
 
 }; // namespace BinarySerializer
 
-} // namespace tpipeline
+} // namespace tnn

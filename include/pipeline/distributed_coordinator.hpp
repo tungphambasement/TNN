@@ -19,7 +19,7 @@
 #include <thread>
 #include <vector>
 
-namespace tpipeline {
+namespace tnn {
 
 /**
  * @brief Distributed pipeline coordinator for network-based stage deployment
@@ -29,7 +29,7 @@ namespace tpipeline {
  */
 class DistributedCoordinator : public Coordinator {
 public:
-  DistributedCoordinator(tnn::Sequential<float> model,
+  DistributedCoordinator(Sequential<float> model,
                          Endpoint coordinator_endpoint = Endpoint::network("localhost", 8000),
                          const std::vector<Endpoint> &endpoints = {})
       : Coordinator(std::move(model)) {
@@ -46,4 +46,4 @@ public:
   ~DistributedCoordinator() = default;
 };
 
-} // namespace tpipeline
+} // namespace tnn

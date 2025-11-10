@@ -24,11 +24,11 @@
 #include <thread>
 #include <vector>
 
-namespace tpipeline {
+namespace tnn {
 
 class Coordinator {
 public:
-  Coordinator(tnn::Sequential<float> model) : model_(std::move(model)) {}
+  Coordinator(Sequential<float> model) : model_(std::move(model)) {}
 
   virtual ~Coordinator() {
     if (message_thread_.joinable()) {
@@ -49,7 +49,7 @@ public:
     partitioner_ = std::move(partitioner);
   }
 
-  void set_loss_function(std::unique_ptr<tnn::Loss<float>> loss) {
+  void set_loss_function(std::unique_ptr<Loss<float>> loss) {
     if (!loss) {
       throw std::invalid_argument("Loss function cannot be null");
     }
@@ -179,7 +179,7 @@ public:
     }
   }
 
-  bool send_params(const std::string &stage_id, const tnn::Partition &partition) {
+  bool send_params(const std::string &stage_id, const Partition &partition) {
     try {
       throw new std::runtime_error("Not implemented yet");
     } catch (const std::exception &e) {
@@ -195,8 +195,8 @@ public:
    * @param new_partitions The new partition configuration
    * @return true if all necessary parameters were sent successfully, false otherwise
    */
-  bool send_updated_parameters(const std::vector<tnn::Partition> &old_partitions,
-                               const std::vector<tnn::Partition> &new_partitions) {
+  bool send_updated_parameters(const std::vector<Partition> &old_partitions,
+                               const std::vector<Partition> &new_partitions) {
     if (old_partitions.size() != new_partitions.size() ||
         new_partitions.size() != stage_names_.size()) {
       std::cerr << "Partition size mismatch in send_updated_parameters\n";
@@ -568,9 +568,9 @@ protected:
   bool should_stop_ = true;
 
   // Components of the coordinator
-  tnn::Sequential<float> model_;
+  Sequential<float> model_;
   std::unique_ptr<Communicator> coordinator_comm_;
-  std::unique_ptr<tnn::Loss<float>> loss_function_;
+  std::unique_ptr<Loss<float>> loss_function_;
   std::unique_ptr<partitioner::Partitioner<float>> partitioner_;
   Endpoint coordinator_endpoint_;
 
@@ -578,7 +578,7 @@ protected:
 
   // Topology information
   std::vector<std::string> stage_names_;
-  std::vector<tnn::Partition> partitions_;
+  std::vector<Partition> partitions_;
   std::vector<Endpoint> remote_endpoints_;
   std::vector<StageConfig> stage_configs_;
   std::thread message_thread_;
@@ -588,4 +588,4 @@ protected:
   mutable std::condition_variable message_notification_cv_;
 };
 
-} // namespace tpipeline
+} // namespace tnn

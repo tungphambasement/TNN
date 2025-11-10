@@ -24,11 +24,11 @@
 #include <queue>
 #include <string>
 
-namespace tpipeline {
+namespace tnn {
 
 class PipelineStage {
 public:
-  explicit PipelineStage(std::unique_ptr<tnn::Sequential<float>> model,
+  explicit PipelineStage(std::unique_ptr<Sequential<float>> model,
                          std::unique_ptr<Communicator> communicator, const std::string &name = "")
       : model_(std::move(model)), communicator_(std::move(communicator)), name_(name),
         should_stop_(true) {}
@@ -92,7 +92,7 @@ public:
   std::string name() const { return name_; }
 
 protected:
-  virtual void process_message(const tpipeline::Message &message) {
+  virtual void process_message(const Message &message) {
     switch (message.header.command_type) {
     case CommandType::FORWARD_TASK: {
       const Task<float> forward_task = message.get<Task<float>>();
@@ -248,8 +248,8 @@ protected:
 
       stage_id_ = config.stage_id;
       std::cout << "Received configuration for stage " << stage_id_ << '\n';
-      this->model_ = std::make_unique<tnn::Sequential<float>>(
-          tnn::Sequential<float>::load_from_config(config.model_config));
+      this->model_ = std::make_unique<Sequential<float>>(
+          Sequential<float>::load_from_config(config.model_config));
 
       this->model_->initialize();
 
@@ -282,7 +282,7 @@ protected:
     this->communicator_->connect("prev_stage", config.prev_stage_endpoint);
   }
 
-  std::unique_ptr<tnn::Sequential<float>> model_;
+  std::unique_ptr<Sequential<float>> model_;
   std::shared_ptr<Communicator> communicator_;
   std::string name_;
   std::atomic<bool> should_stop_;
@@ -299,4 +299,4 @@ protected:
   std::thread monitoring_thread_;
 };
 
-} // namespace tpipeline
+} // namespace tnn

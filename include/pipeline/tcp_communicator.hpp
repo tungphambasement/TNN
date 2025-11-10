@@ -24,7 +24,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace tpipeline {
+namespace tnn {
 
 // Lock-free buffer pool using thread-local storage
 class BufferPool {
@@ -472,4 +472,4 @@ private:
         });
   }
 };
-} // namespace tpipeline
+} // namespace tnn
