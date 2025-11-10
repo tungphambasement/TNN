@@ -17,16 +17,16 @@ template <typename T>
 void compute_dense_forward(const T *input_data, const T *weight_data, T *output_data,
                            const size_t batch_size, const size_t input_features,
                            const size_t output_features) {
-  tmath::cpu::gemm<T>(input_data, weight_data, output_data, batch_size, output_features,
-                      input_features, false, true);
+  cpu::gemm<T>(input_data, weight_data, output_data, batch_size, output_features, input_features,
+               false, true);
 }
 
 template <typename T>
 void compute_weight_gradients(const T *input_data, const T *gradient_data, T *weight_grad_data,
                               const size_t batch_size, const size_t input_features,
                               const size_t output_features) {
-  tmath::cpu::gemm<T>(gradient_data, input_data, weight_grad_data, output_features, input_features,
-                      batch_size, true, false);
+  cpu::gemm<T>(gradient_data, input_data, weight_grad_data, output_features, input_features,
+               batch_size, true, false);
 }
 
 template <typename T>
@@ -34,14 +34,14 @@ void compute_input_gradients(const T *gradient_data, const T *weight_data, T *gr
                              const size_t batch_size, const size_t input_features,
                              const size_t output_features) {
   std::fill_n(grad_input_data, batch_size * input_features, T(0));
-  tmath::cpu::gemm<T>(gradient_data, weight_data, grad_input_data, batch_size, input_features,
-                      output_features, false, false);
+  cpu::gemm<T>(gradient_data, weight_data, grad_input_data, batch_size, input_features,
+               output_features, false, false);
 }
 
 template <typename T>
 void compute_bias_gradients(const T *current_grad_data, T *bias_gradient_data,
                             const size_t batch_size, const size_t output_features) {
-  tthreads::parallel_for<size_t>(0, output_features, [&](size_t out_f) {
+  parallel_for<size_t>(0, output_features, [&](size_t out_f) {
     T grad_sum = T(0);
     for (size_t n = 0; n < batch_size; ++n) {
       grad_sum += current_grad_data[n * output_features + out_f];
@@ -53,7 +53,7 @@ void compute_bias_gradients(const T *current_grad_data, T *bias_gradient_data,
 template <typename T>
 void add_bias_vector(T *output_data, const T *bias_data, const size_t batch_size,
                      const size_t output_features) {
-  tthreads::parallel_for_2d(batch_size, output_features, [&](size_t n, size_t out_f) {
+  parallel_for_2d(batch_size, output_features, [&](size_t n, size_t out_f) {
     output_data[n * output_features + out_f] += bias_data[out_f];
   });
 }
@@ -101,73 +101,71 @@ template void add_bias_vector<double>(double *output_data, const double *bias_da
 
 // device_ptr implementations
 template <typename T>
-void compute_dense_forward(const tdevice::device_ptr<T[]> &input_data,
-                           const tdevice::device_ptr<T[]> &weight_data,
-                           tdevice::device_ptr<T[]> &output_data, const size_t batch_size,
+void compute_dense_forward(const device_ptr<T[]> &input_data, const device_ptr<T[]> &weight_data,
+                           device_ptr<T[]> &output_data, const size_t batch_size,
                            const size_t input_features, const size_t output_features) {
   compute_dense_forward(input_data.get(), weight_data.get(), output_data.get(), batch_size,
                         input_features, output_features);
 }
 
 template <typename T>
-void compute_weight_gradients(const tdevice::device_ptr<T[]> &input_data,
-                              const tdevice::device_ptr<T[]> &gradient_data,
-                              tdevice::device_ptr<T[]> &weight_grad_data, const size_t batch_size,
+void compute_weight_gradients(const device_ptr<T[]> &input_data,
+                              const device_ptr<T[]> &gradient_data,
+                              device_ptr<T[]> &weight_grad_data, const size_t batch_size,
                               const size_t input_features, const size_t output_features) {
   compute_weight_gradients(input_data.get(), gradient_data.get(), weight_grad_data.get(),
                            batch_size, input_features, output_features);
 }
 
 template <typename T>
-void compute_input_gradients(const tdevice::device_ptr<T[]> &gradient_data,
-                             const tdevice::device_ptr<T[]> &weight_data,
-                             tdevice::device_ptr<T[]> &grad_input_data, const size_t batch_size,
-                             const size_t input_features, const size_t output_features) {
+void compute_input_gradients(const device_ptr<T[]> &gradient_data,
+                             const device_ptr<T[]> &weight_data, device_ptr<T[]> &grad_input_data,
+                             const size_t batch_size, const size_t input_features,
+                             const size_t output_features) {
   compute_input_gradients(gradient_data.get(), weight_data.get(), grad_input_data.get(), batch_size,
                           input_features, output_features);
 }
 
 template <typename T>
-void compute_bias_gradients(const tdevice::device_ptr<T[]> &current_grad_data,
-                            const tdevice::device_ptr<T[]> &bias_gradient_data,
-                            const size_t batch_size, const size_t output_features) {
+void compute_bias_gradients(const device_ptr<T[]> &current_grad_data,
+                            const device_ptr<T[]> &bias_gradient_data, const size_t batch_size,
+                            const size_t output_features) {
   compute_bias_gradients(current_grad_data.get(), bias_gradient_data.get(), batch_size,
                          output_features);
 }
 
 template <typename T>
-void add_bias_vector(tdevice::device_ptr<T[]> &output_data,
-                     const tdevice::device_ptr<T[]> &bias_data, const size_t batch_size,
-                     const size_t output_features) {
+void add_bias_vector(device_ptr<T[]> &output_data, const device_ptr<T[]> &bias_data,
+                     const size_t batch_size, const size_t output_features) {
   add_bias_vector(output_data.get(), bias_data.get(), batch_size, output_features);
 }
 
 // device_ptr explicit template instantiations
-template void compute_dense_forward<float>(const tdevice::device_ptr<float[]> &input_data,
-                                           const tdevice::device_ptr<float[]> &weight_data,
-                                           tdevice::device_ptr<float[]> &output_data,
+template void compute_dense_forward<float>(const device_ptr<float[]> &input_data,
+                                           const device_ptr<float[]> &weight_data,
+                                           device_ptr<float[]> &output_data,
                                            const size_t batch_size, const size_t input_features,
                                            const size_t output_features);
 
-template void compute_weight_gradients<float>(const tdevice::device_ptr<float[]> &input_data,
-                                              const tdevice::device_ptr<float[]> &gradient_data,
-                                              tdevice::device_ptr<float[]> &weight_grad_data,
+template void compute_weight_gradients<float>(const device_ptr<float[]> &input_data,
+                                              const device_ptr<float[]> &gradient_data,
+                                              device_ptr<float[]> &weight_grad_data,
                                               const size_t batch_size, const size_t input_features,
                                               const size_t output_features);
 
-template void compute_input_gradients<float>(const tdevice::device_ptr<float[]> &gradient_data,
-                                             const tdevice::device_ptr<float[]> &weight_data,
-                                             tdevice::device_ptr<float[]> &grad_input_data,
+template void compute_input_gradients<float>(const device_ptr<float[]> &gradient_data,
+                                             const device_ptr<float[]> &weight_data,
+                                             device_ptr<float[]> &grad_input_data,
                                              const size_t batch_size, const size_t input_features,
                                              const size_t output_features);
 
-template void compute_bias_gradients<float>(const tdevice::device_ptr<float[]> &current_grad_data,
-                                            const tdevice::device_ptr<float[]> &bias_gradient_data,
+template void compute_bias_gradients<float>(const device_ptr<float[]> &current_grad_data,
+                                            const device_ptr<float[]> &bias_gradient_data,
                                             const size_t batch_size, const size_t output_features);
 
-template void add_bias_vector<float>(tdevice::device_ptr<float[]> &output_data,
-                                     const tdevice::device_ptr<float[]> &bias_data,
-                                     const size_t batch_size, const size_t output_features);
+template void add_bias_vector<float>(device_ptr<float[]> &output_data,
+                                     const device_ptr<float[]> &bias_data, const size_t batch_size,
+                                     const size_t output_features);
 
 } // namespace cpu
 } // namespace tnn

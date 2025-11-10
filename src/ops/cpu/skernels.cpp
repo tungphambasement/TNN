@@ -10,6 +10,7 @@
 #include <immintrin.h>
 #endif
 
+namespace tnn {
 namespace ops {
 namespace cpu {
 namespace fp {
@@ -290,7 +291,7 @@ inline void avx2_unaligned_set_scalar(float *c, float scalar, size_t size) {
   __m256 vec_scalar = _mm256_set1_ps(scalar);
   size_t vec_size = (size / 8) * 8;
 
-  tthreads::parallel_for<size_t>(0, vec_size / 8, [&](size_t block) {
+  parallel_for<size_t>(0, vec_size / 8, [&](size_t block) {
     size_t i = block * 8;
     _mm256_storeu_ps(&c[i], vec_scalar);
   });
@@ -303,7 +304,7 @@ inline void avx2_unaligned_set_scalar(float *c, float scalar, size_t size) {
 inline void avx2_aligned_set_scalar(float *c, float scalar, size_t size) {
   __m256 vec_scalar = _mm256_set1_ps(scalar);
   size_t vec_size = (size / 8) * 8;
-  tthreads::parallel_for<size_t>(0, (size / 8), [&](size_t block) {
+  parallel_for<size_t>(0, (size / 8), [&](size_t block) {
     size_t i = block * 8;
     _mm256_store_ps(&c[i], vec_scalar);
   });
@@ -581,7 +582,7 @@ inline void avx2_aligned_greater(const float *a, const float *b, float *c, size_
 inline void avx2_unaligned_copy(const float *a, float *c, size_t size) {
   size_t vec_size = (size / 8) * 8;
 
-  tthreads::parallel_for<size_t>(0, vec_size / 8, [&](size_t block) {
+  parallel_for<size_t>(0, vec_size / 8, [&](size_t block) {
     size_t i = block * 8;
     __m256 vec_a = _mm256_loadu_ps(&a[i]);
     _mm256_storeu_ps(&c[i], vec_a);
@@ -595,7 +596,7 @@ inline void avx2_unaligned_copy(const float *a, float *c, size_t size) {
 inline void avx2_aligned_copy(const float *a, float *c, size_t size) {
   size_t vec_size = (size / 8) * 8;
 
-  tthreads::parallel_for<size_t>(0, vec_size / 8, [&](size_t block) {
+  parallel_for<size_t>(0, vec_size / 8, [&](size_t block) {
     size_t i = block * 8;
     __m256 vec_a = _mm256_load_ps(&a[i]);
     _mm256_store_ps(&c[i], vec_a);
@@ -1288,3 +1289,4 @@ void fill_random_normal(float *data, size_t size, float mean, float stddev,
 } // namespace fp
 } // namespace cpu
 } // namespace ops
+} // namespace tnn

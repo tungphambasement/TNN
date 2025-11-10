@@ -20,11 +20,12 @@
 #include <malloc.h>
 #endif
 
+namespace tnn {
 template <typename T = float> struct Matrix {
 private:
   size_t rows_, cols_;
-  tdevice::device_ptr<T[]> data_;
-  const tdevice::Device *device_;
+  const Device *device_;
+  device_ptr<T[]> data_;
 
   static constexpr size_t MKL_ALIGNMENT = 64;
   static constexpr size_t AVX2_ALIGNMENT = 32;
@@ -36,23 +37,25 @@ private:
     size_t bytes = count * sizeof(T);
     size_t aligned_size = ((bytes + MKL_ALIGNMENT - 1) / MKL_ALIGNMENT) * MKL_ALIGNMENT;
 
-    data_ = tdevice::make_array_ptr<T[]>(device_, aligned_size / sizeof(T));
+    data_ = make_array_ptr<T[]>(device_, aligned_size / sizeof(T));
   }
 
 public:
-  Matrix(const tdevice::Device *device) : rows_(0), cols_(0), data_(nullptr), device_(device) {}
+  Matrix(const Device *device) : rows_(0), cols_(0), device_(device), data_(nullptr) {}
 
-  Matrix(size_t rows_, size_t cols_, const tdevice::device_ptr<T[]> &initialdata_ = nullptr)
-      : rows_(rows_), cols_(cols_), device_(device_) {
+  Matrix(size_t rows, size_t cols, const device_ptr<T[]> &data = nullptr,
+         const Device *device = &getCPU())
+      : rows_(rows), cols_(cols), device_(device) {
     allocate_aligned(rows_ * cols_);
-    if (initialdata_.get() != nullptr) {
-      ops::copy(initialdata_, data_, rows_ * cols_);
+    if (data.get() != nullptr) {
+      ops::copy(data, data_, rows_ * cols_);
     }
   }
 
   Matrix(const Matrix<T> &other) {
     this->rows_ = other.rows_;
     this->cols_ = other.cols_;
+    this->device_ = other.device_;
     allocate_aligned(rows_ * cols_);
     ops::copy(other.data_, data_, rows_ * cols_);
   }
@@ -212,3 +215,4 @@ public:
                             static_cast<unsigned long long>(std::random_device{}()));
   }
 };
+} // namespace tnn

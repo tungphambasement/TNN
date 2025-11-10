@@ -15,8 +15,6 @@
 #include <vector>
 
 using namespace tnn;
-using namespace tpipeline;
-using namespace ::utils;
 
 namespace mnist_constants {
 constexpr float LR_INITIAL = 0.01f;
@@ -28,7 +26,7 @@ constexpr size_t PROGRESS_PRINT_INTERVAL = 100;
 } // namespace mnist_constants
 
 Sequential<float> create_demo_model() {
-  auto model = tnn::SequentialBuilder<float>("optimized_mnist_cnn_classifier")
+  auto model = SequentialBuilder<float>("optimized_mnist_cnn_classifier")
                    .input({1, 28, 28})
                    .conv2d(16, 3, 3, 1, 1, 0, 0, true, "conv1")
                    .activation("relu", "relu1")
@@ -41,11 +39,10 @@ Sequential<float> create_demo_model() {
                    .activation("softmax", "softmax_output")
                    .build();
 
-  auto optimizer =
-      std::make_unique<tnn::Adam<float>>(mnist_constants::LR_INITIAL, 0.9f, 0.999f, 1e-8f);
+  auto optimizer = std::make_unique<Adam<float>>(mnist_constants::LR_INITIAL, 0.9f, 0.999f, 1e-8f);
   model.set_optimizer(std::move(optimizer));
 
-  auto loss_function = tnn::LossFactory<float>::create_crossentropy(mnist_constants::EPSILON);
+  auto loss_function = LossFactory<float>::create_crossentropy(mnist_constants::EPSILON);
   model.set_loss_function(std::move(loss_function));
   return model;
 }
@@ -87,7 +84,7 @@ int main() {
   std::cout << "\nCreating distributed coordinator..." << std::endl;
   DistributedCoordinator coordinator(std::move(model), coordinator_endpoint, endpoints);
 
-  coordinator.set_partitioner(std::make_unique<partitioner::NaivePartitioner<float>>());
+  coordinator.set_partitioner(std::make_unique<NaivePartitioner<float>>());
 
   std::cout << "\nDeploying stages to remote endpoints..." << std::endl;
   for (const auto &ep : endpoints) {
@@ -102,7 +99,7 @@ int main() {
   std::cout << "\nStarting distributed pipeline..." << std::endl;
   coordinator.start();
 
-  data_loading::MNISTDataLoader<float> train_loader, test_loader;
+  MNISTDataLoader<float> train_loader, test_loader;
 
   if (!train_loader.load_data("./data/mnist/train.csv")) {
     std::cerr << "Failed to load training data!" << std::endl;
@@ -116,7 +113,7 @@ int main() {
 
   Tensor<float> batch_data, batch_labels;
 
-  auto loss_function = tnn::LossFactory<float>::create("crossentropy");
+  auto loss_function = LossFactory<float>::create("crossentropy");
 
   size_t batch_index = 0;
 
@@ -164,26 +161,25 @@ int main() {
         std::chrono::duration_cast<std::chrono::microseconds>(forward_end - forward_start);
     auto compute_loss_start = std::chrono::high_resolution_clock::now();
 
-    std::vector<tpipeline::Message> all_messages =
-        coordinator.dequeue_all_messages(tpipeline::CommandType::FORWARD_TASK);
+    std::vector<Message> all_messages = coordinator.dequeue_all_messages(CommandType::FORWARD_TASK);
 
-    std::vector<tpipeline::Task<float>> forward_tasks;
+    std::vector<Task<float>> forward_tasks;
     for (const auto &message : all_messages) {
       if (message.header.command_type == CommandType::FORWARD_TASK) {
-        forward_tasks.push_back(message.get<tpipeline::Task<float>>());
+        forward_tasks.push_back(message.get<Task<float>>());
       }
     }
 
-    std::vector<tpipeline::Task<float>> backward_tasks;
+    std::vector<Task<float>> backward_tasks;
     for (auto &task : forward_tasks) {
       loss += loss_function->compute_loss(task.data, micro_batch_labels[task.micro_batch_id]);
       avg_accuracy +=
-          utils::compute_class_accuracy<float>(task.data, micro_batch_labels[task.micro_batch_id]);
+          compute_class_accuracy<float>(task.data, micro_batch_labels[task.micro_batch_id]);
 
       Tensor<float> gradient =
           loss_function->compute_gradient(task.data, micro_batch_labels[task.micro_batch_id]);
 
-      tpipeline::Task<float> backward_task{gradient, task.micro_batch_id};
+      Task<float> backward_task{gradient, task.micro_batch_id};
 
       backward_tasks.push_back(backward_task);
     }
@@ -203,7 +199,7 @@ int main() {
 
     coordinator.join(CommandType::BACKWARD_TASK, num_microbatches, 60);
 
-    coordinator.dequeue_all_messages(tpipeline::CommandType::BACKWARD_TASK);
+    coordinator.dequeue_all_messages(CommandType::BACKWARD_TASK);
 
     auto backward_end = std::chrono::high_resolution_clock::now();
     auto backward_duration =
@@ -258,8 +254,7 @@ int main() {
 
     coordinator.join(CommandType::FORWARD_TASK, num_microbatches, 60);
 
-    std::vector<tpipeline::Message> all_messages =
-        coordinator.dequeue_all_messages(tpipeline::CommandType::FORWARD_TASK);
+    std::vector<Message> all_messages = coordinator.dequeue_all_messages(CommandType::FORWARD_TASK);
 
     if (all_messages.size() != static_cast<size_t>(num_microbatches)) {
       throw std::runtime_error(
@@ -267,17 +262,17 @@ int main() {
           ", expected: " + std::to_string(num_microbatches));
     }
 
-    std::vector<tpipeline::Task<float>> forward_tasks;
+    std::vector<Task<float>> forward_tasks;
     for (const auto &message : all_messages) {
       if (message.header.command_type == CommandType::FORWARD_TASK) {
-        forward_tasks.push_back(message.get<tpipeline::Task<float>>());
+        forward_tasks.push_back(message.get<Task<float>>());
       }
     }
 
     for (auto &task : forward_tasks) {
       val_loss += loss_function->compute_loss(task.data, micro_batch_labels[task.micro_batch_id]);
       val_accuracy +=
-          utils::compute_class_accuracy<float>(task.data, micro_batch_labels[task.micro_batch_id]);
+          compute_class_accuracy<float>(task.data, micro_batch_labels[task.micro_batch_id]);
     }
     ++val_batches;
   }

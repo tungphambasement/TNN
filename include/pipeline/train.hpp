@@ -14,7 +14,7 @@
 namespace tnn {
 
 ClassResult train_semi_async_epoch(DistributedCoordinator &coordinator,
-                                   data_loading::BaseDataLoader<float> &train_loader,
+                                   BaseDataLoader<float> &train_loader,
                                    size_t progress_print_interval) {
   Tensor<float> batch_data, batch_labels;
 
@@ -66,7 +66,7 @@ ClassResult train_semi_async_epoch(DistributedCoordinator &coordinator,
 }
 
 ClassResult validate_semi_async_epoch(DistributedCoordinator &coordinator,
-                                      data_loading::BaseDataLoader<float> &test_loader) {
+                                      BaseDataLoader<float> &test_loader) {
   Tensor<float> batch_data, batch_labels;
 
   float total_val_loss = 0.0f;
@@ -105,8 +105,8 @@ ClassResult validate_semi_async_epoch(DistributedCoordinator &coordinator,
 
     for (auto &task : forward_tasks) {
       val_loss += coordinator.compute_loss(task.data, micro_batch_labels[task.micro_batch_id]);
-      val_correct += ::utils::compute_class_corrects<float>(
-          task.data, micro_batch_labels[task.micro_batch_id]);
+      val_correct +=
+          compute_class_corrects<float>(task.data, micro_batch_labels[task.micro_batch_id]);
     }
     total_val_loss += val_loss;
     total_val_correct += val_correct;
@@ -121,10 +121,8 @@ ClassResult validate_semi_async_epoch(DistributedCoordinator &coordinator,
           static_cast<float>((total_val_correct / test_loader.size()) * 100.0f)};
 }
 
-void train_model(DistributedCoordinator &coordinator,
-                 data_loading::BaseDataLoader<float> &train_loader,
-                 data_loading::BaseDataLoader<float> &test_loader,
-                 TrainingConfig config = TrainingConfig()) {
+void train_model(DistributedCoordinator &coordinator, BaseDataLoader<float> &train_loader,
+                 BaseDataLoader<float> &test_loader, TrainingConfig config = TrainingConfig()) {
   train_loader.prepare_batches(config.batch_size);
   test_loader.prepare_batches(config.batch_size);
 

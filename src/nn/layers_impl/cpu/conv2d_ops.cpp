@@ -20,12 +20,11 @@ void compute_conv_forward(const T *col_data, const T *weight_data, T *output_dat
                           const size_t output_size, const size_t kernel_size,
                           const size_t out_channels) {
 #ifdef USE_MKL
-  utils::mkl::conv_forward_gemm(
-      weight_data, col_data, output_data, static_cast<MKL_INT>(out_channels),
-      static_cast<MKL_INT>(kernel_size), static_cast<MKL_INT>(output_size));
+  mkl::conv_forward_gemm(weight_data, col_data, output_data, static_cast<MKL_INT>(out_channels),
+                         static_cast<MKL_INT>(kernel_size), static_cast<MKL_INT>(output_size));
 #else
   ops::cpu::set_scalar(output_data, T(0), out_channels * output_size);
-  tmath::gemm(weight_data, col_data, output_data, out_channels, output_size, kernel_size);
+  gemm(weight_data, col_data, output_data, out_channels, output_size, kernel_size);
 #endif
 }
 
@@ -34,12 +33,12 @@ void compute_weight_gradients(const T *col_data, const T *gradient_data, T *weig
                               const size_t output_size, const size_t kernel_size,
                               const size_t out_channels) {
 #ifdef USE_MKL
-  utils::mkl::conv_weight_grad_gemm(
-      gradient_data, col_data, weight_grad_data, static_cast<MKL_INT>(out_channels),
-      static_cast<MKL_INT>(kernel_size), static_cast<MKL_INT>(output_size));
+  mkl::conv_weight_grad_gemm(gradient_data, col_data, weight_grad_data,
+                             static_cast<MKL_INT>(out_channels), static_cast<MKL_INT>(kernel_size),
+                             static_cast<MKL_INT>(output_size));
 #else
-  tmath::gemm(gradient_data, col_data, weight_grad_data, out_channels, kernel_size, output_size,
-              false, true);
+  gemm(gradient_data, col_data, weight_grad_data, out_channels, kernel_size, output_size, false,
+       true);
 #endif
 }
 
@@ -48,13 +47,13 @@ void compute_input_gradients(const T *gradient_data, const T *weight_data, T *co
                              const size_t output_size, const size_t kernel_size,
                              const size_t out_channels) {
 #ifdef USE_MKL
-  utils::mkl::conv_input_grad_gemm(
-      weight_data, gradient_data, col_grad_data, static_cast<MKL_INT>(out_channels),
-      static_cast<MKL_INT>(kernel_size), static_cast<MKL_INT>(output_size));
+  mkl::conv_input_grad_gemm(weight_data, gradient_data, col_grad_data,
+                            static_cast<MKL_INT>(out_channels), static_cast<MKL_INT>(kernel_size),
+                            static_cast<MKL_INT>(output_size));
 #else
   ops::cpu::set_scalar(col_grad_data, T(0), kernel_size * output_size);
-  tmath::gemm(weight_data, gradient_data, col_grad_data, kernel_size, output_size, out_channels,
-              true, false);
+  gemm(weight_data, gradient_data, col_grad_data, kernel_size, output_size, out_channels, true,
+       false);
 #endif
 }
 
@@ -65,7 +64,7 @@ void compute_bias_gradients(const T *gradient_data, T *bias_grad_data, const siz
   const size_t N_stride = out_channels * output_h * output_w;
   const size_t C_stride = output_h * output_w;
 
-  tthreads::parallel_for<size_t>(0, out_channels, [&](size_t oc) {
+  parallel_for<size_t>(0, out_channels, [&](size_t oc) {
     T grad_sum = T(0);
     for (size_t n = 0; n < batch_size; ++n) {
       std::accumulate(gradient_data + n * N_stride + oc * C_stride,
@@ -78,7 +77,7 @@ void compute_bias_gradients(const T *gradient_data, T *bias_grad_data, const siz
 template <typename T>
 void add_bias_to_output(T *output_data, const T *bias_data, const size_t batch_size,
                         const size_t output_h, const size_t output_w, const size_t out_channels) {
-  tthreads::parallel_for_2d(batch_size, out_channels, [&](size_t n, size_t oc) {
+  parallel_for_2d(batch_size, out_channels, [&](size_t n, size_t oc) {
     ops::cpu::add_scalar(output_data + (n * out_channels + oc) * output_h * output_w, bias_data[oc],
                          output_data + (n * out_channels + oc) * output_h * output_w,
                          output_h * output_w);

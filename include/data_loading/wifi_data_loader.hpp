@@ -21,6 +21,8 @@
 #include <string_view>
 #include <vector>
 
+namespace tnn {
+
 class WiFiDataLoader {
 private:
   std::vector<std::vector<float>> features_;
@@ -458,3 +460,5 @@ public:
     }
   }
 };
+
+} // namespace tnn

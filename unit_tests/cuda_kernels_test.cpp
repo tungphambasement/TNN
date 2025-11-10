@@ -1,8 +1,10 @@
-#include "cuda/kernels.hpp"
+#include "ops/cuda/kernels.hpp"
 #include <algorithm>
 #include <cmath>
 #include <gtest/gtest.h>
 #include <vector>
+
+using namespace tnn;
 
 class CudaKernelsTest : public ::testing::Test {
 protected:

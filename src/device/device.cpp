@@ -3,7 +3,7 @@
 
 #include <stdexcept>
 
-namespace tdevice {
+namespace tnn {
 Device::Device(DeviceType type, int id, std::unique_ptr<Context> context)
     : type_(type), id_(id), context_(std::move(context)) {}
 
@@ -57,4 +57,4 @@ void Device::copyToDevice(void *dest, const void *src, size_t size) const {
 void Device::copyToHost(void *dest, const void *src, size_t size) const {
   context_->copyToHost(dest, src, size);
 }
-} // namespace tdevice
+} // namespace tnn

@@ -1,9 +1,9 @@
 #include "device/device_manager.hpp"
 #include "device/device_ptr.hpp"
+#include "ops/cpu/kernels.hpp"
 #include "ops/cuda/kernels.hpp"
 #include "threading/thread_handler.hpp"
 #include "threading/thread_wrapper.hpp"
-#include "utils/avx2.hpp"
 #include <chrono>
 #include <cstring>
 #include <iomanip>
@@ -13,8 +13,7 @@
 
 #include <cuda_runtime.h>
 
-using namespace tthreads;
-using namespace tdevice;
+using namespace tnn;
 
 template <typename Func> double timeFunction(Func &&func, const std::string &name) {
   auto start = std::chrono::high_resolution_clock::now();
@@ -32,10 +31,10 @@ void avx2_add_multithreaded(const float *a, const float *b, float *c, size_t siz
   size_t num_threads = tbb::this_task_arena::max_concurrency();
   size_t chunk_size = size / num_threads;
 
-  tthreads::parallel_for<size_t>(0, num_threads, [&](size_t i) {
+  parallel_for<size_t>(0, num_threads, [&](size_t i) {
     size_t start = i * chunk_size;
     size_t end = (i == num_threads - 1) ? size : (i + 1) * chunk_size;
-    utils::avx2_add(a + start, b + start, c + start, end - start);
+    ops::cpu::add(a + start, b + start, c + start, end - start);
   });
 }
 
@@ -43,10 +42,10 @@ void avx2_mul_multithreaded(const float *a, const float *b, float *c, size_t siz
   size_t num_threads = tbb::this_task_arena::max_concurrency();
   size_t chunk_size = size / num_threads;
 
-  tthreads::parallel_for<size_t>(0, num_threads, [&](size_t i) {
+  parallel_for<size_t>(0, num_threads, [&](size_t i) {
     size_t start = i * chunk_size;
     size_t end = (i == num_threads - 1) ? size : (i + 1) * chunk_size;
-    utils::avx2_mul(a + start, b + start, c + start, end - start);
+    ops::cpu::mul(a + start, b + start, c + start, end - start);
   });
 }
 
@@ -54,10 +53,10 @@ void avx2_add_scalar_multithreaded(const float *a, float scalar, float *c, size_
   size_t num_threads = tbb::this_task_arena::max_concurrency();
   size_t chunk_size = size / num_threads;
 
-  tthreads::parallel_for<size_t>(0, num_threads, [&](size_t i) {
+  parallel_for<size_t>(0, num_threads, [&](size_t i) {
     size_t start = i * chunk_size;
     size_t end = (i == num_threads - 1) ? size : (i + 1) * chunk_size;
-    utils::avx2_add_scalar(a + start, scalar, c + start, end - start);
+    ops::cpu::add_scalar(a + start, scalar, c + start, end - start);
   });
 }
 
@@ -65,10 +64,10 @@ void avx2_sqrt_multithreaded(const float *a, float *c, size_t size) {
   size_t num_threads = tbb::this_task_arena::max_concurrency();
   size_t chunk_size = size / num_threads;
 
-  tthreads::parallel_for<size_t>(0, num_threads, [&](size_t i) {
+  parallel_for<size_t>(0, num_threads, [&](size_t i) {
     size_t start = i * chunk_size;
     size_t end = (i == num_threads - 1) ? size : (i + 1) * chunk_size;
-    utils::avx2_sqrt(a + start, c + start, end - start);
+    ops::cpu::sqrt(a + start, c + start, end - start);
   });
 }
 
@@ -207,7 +206,7 @@ int main() {
     avx2SingleTime = timeFunction(
         [&]() {
           for (int i = 0; i < ITERATIONS; ++i) {
-            utils::avx2_add(cpu_a.get(), cpu_b.get(), cpu_c_avx2_single.get(), SIZE);
+            ops::cpu::add(cpu_a.get(), cpu_b.get(), cpu_c_avx2_single.get(), SIZE);
           }
         },
         "AVX2 Addition (single-threaded)");
@@ -216,7 +215,7 @@ int main() {
     timeFunction(
         [&]() {
           for (int i = 0; i < ITERATIONS; ++i) {
-            utils::avx2_mul(cpu_a.get(), cpu_b.get(), cpu_c_avx2_single.get(), SIZE);
+            ops::cpu::mul(cpu_a.get(), cpu_b.get(), cpu_c_avx2_single.get(), SIZE);
           }
         },
         "AVX2 Multiplication (single-threaded)");
@@ -224,7 +223,7 @@ int main() {
     timeFunction(
         [&]() {
           for (int i = 0; i < ITERATIONS; ++i) {
-            utils::avx2_add_scalar(cpu_a.get(), 3.14f, cpu_c_avx2_single.get(), SIZE);
+            ops::cpu::add_scalar(cpu_a.get(), 3.14f, cpu_c_avx2_single.get(), SIZE);
           }
         },
         "AVX2 Add Scalar (single-threaded)");
@@ -232,7 +231,7 @@ int main() {
     timeFunction(
         [&]() {
           for (int i = 0; i < ITERATIONS; ++i) {
-            utils::avx2_sqrt(cpu_a.get(), cpu_c_avx2_single.get(), SIZE);
+            ops::cpu::sqrt(cpu_a.get(), cpu_c_avx2_single.get(), SIZE);
           }
         },
         "AVX2 Square Root (single-threaded)");

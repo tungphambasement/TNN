@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstddef> // For size_t
 
+namespace tnn {
 namespace ops {
 namespace cpu {
 namespace dp {
@@ -128,3 +129,4 @@ void fill_random_normal(double *data, size_t size, double mean, double stddev,
 } // namespace dp
 } // namespace cpu
 } // namespace ops
+} // namespace tnn

@@ -6,9 +6,8 @@
 #include <cstring>
 #include <memory>
 #include <string>
-#include <vector>
 
-namespace tdevice {
+namespace tnn {
 
 class Device {
 public:
@@ -41,4 +40,4 @@ private:
   std::unique_ptr<Context> context_;
 };
 
-} // namespace tdevice
+} // namespace tnn

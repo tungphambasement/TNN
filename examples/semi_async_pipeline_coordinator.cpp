@@ -22,11 +22,6 @@
 #include <vector>
 
 using namespace tnn;
-using namespace tpipeline;
-using namespace data_augmentation;
-using namespace data_loading;
-using namespace ::utils;
-using namespace tthreads;
 
 namespace semi_async_constants {
 constexpr float LR_INITIAL = 0.001f; // Careful, too big can cause exploding gradients
@@ -86,7 +81,7 @@ int main() {
   std::cout << "Creating distributed coordinator." << std::endl;
   DistributedCoordinator coordinator(std::move(model), coordinator_endpoint, endpoints);
 
-  coordinator.set_partitioner(std::make_unique<partitioner::NaivePartitioner<float>>());
+  coordinator.set_partitioner(std::make_unique<NaivePartitioner<float>>());
   coordinator.initialize();
 
   auto loss_function = LossFactory<float>::create_softmax_crossentropy();

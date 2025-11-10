@@ -4,7 +4,7 @@
 #include <cmath>
 #include <random>
 
-namespace data_augmentation {
+namespace tnn {
 
 /**
  * Rotation augmentation
@@ -94,4 +94,4 @@ private:
   }
 };
 
-} // namespace data_augmentation
+} // namespace tnn

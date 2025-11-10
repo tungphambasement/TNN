@@ -31,7 +31,7 @@ constexpr float NORMALIZATION_FACTOR = 255.0f;
 constexpr size_t RECORD_SIZE = 1 + 1 + IMAGE_SIZE;
 } // namespace cifar100_constants
 
-namespace data_loading {
+namespace tnn {
 
 /**
  * Enhanced CIFAR-100 data loader for binary format adapted for CNN (2D RGB
@@ -89,7 +89,7 @@ private:
                                                   "vehicles_1",
                                                   "vehicles_2"};
 
-  std::unique_ptr<data_augmentation::AugmentationStrategy<T>> augmentation_strategy_;
+  std::unique_ptr<AugmentationStrategy<T>> augmentation_strategy_;
 
 public:
   CIFAR100DataLoader(bool use_coarse_labels = false)
@@ -458,16 +458,15 @@ public:
   /**
    * Set augmentation strategy to apply during batch preparation and retrieval
    */
-  void
-  set_augmentation_strategy(std::unique_ptr<data_augmentation::AugmentationStrategy<T>> strategy) {
+  void set_augmentation_strategy(std::unique_ptr<AugmentationStrategy<T>> strategy) {
     augmentation_strategy_ = std::move(strategy);
   }
 
   /**
    * Set augmentation strategy using a copy
    */
-  void set_augmentation_strategy(const data_augmentation::AugmentationStrategy<T> &strategy) {
-    augmentation_strategy_ = std::make_unique<data_augmentation::AugmentationStrategy<T>>();
+  void set_augmentation_strategy(const AugmentationStrategy<T> &strategy) {
+    augmentation_strategy_ = std::make_unique<AugmentationStrategy<T>>();
     for (const auto &aug : strategy.get_augmentations()) {
       augmentation_strategy_->add_augmentation(aug->clone());
     }
@@ -539,4 +538,4 @@ public:
 using CIFAR100DataLoaderFloat = CIFAR100DataLoader<float>;
 using CIFAR100DataLoaderDouble = CIFAR100DataLoader<double>;
 
-} // namespace data_loading
+} // namespace tnn

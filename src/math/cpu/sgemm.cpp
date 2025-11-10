@@ -3,7 +3,7 @@
 
 #include <cstring>
 
-namespace tmath {
+namespace tnn {
 namespace cpu {
 constexpr size_t DEFAULT_BLOCK_SIZE = 32;
 
@@ -474,19 +474,18 @@ inline void sgemm_kernel_avx2_tn_aligned(const float *A, const float *B, float *
 
 void transpose_matrix(const float *src, float *dst, const size_t rows, const size_t cols) {
   constexpr size_t block_size = 64;
-  tthreads::parallel_for_2d((rows + block_size - 1) / block_size,
-                            (cols + block_size - 1) / block_size,
-                            [&](size_t i_block, size_t j_block) {
-                              const size_t start_row = i_block * block_size;
-                              const size_t start_col = j_block * block_size;
-                              const size_t end_row = std::min(start_row + block_size, rows);
-                              const size_t end_col = std::min(start_col + block_size, cols);
-                              for (size_t i = start_row; i < end_row; ++i) {
-                                for (size_t j = start_col; j < end_col; ++j) {
-                                  dst[j * rows + i] = src[i * cols + j];
-                                }
-                              }
-                            });
+  parallel_for_2d((rows + block_size - 1) / block_size, (cols + block_size - 1) / block_size,
+                  [&](size_t i_block, size_t j_block) {
+                    const size_t start_row = i_block * block_size;
+                    const size_t start_col = j_block * block_size;
+                    const size_t end_row = std::min(start_row + block_size, rows);
+                    const size_t end_col = std::min(start_col + block_size, cols);
+                    for (size_t i = start_row; i < end_row; ++i) {
+                      for (size_t j = start_col; j < end_col; ++j) {
+                        dst[j * rows + i] = src[i * cols + j];
+                      }
+                    }
+                  });
 }
 
 void sgemm(const float *A, const float *B, float *C, const size_t M, const size_t N, const size_t K,
@@ -504,7 +503,7 @@ void sgemm(const float *A, const float *B, float *C, const size_t M, const size_
     size_t N_blocks = (N + N_BLOCK_SIZE - 1) / N_BLOCK_SIZE;
 
     if (all_aligned) {
-      tthreads::parallel_for_2d(
+      parallel_for_2d(
           M_blocks, N_blocks,
           [&](size_t block_i, size_t block_j) {
             size_t i = block_i * M_BLOCK_SIZE;
@@ -516,9 +515,9 @@ void sgemm(const float *A, const float *B, float *C, const size_t M, const size_
               sgemm_kernel_avx2_nn_aligned(A, B, C, M, N, K, i, j, k, i_max, j_max, k_max);
             }
           },
-          tthreads::SchedulePolicy::Auto);
+          SchedulePolicy::Auto);
     } else {
-      tthreads::parallel_for_2d(
+      parallel_for_2d(
           M_blocks, N_blocks,
           [&](size_t block_i, size_t block_j) {
             size_t i = block_i * M_BLOCK_SIZE;
@@ -530,7 +529,7 @@ void sgemm(const float *A, const float *B, float *C, const size_t M, const size_
               sgemm_kernel_avx2_nn(A, B, C, M, N, K, i, j, k, i_max, j_max, k_max);
             }
           },
-          tthreads::SchedulePolicy::Auto);
+          SchedulePolicy::Auto);
     }
   } else if (!trans_A && trans_B) {
     M_BLOCK_SIZE = DEFAULT_BLOCK_SIZE / 2;
@@ -541,7 +540,7 @@ void sgemm(const float *A, const float *B, float *C, const size_t M, const size_
     size_t N_blocks = (N + N_BLOCK_SIZE - 1) / N_BLOCK_SIZE;
 
     if (all_aligned) {
-      tthreads::parallel_for_2d(
+      parallel_for_2d(
           M_blocks, N_blocks,
           [&](size_t block_i, size_t block_j) {
             size_t i = block_i * M_BLOCK_SIZE;
@@ -553,9 +552,9 @@ void sgemm(const float *A, const float *B, float *C, const size_t M, const size_
               sgemm_kernel_avx2_nt_aligned(A, B, C, M, N, K, i, j, k, i_max, j_max, k_max);
             }
           },
-          tthreads::SchedulePolicy::Auto);
+          SchedulePolicy::Auto);
     } else {
-      tthreads::parallel_for_2d(
+      parallel_for_2d(
           M_blocks, N_blocks,
           [&](size_t block_i, size_t block_j) {
             size_t i = block_i * M_BLOCK_SIZE;
@@ -567,7 +566,7 @@ void sgemm(const float *A, const float *B, float *C, const size_t M, const size_
               sgemm_kernel_avx2_nt(A, B, C, M, N, K, i, j, k, i_max, j_max, k_max);
             }
           },
-          tthreads::SchedulePolicy::Auto);
+          SchedulePolicy::Auto);
     }
   } else if (trans_A && !trans_B) {
     M_BLOCK_SIZE = DEFAULT_BLOCK_SIZE;
@@ -577,7 +576,7 @@ void sgemm(const float *A, const float *B, float *C, const size_t M, const size_
     size_t N_blocks = (N + N_BLOCK_SIZE - 1) / N_BLOCK_SIZE;
 
     if (all_aligned) {
-      tthreads::parallel_for_2d(
+      parallel_for_2d(
           M_blocks, N_blocks,
           [&](size_t block_i, size_t block_j) {
             size_t i = block_i * M_BLOCK_SIZE;
@@ -589,9 +588,9 @@ void sgemm(const float *A, const float *B, float *C, const size_t M, const size_
               sgemm_kernel_avx2_tn_aligned(A, B, C, M, N, K, i, j, k, i_max, j_max, k_max);
             }
           },
-          tthreads::SchedulePolicy::Auto);
+          SchedulePolicy::Auto);
     } else {
-      tthreads::parallel_for_2d(
+      parallel_for_2d(
           M_blocks, N_blocks,
           [&](size_t block_i, size_t block_j) {
             size_t i = block_i * M_BLOCK_SIZE;
@@ -603,7 +602,7 @@ void sgemm(const float *A, const float *B, float *C, const size_t M, const size_
               sgemm_kernel_avx2_tn(A, B, C, M, N, K, i, j, k, i_max, j_max, k_max);
             }
           },
-          tthreads::SchedulePolicy::Auto);
+          SchedulePolicy::Auto);
     }
   } else {
 
@@ -638,4 +637,4 @@ void sgemm(const float *A, const float *B, float *C, const size_t M, const size_
 #endif
 }
 } // namespace cpu
-} // namespace tmath
+} // namespace tnn

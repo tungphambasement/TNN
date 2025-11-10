@@ -6,6 +6,7 @@
  */
 #include "nn/layers_impl/cuda/conv2d_ops.hpp"
 
+#include "cuda/error_handler.hpp"
 #include "math/cuda/gemm.hpp"
 
 #include <cublas_v2.h>
@@ -55,24 +56,28 @@ template <typename T>
 void compute_conv_forward(const T *col_data, const T *weight_data, T *output_data,
                           const size_t output_size, const size_t kernel_size,
                           const size_t out_channels) {
-  tmath::cuda::gemm<T>(weight_data, col_data, output_data, out_channels, output_size, kernel_size,
-                       T(0.0), false, false);
+  cuda::gemm<T>(weight_data, col_data, output_data, out_channels, output_size, kernel_size, T(0.0),
+                false, false);
+
+  cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
 }
 
 template <typename T>
 void compute_weight_gradients(const T *col_data, const T *gradient_data, T *weight_grad_data,
                               const size_t output_size, const size_t kernel_size,
                               const size_t out_channels) {
-  tmath::cuda::gemm<T>(gradient_data, col_data, weight_grad_data, out_channels, kernel_size,
-                       output_size, T(0.0), false, true);
+  cuda::gemm<T>(gradient_data, col_data, weight_grad_data, out_channels, kernel_size, output_size,
+                T(0.0), false, true);
+
+  cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
 }
 
 template <typename T>
 void compute_input_gradients(const T *gradient_data, const T *weight_data, T *col_grad_data,
                              const size_t output_size, const size_t kernel_size,
                              const size_t out_channels) {
-  tmath::cuda::gemm<T>(weight_data, gradient_data, col_grad_data, kernel_size, output_size,
-                       out_channels, T(1.0), true, false);
+  cuda::gemm<T>(weight_data, gradient_data, col_grad_data, kernel_size, output_size, out_channels,
+                T(1.0), true, false);
 }
 
 template <typename T>
@@ -84,6 +89,8 @@ void compute_bias_gradients(const T *gradient_data, T *bias_grad_data, const siz
 
   compute_bias_gradients_kernel<<<num_blocks, threads_per_block>>>(
       gradient_data, bias_grad_data, batch_size, output_h, output_w, out_channels);
+
+  cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
   cudaDeviceSynchronize();
 }
 
@@ -96,6 +103,8 @@ void add_bias_to_output(T *output_data, const T *bias_data, const size_t batch_s
 
   add_bias_kernel<<<num_blocks, threads_per_block>>>(output_data, bias_data, batch_size, output_h,
                                                      output_w, out_channels);
+
+  cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
   cudaDeviceSynchronize();
 }
 

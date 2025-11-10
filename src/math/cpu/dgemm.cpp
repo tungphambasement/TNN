@@ -2,7 +2,7 @@
 #include "threading/thread_handler.hpp"
 #include <cstring>
 
-namespace tmath {
+namespace tnn {
 namespace cpu {
 
 constexpr size_t DEFAULT_BLOCK_SIZE = 32;
@@ -484,7 +484,7 @@ void dgemm(const double *A, const double *B, double *C, const size_t M, const si
     size_t N_blocks = (N + N_BLOCK_SIZE - 1) / N_BLOCK_SIZE;
 
     if (all_aligned) {
-      tthreads::parallel_for_2d(M_blocks, N_blocks, [&](size_t block_i, size_t block_j) {
+      parallel_for_2d(M_blocks, N_blocks, [&](size_t block_i, size_t block_j) {
         size_t i_start = block_i * M_BLOCK_SIZE;
         size_t j_start = block_j * N_BLOCK_SIZE;
         size_t i_end = std::min(i_start + M_BLOCK_SIZE, M);
@@ -495,7 +495,7 @@ void dgemm(const double *A, const double *B, double *C, const size_t M, const si
         }
       });
     } else {
-      tthreads::parallel_for_2d(M_blocks, N_blocks, [&](size_t block_i, size_t block_j) {
+      parallel_for_2d(M_blocks, N_blocks, [&](size_t block_i, size_t block_j) {
         size_t i_start = block_i * M_BLOCK_SIZE;
         size_t j_start = block_j * N_BLOCK_SIZE;
         size_t i_end = std::min(i_start + M_BLOCK_SIZE, M);
@@ -515,7 +515,7 @@ void dgemm(const double *A, const double *B, double *C, const size_t M, const si
     size_t N_blocks = (N + N_BLOCK_SIZE - 1) / N_BLOCK_SIZE;
 
     if (all_aligned) {
-      tthreads::parallel_for_2d(M_blocks, N_blocks, [&](size_t block_i, size_t block_j) {
+      parallel_for_2d(M_blocks, N_blocks, [&](size_t block_i, size_t block_j) {
         size_t i_start = block_i * M_BLOCK_SIZE;
         size_t j_start = block_j * N_BLOCK_SIZE;
         size_t i_end = std::min(i_start + M_BLOCK_SIZE, M);
@@ -526,7 +526,7 @@ void dgemm(const double *A, const double *B, double *C, const size_t M, const si
         }
       });
     } else {
-      tthreads::parallel_for_2d(M_blocks, N_blocks, [&](size_t block_i, size_t block_j) {
+      parallel_for_2d(M_blocks, N_blocks, [&](size_t block_i, size_t block_j) {
         size_t i_start = block_i * M_BLOCK_SIZE;
         size_t j_start = block_j * N_BLOCK_SIZE;
         size_t i_end = std::min(i_start + M_BLOCK_SIZE, M);
@@ -546,7 +546,7 @@ void dgemm(const double *A, const double *B, double *C, const size_t M, const si
     size_t N_blocks = (N + N_BLOCK_SIZE - 1) / N_BLOCK_SIZE;
 
     if (all_aligned) {
-      tthreads::parallel_for_2d(M_blocks, N_blocks, [&](size_t block_i, size_t block_j) {
+      parallel_for_2d(M_blocks, N_blocks, [&](size_t block_i, size_t block_j) {
         size_t i_start = block_i * M_BLOCK_SIZE;
         size_t j_start = block_j * N_BLOCK_SIZE;
         size_t i_end = std::min(i_start + M_BLOCK_SIZE, M);
@@ -557,7 +557,7 @@ void dgemm(const double *A, const double *B, double *C, const size_t M, const si
         }
       });
     } else {
-      tthreads::parallel_for_2d(M_blocks, N_blocks, [&](size_t block_i, size_t block_j) {
+      parallel_for_2d(M_blocks, N_blocks, [&](size_t block_i, size_t block_j) {
         size_t i_start = block_i * M_BLOCK_SIZE;
         size_t j_start = block_j * N_BLOCK_SIZE;
         size_t i_end = std::min(i_start + M_BLOCK_SIZE, M);
@@ -608,4 +608,4 @@ void dgemm(const double *A, const double *B, double *C, const size_t M, const si
 }
 
 } // namespace cpu
-} // namespace tmath
+} // namespace tnn

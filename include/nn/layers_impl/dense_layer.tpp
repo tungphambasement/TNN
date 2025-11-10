@@ -137,47 +137,46 @@ Tensor<T> DenseLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch_
 }
 
 template <typename T>
-void DenseLayer<T>::compute_dense_forward(const tdevice::device_ptr<T[]> &input_data,
-                                          const tdevice::device_ptr<T[]> &weight_data,
-                                          tdevice::device_ptr<T[]> &output_data,
-                                          const size_t batch_size, const size_t input_features,
+void DenseLayer<T>::compute_dense_forward(const device_ptr<T[]> &input_data,
+                                          const device_ptr<T[]> &weight_data,
+                                          device_ptr<T[]> &output_data, const size_t batch_size,
+                                          const size_t input_features,
                                           const size_t output_features) const {
-  tmath::gemm<T>(input_data, weight_data, output_data, batch_size, output_features, input_features,
-                 false, true);
+  gemm<T>(input_data, weight_data, output_data, batch_size, output_features, input_features, false,
+          true);
 }
 
 template <typename T>
-void DenseLayer<T>::compute_weight_gradients(const tdevice::device_ptr<T[]> &input_data,
-                                             const tdevice::device_ptr<T[]> &gradient_data,
-                                             tdevice::device_ptr<T[]> &weight_grad_data,
+void DenseLayer<T>::compute_weight_gradients(const device_ptr<T[]> &input_data,
+                                             const device_ptr<T[]> &gradient_data,
+                                             device_ptr<T[]> &weight_grad_data,
                                              const size_t batch_size, const size_t input_features,
                                              const size_t output_features) const {
-  tmath::gemm<T>(gradient_data, input_data, weight_grad_data, output_features, input_features,
-                 batch_size, true, false);
+  gemm<T>(gradient_data, input_data, weight_grad_data, output_features, input_features, batch_size,
+          true, false);
 }
 
 template <typename T>
-void DenseLayer<T>::compute_input_gradients(const tdevice::device_ptr<T[]> &gradient_data,
-                                            const tdevice::device_ptr<T[]> &weight_data,
-                                            tdevice::device_ptr<T[]> &grad_input_data,
-                                            size_t batch_size, size_t input_features,
-                                            size_t output_features) const {
+void DenseLayer<T>::compute_input_gradients(const device_ptr<T[]> &gradient_data,
+                                            const device_ptr<T[]> &weight_data,
+                                            device_ptr<T[]> &grad_input_data, size_t batch_size,
+                                            size_t input_features, size_t output_features) const {
   ops::set_scalar(grad_input_data, T(0), batch_size * input_features);
-  tmath::gemm<T>(gradient_data, weight_data, grad_input_data, batch_size, input_features,
-                 output_features, false, false);
+  gemm<T>(gradient_data, weight_data, grad_input_data, batch_size, input_features, output_features,
+          false, false);
 }
 
 template <typename T>
-void DenseLayer<T>::compute_bias_gradients(const tdevice::device_ptr<T[]> &current_grad_data,
-                                           const tdevice::device_ptr<T[]> &bias_gradient_data,
+void DenseLayer<T>::compute_bias_gradients(const device_ptr<T[]> &current_grad_data,
+                                           const device_ptr<T[]> &bias_gradient_data,
                                            size_t batch_size, size_t output_features) const {
   if (current_grad_data.getDeviceType() != bias_gradient_data.getDeviceType()) {
     throw std::runtime_error("Device type mismatch in compute_bias_gradients");
   }
-  if (current_grad_data.getDeviceType() == tdevice::DeviceType::CPU) {
+  if (current_grad_data.getDeviceType() == DeviceType::CPU) {
     cpu::compute_bias_gradients<T>(current_grad_data.get(), bias_gradient_data.get(), batch_size,
                                    output_features);
-  } else if (current_grad_data.getDeviceType() == tdevice::DeviceType::GPU) {
+  } else if (current_grad_data.getDeviceType() == DeviceType::GPU) {
     throw new std::runtime_error("GPU compute_bias_gradients not implemented yet");
   } else {
     throw std::runtime_error("Unsupported device type in compute_bias_gradients");
@@ -185,15 +184,14 @@ void DenseLayer<T>::compute_bias_gradients(const tdevice::device_ptr<T[]> &curre
 }
 
 template <typename T>
-void DenseLayer<T>::add_bias_vector(tdevice::device_ptr<T[]> &output_data,
-                                    const tdevice::device_ptr<T[]> &bias_data, size_t batch_size,
-                                    size_t output_features) const {
+void DenseLayer<T>::add_bias_vector(device_ptr<T[]> &output_data, const device_ptr<T[]> &bias_data,
+                                    size_t batch_size, size_t output_features) const {
   if (output_data.getDeviceType() != bias_data.getDeviceType()) {
     throw std::runtime_error("Device type mismatch in add_bias_vector");
   }
-  if (output_data.getDeviceType() == tdevice::DeviceType::CPU) {
+  if (output_data.getDeviceType() == DeviceType::CPU) {
     cpu::add_bias_vector<T>(output_data.get(), bias_data.get(), batch_size, output_features);
-  } else if (output_data.getDeviceType() == tdevice::DeviceType::GPU) {
+  } else if (output_data.getDeviceType() == DeviceType::GPU) {
     cuda::add_bias_vector<T>(output_data.get(), bias_data.get(), batch_size, output_features);
   } else {
     throw std::runtime_error("Unsupported device type in add_bias_vector");

@@ -21,7 +21,7 @@ template <typename T> void Softmax<T>::apply(Tensor<T> &tensor) const {
   size_t height = tensor.height();
   size_t width = tensor.width();
 
-  tthreads::parallel_for<size_t>(0, batch_size, [&](size_t n) {
+  parallel_for<size_t>(0, batch_size, [&](size_t n) {
     for (size_t h = 0; h < height; ++h) {
       for (size_t w = 0; w < width; ++w) {
         T max_val = tensor(n, 0, h, w);
@@ -64,7 +64,7 @@ void Softmax<T>::compute_gradient_inplace(const Tensor<T> &input,
   Tensor<T> softmax_values = input;
   apply(softmax_values);
 
-  tthreads::parallel_for<size_t>(0, batch_size, [&](size_t n) {
+  parallel_for<size_t>(0, batch_size, [&](size_t n) {
     for (size_t h = 0; h < height; ++h) {
       for (size_t w = 0; w < width; ++w) {
         T dot_product = T(0);
@@ -80,6 +80,12 @@ void Softmax<T>::compute_gradient_inplace(const Tensor<T> &input,
       }
     }
   });
+}
+
+template <typename T> std::string Softmax<T>::name() const { return "softmax"; }
+
+template <typename T> std::unique_ptr<ActivationFunction<T>> Softmax<T>::clone() const {
+  return std::make_unique<Softmax<T>>(*this);
 }
 
 // Explicit template instantiations

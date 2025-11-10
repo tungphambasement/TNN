@@ -6,22 +6,19 @@
  */
 #pragma once
 
+#include "cuda/error_handler.hpp"
+#include "device/device_ptr.hpp"
+#include "layout_trait.hpp"
 #include <cassert>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
-#include <iomanip>
-#include <memory>
 #include <numeric>
-#include <random>
 #include <sstream>
 #include <stdexcept>
 #include <type_traits>
 #include <vector>
-
-#include "device/device_ptr.hpp"
-#include "layout_trait.hpp"
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -39,6 +36,8 @@
 #include "ops/ops.hpp"
 #include "threading/thread_handler.hpp"
 
+namespace tnn {
+
 enum ALIGNMENT_TYPE { MKL = 64, AVX2 = 32, DEFAULT = 16 };
 
 /**
@@ -55,8 +54,8 @@ template <typename T = float, Layout L = NCHW> struct Tensor {
 
 private:
   LayoutTrait<L> layout_trait_;
-  const tdevice::Device *device_;
-  tdevice::device_ptr<T[]> data_;
+  const Device *device_;
+  device_ptr<T[]> data_;
   static constexpr size_t dims_ = LayoutTrait<L>::dims;
   size_t (&shape_)[LayoutTrait<L>::dims] = layout_trait_.shape;
   size_t (&strides_)[LayoutTrait<L>::dims] = layout_trait_.strides;
@@ -71,11 +70,11 @@ private:
     return index;
   }
 
-  void allocate_data(size_t size) { data_ = tdevice::make_array_ptr<T[]>(device_, size); }
+  void allocate_data(size_t size) { data_ = make_array_ptr<T[]>(device_, size); }
 
 public:
   // Constructors and Destructor
-  Tensor(const tdevice::Device *device = &tdevice::getCPU()) : device_(device), data_size_(0) {
+  Tensor(const Device *device = &getCPU()) : device_(device), data_size_(0) {
     for (size_t i = 0; i < dims_; ++i) {
       shape_[i] = 0;
       strides_[i] = 0;
@@ -83,8 +82,7 @@ public:
     allocate_data(0);
   }
 
-  Tensor(std::initializer_list<size_t> shape_list, const tdevice::Device *dt = &tdevice::getCPU())
-      : device_(dt) {
+  Tensor(std::initializer_list<size_t> shape_list, const Device *dt = &getCPU()) : device_(dt) {
     assert(shape_list.size() == dims_ && "Initializer list size must match tensor dimensions");
     std::copy(shape_list.begin(), shape_list.end(), shape_);
     layout_trait_.compute_strides();
@@ -93,8 +91,8 @@ public:
     ops::set_scalar(data_, T(0), data_size_);
   }
 
-  Tensor(std::initializer_list<size_t> shape_list, const tdevice::device_ptr<T[]> &data,
-         tdevice::Device *dt = &tdevice::getCPU())
+  Tensor(std::initializer_list<size_t> shape_list, const device_ptr<T[]> &data,
+         const Device *dt = &getCPU())
       : device_(dt) {
     assert(shape_list.size() == dims_ && "Initializer list size must match dimensions");
     std::copy(shape_list.begin(), shape_list.end(), shape_);
@@ -106,7 +104,7 @@ public:
     }
   }
 
-  Tensor(std::vector<size_t> shape, const tdevice::Device *dt = &tdevice::getCPU()) : device_(dt) {
+  Tensor(std::vector<size_t> shape, const Device *dt = &getCPU()) : device_(dt) {
     assert(shape.size() == dims_ && "Shape vector size must match tensor dimensions");
     std::copy(shape.begin(), shape.end(), shape_);
     layout_trait_.compute_strides();
@@ -115,8 +113,7 @@ public:
     ops::set_scalar(data_, T(0), data_size_);
   }
 
-  Tensor(std::vector<size_t> shape, const tdevice::device_ptr<T[]> &data,
-         const tdevice::Device *dt = &tdevice::getCPU())
+  Tensor(std::vector<size_t> shape, const device_ptr<T[]> &data, const Device *dt = &getCPU())
       : device_(dt) {
     assert(shape.size() == dims_ && "Shape vector size must match dimensions");
     std::copy(shape.begin(), shape.end(), shape_);
@@ -130,30 +127,30 @@ public:
 
   ~Tensor() { data_.reset(); }
 
-  Tensor(const Tensor &other) : device_(other.device_), data_size_(other.data_size_) {
-    layout_trait_ = other.layout_trait_;
+  Tensor(const Tensor &other)
+      : layout_trait_(other.layout_trait_), device_(other.device_), data_size_(other.data_size_) {
     if (data_size_ > 0) {
       allocate_data(data_size_);
       ops::copy(other.data_, data_, data_size_);
     }
   }
 
-  Tensor(Tensor &&other) noexcept
-      : device_(other.device_), data_(std::move(other.data_)), data_size_(other.data_size_) {
+  Tensor(Tensor &&other) noexcept : device_(other.device_), data_size_(other.data_size_) {
     layout_trait_ = other.layout_trait_;
-    other.data_size_ = 0;
+    data_ = std::move(other.data_);
+    cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
   }
 
   template <typename... Indices> T &operator()(Indices... indices) {
     static_assert(sizeof...(indices) == dims_, "Incorrect number of dimensions");
-    assert(device_->getDeviceType() == tdevice::DeviceType::CPU &&
+    assert(device_->getDeviceType() == DeviceType::CPU &&
            "Operator() is only available for CPU tensors");
     return data_.get()[compute_index(indices...)];
   }
 
   template <typename... Indices> const T &operator()(Indices... indices) const {
     static_assert(sizeof...(indices) == dims_, "Incorrect number of dimensions");
-    assert(device_->getDeviceType() == tdevice::DeviceType::CPU &&
+    assert(device_->getDeviceType() == DeviceType::CPU &&
            "Operator() is only available for CPU tensors");
     return data_.get()[compute_index(indices...)];
   }
@@ -346,43 +343,44 @@ public:
     return (reinterpret_cast<uintptr_t>(data_.get()) % alignment) == 0;
   }
 
-  tdevice::DeviceType device_type() const { return device_->getDeviceType(); }
+  DeviceType device_type() const { return device_->getDeviceType(); }
 
-  bool is_on_cpu() const { return device_->getDeviceType() == tdevice::DeviceType::CPU; }
+  bool is_on_cpu() const { return device_->getDeviceType() == DeviceType::CPU; }
 
-  bool is_on_gpu() const { return device_->getDeviceType() == tdevice::DeviceType::GPU; }
+  bool is_on_gpu() const { return device_->getDeviceType() == DeviceType::GPU; }
 
-  const tdevice::device_ptr<T[]> &data_ptr() const { return data_; }
+  const device_ptr<T[]> &data_ptr() const { return data_; }
 
-  tdevice::device_ptr<T[]> &data_ptr() { return data_; }
+  device_ptr<T[]> &data_ptr() { return data_; }
 
   Tensor<T, L> to_cpu() const {
-    if (device_type() == tdevice::DeviceType::CPU) {
+    if (device_type() == DeviceType::CPU) {
       return clone();
     }
 
-    if (device_type() == tdevice::DeviceType::GPU) {
+    if (device_type() == DeviceType::GPU) {
       std::vector<size_t> shape_vec(shape_, shape_ + dims_);
-      Tensor<T, L> cpu_tensor(shape_vec, &tdevice::getCPU());
+      Tensor<T, L> cpu_tensor(shape_vec, &getCPU());
       // Copy from GPU to CPU
       data_.getDevice()->copyToHost(cpu_tensor.data_.get(), data_.get(), data_size_ * sizeof(T));
+      cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
+
       return cpu_tensor;
     }
     throw std::runtime_error("Unsupported device type for to_cpu()");
   }
 
   Tensor<T, L> to_gpu(int gpu_id = 0) const {
-    if (device_type() == tdevice::DeviceType::GPU) {
+    if (device_type() == DeviceType::GPU) {
       return clone();
     }
 
-    if (device_type() == tdevice::DeviceType::CPU) {
+    if (device_type() == DeviceType::CPU) {
       std::vector<size_t> shape_vec(shape_, shape_ + dims_);
-      Tensor<T, L> gpu_tensor(shape_vec, &tdevice::getGPU(gpu_id));
+      Tensor<T, L> gpu_tensor(shape_vec, &getGPU(gpu_id));
 
       // Copy from CPU to GPU
-      tdevice::getGPU(gpu_id).copyToDevice(gpu_tensor.data_.get(), data_.get(),
-                                           data_size_ * sizeof(T));
+      getGPU(gpu_id).copyToDevice(gpu_tensor.data_.get(), data_.get(), data_size_ * sizeof(T));
       return gpu_tensor;
     }
 
@@ -455,7 +453,7 @@ public:
       throw std::runtime_error("File is not open for writing");
     }
 
-    if (device_type() != tdevice::DeviceType::CPU) {
+    if (device_type() != DeviceType::CPU) {
       throw std::runtime_error("Tensor must be on CPU to save to file");
     }
 
@@ -482,3 +480,5 @@ public:
     return tensor;
   }
 };
+
+} // namespace tnn

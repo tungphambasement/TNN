@@ -20,8 +20,7 @@ template <typename T> void Sigmoid<T>::apply(Tensor<T> &tensor) const {
   T *data = tensor.data();
   size_t size = tensor.size();
 
-  tthreads::parallel_for<size_t>(0, size,
-                                 [&](size_t i) { data[i] = T(1) / (T(1) + std::exp(-data[i])); });
+  parallel_for<size_t>(0, size, [&](size_t i) { data[i] = T(1) / (T(1) + std::exp(-data[i])); });
 }
 
 template <typename T>
@@ -36,7 +35,7 @@ void Sigmoid<T>::compute_gradient_inplace(const Tensor<T> &input,
   T *grad_data = upstream_gradient.data();
   size_t size = input.size();
 
-  tthreads::parallel_for<size_t>(0, size, [&](size_t i) {
+  parallel_for<size_t>(0, size, [&](size_t i) {
     T sigmoid_val = T(1) / (T(1) + std::exp(-input_data[i]));
     T local_grad = sigmoid_val * (T(1) - sigmoid_val);
     grad_data[i] *= local_grad;

@@ -101,16 +101,16 @@ Tensor<T> MaxPool2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_ba
 }
 
 template <typename T>
-void MaxPool2DLayer<T>::compute_max_pool_forward(const tdevice::device_ptr<T[]> &input_data,
-                                                 tdevice::device_ptr<T[]> &output_data,
-                                                 size_t batch_size, size_t channels, size_t input_h,
-                                                 size_t input_w, size_t output_h, size_t output_w,
+void MaxPool2DLayer<T>::compute_max_pool_forward(const device_ptr<T[]> &input_data,
+                                                 device_ptr<T[]> &output_data, size_t batch_size,
+                                                 size_t channels, size_t input_h, size_t input_w,
+                                                 size_t output_h, size_t output_w,
                                                  std::vector<size_t> &mask_indices) const {
   if (input_data.getDeviceType() != output_data.getDeviceType()) {
     throw std::runtime_error("Input and output tensors must be on the same device");
   }
 
-  if (input_data.getDeviceType() == tdevice::DeviceType::CPU) {
+  if (input_data.getDeviceType() == DeviceType::CPU) {
     cpu::compute_max_pool_forward(input_data.get(), output_data.get(), batch_size, channels,
                                   input_h, input_w, output_h, output_w, pool_h_, pool_w_, stride_h_,
                                   stride_w_, mask_indices);
@@ -122,8 +122,8 @@ void MaxPool2DLayer<T>::compute_max_pool_forward(const tdevice::device_ptr<T[]> 
 }
 
 template <typename T>
-void MaxPool2DLayer<T>::compute_max_pool_backward(const tdevice::device_ptr<T[]> &gradient_data,
-                                                  tdevice::device_ptr<T[]> &grad_input_data,
+void MaxPool2DLayer<T>::compute_max_pool_backward(const device_ptr<T[]> &gradient_data,
+                                                  device_ptr<T[]> &grad_input_data,
                                                   size_t batch_size, size_t channels,
                                                   size_t output_h, size_t output_w,
                                                   const std::vector<size_t> &mask_indices) const {
@@ -131,7 +131,7 @@ void MaxPool2DLayer<T>::compute_max_pool_backward(const tdevice::device_ptr<T[]>
     throw std::runtime_error("Gradient and input gradient tensors must be on the same device");
   }
 
-  if (gradient_data.getDeviceType() == tdevice::DeviceType::CPU) {
+  if (gradient_data.getDeviceType() == DeviceType::CPU) {
     cpu::compute_max_pool_backward(gradient_data.get(), grad_input_data.get(), batch_size, channels,
                                    output_h, output_w, mask_indices);
   } else {

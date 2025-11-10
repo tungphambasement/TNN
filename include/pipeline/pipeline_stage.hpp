@@ -293,7 +293,7 @@ protected:
   std::mutex message_available_mutex_;
   std::condition_variable message_available_cv_;
 
-  utils::HardwareInfo cpu_info_;
+  HardwareInfo cpu_info_;
   LoadTracker load_tracker_;
   uint32_t update_interval = 10000;
   std::thread monitoring_thread_;

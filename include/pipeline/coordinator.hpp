@@ -45,9 +45,7 @@ public:
     initialize_topology();
   }
 
-  void set_partitioner(std::unique_ptr<partitioner::Partitioner<float>> partitioner) {
-    partitioner_ = std::move(partitioner);
-  }
+  void set_partitioner(std::unique_ptr<Partitioner<float>> tnn) { partitioner_ = std::move(tnn); }
 
   void set_loss_function(std::unique_ptr<Loss<float>> loss) {
     if (!loss) {
@@ -571,7 +569,7 @@ protected:
   Sequential<float> model_;
   std::unique_ptr<Communicator> coordinator_comm_;
   std::unique_ptr<Loss<float>> loss_function_;
-  std::unique_ptr<partitioner::Partitioner<float>> partitioner_;
+  std::unique_ptr<Partitioner<float>> partitioner_;
   Endpoint coordinator_endpoint_;
 
   std::atomic<bool> is_deployed_;

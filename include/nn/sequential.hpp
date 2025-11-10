@@ -5,6 +5,10 @@
  * project root for the full license text.
  */
 #pragma once
+#include "cuda/error_handler.hpp"
+#include "layers.hpp"
+#include "loss.hpp"
+#include "optimizers.hpp"
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -17,10 +21,6 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-
-#include "layers.hpp"
-#include "loss.hpp"
-#include "optimizers.hpp"
 
 namespace tnn {
 struct Partition {
@@ -368,6 +368,7 @@ public:
 
           // current_output = layers_[i]->forward(current_output, micro_batch_id);
           layers_[i]->forward_inplace(current_output, micro_batch_id);
+          cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
 
           auto end_time = std::chrono::high_resolution_clock::now();
           auto duration =
@@ -388,8 +389,8 @@ public:
         }
 
       } catch (const std::exception &e) {
-        throw std::runtime_error("Error in layer " + std::to_string(i) + " (" + layers_[i]->type() +
-                                 "): " + e.what());
+        throw std::runtime_error("Error while forward in layer " + std::to_string(i) + " (" +
+                                 layers_[i]->name() + "): " + e.what());
       }
     }
 
@@ -827,7 +828,7 @@ public:
   }
 
   void clear_gradients() const {
-    tthreads::parallel_for<size_t>(0, layers_.size(), [&](size_t i) {
+    parallel_for<size_t>(0, layers_.size(), [&](size_t i) {
       if (layers_[i]->has_parameters()) {
         auto parameterized_layer = dynamic_cast<ParameterizedLayer<T> *>(layers_[i].get());
         if (parameterized_layer) {
@@ -989,7 +990,7 @@ public:
   /**
    * @brief Gets the config json from partition params
    */
-  nlohmann::json get_config(const tnn::Partition &partition) const {
+  nlohmann::json get_config(const Partition &partition) const {
     if (partition.start_layer >= layers_.size() || partition.end_layer > layers_.size() ||
         partition.start_layer >= partition.end_layer) {
       throw std::out_of_range("Partition indices out of range");
@@ -1225,8 +1226,8 @@ public:
     size_t input_features = get_feature_count();
 
     auto layer =
-        tnn::dense<T>(input_features, output_features, activation, use_bias,
-                      name.empty() ? "dense_" + std::to_string(model_.layer_size()) : name);
+        dense_layer<T>(input_features, output_features, activation, use_bias,
+                       name.empty() ? "dense_" + std::to_string(model_.layer_size()) : name);
     model_.add(std::move(layer));
     return *this;
   }
@@ -1244,7 +1245,7 @@ public:
 
     size_t in_channels = current_shape[1];
 
-    auto layer = tnn::conv2d<T>(
+    auto layer = conv2d_layer<T>(
         in_channels, out_channels, kernel_h, kernel_w, stride_h, stride_w, pad_h, pad_w, use_bias,
         name.empty() ? "conv2d_" + std::to_string(model_.layer_size()) : name);
     model_.add(std::move(layer));
@@ -1271,15 +1272,15 @@ public:
       num_features = current_shape[1];
     }
 
-    auto layer =
-        tnn::batchnorm<T>(num_features, epsilon, momentum, affine,
-                          name.empty() ? "batchnorm_" + std::to_string(model_.layer_size()) : name);
+    auto layer = batchnorm_layer<T>(
+        num_features, epsilon, momentum, affine,
+        name.empty() ? "batchnorm_" + std::to_string(model_.layer_size()) : name);
     model_.add(std::move(layer));
     return *this;
   }
 
   SequentialBuilder &activation(const std::string &activation_name, const std::string &name = "") {
-    auto layer = tnn::activation<T>(
+    auto layer = activation_layer<T>(
         activation_name, name.empty() ? "activation_" + std::to_string(model_.layer_size()) : name);
     model_.add(std::move(layer));
     return *this;
@@ -1288,15 +1289,15 @@ public:
   SequentialBuilder &maxpool2d(size_t pool_h, size_t pool_w, size_t stride_h = 0,
                                size_t stride_w = 0, size_t pad_h = 0, size_t pad_w = 0,
                                const std::string &name = "") {
-    auto layer =
-        tnn::maxpool2d<T>(pool_h, pool_w, stride_h, stride_w, pad_h, pad_w,
-                          name.empty() ? "maxpool2d_" + std::to_string(model_.layer_size()) : name);
+    auto layer = maxpool2d_layer<T>(
+        pool_h, pool_w, stride_h, stride_w, pad_h, pad_w,
+        name.empty() ? "maxpool2d_" + std::to_string(model_.layer_size()) : name);
     model_.add(std::move(layer));
     return *this;
   }
 
   SequentialBuilder &dropout(T dropout_rate, const std::string &name = "") {
-    auto layer = tnn::dropout<T>(
+    auto layer = dropout_layer<T>(
         dropout_rate, name.empty() ? "dropout_" + std::to_string(model_.layer_size()) : name);
     model_.add(std::move(layer));
     return *this;
@@ -1304,7 +1305,7 @@ public:
 
   SequentialBuilder &flatten(const std::string &name = "") {
     auto layer =
-        tnn::flatten<T>(name.empty() ? "flatten_" + std::to_string(model_.layer_size()) : name);
+        flatten_layer<T>(name.empty() ? "flatten_" + std::to_string(model_.layer_size()) : name);
     model_.add(std::move(layer));
     return *this;
   }

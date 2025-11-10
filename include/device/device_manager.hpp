@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace tdevice {
+namespace tnn {
 class DeviceManager {
 public:
   static DeviceManager &getInstance();
@@ -35,4 +35,4 @@ void initializeDefaultDevices();
 const Device &getGPU(size_t gpu_index = 0);
 const Device &getCPU();
 
-} // namespace tdevice
+} // namespace tnn

@@ -32,13 +32,13 @@ private:
   mutable size_t input_stride_n_, input_stride_c_, input_stride_h_, input_stride_w_;
   mutable size_t output_stride_n_, output_stride_c_, output_stride_h_, output_stride_w_;
 
-  void compute_max_pool_forward(const tdevice::device_ptr<T[]> &input_data,
-                                tdevice::device_ptr<T[]> &output_data, size_t batch_size,
-                                size_t channels, size_t input_h, size_t input_w, size_t output_h,
-                                size_t output_w, std::vector<size_t> &mask_indices) const;
+  void compute_max_pool_forward(const device_ptr<T[]> &input_data, device_ptr<T[]> &output_data,
+                                size_t batch_size, size_t channels, size_t input_h, size_t input_w,
+                                size_t output_h, size_t output_w,
+                                std::vector<size_t> &mask_indices) const;
 
-  void compute_max_pool_backward(const tdevice::device_ptr<T[]> &gradient_data,
-                                 tdevice::device_ptr<T[]> &grad_input_data, size_t batch_size,
+  void compute_max_pool_backward(const device_ptr<T[]> &gradient_data,
+                                 device_ptr<T[]> &grad_input_data, size_t batch_size,
                                  size_t channels, size_t output_h, size_t output_w,
                                  const std::vector<size_t> &mask_indices) const;
 

@@ -2,6 +2,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+using namespace tnn;
+
 // Test fixture for common tensor operations
 class TensorTest : public ::testing::Test {
 protected:

@@ -13,7 +13,6 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include <vector>
 
 namespace tnn {
 
@@ -21,7 +20,7 @@ template <typename T> void Tanh<T>::apply(Tensor<T> &tensor) const {
   T *data = tensor.data();
   size_t size = tensor.size();
 
-  tthreads::parallel_for<size_t>(0, size, [&](size_t i) { data[i] = std::tanh(data[i]); });
+  parallel_for<size_t>(0, size, [&](size_t i) { data[i] = std::tanh(data[i]); });
 }
 
 template <typename T>
@@ -35,7 +34,7 @@ void Tanh<T>::compute_gradient_inplace(const Tensor<T> &input, Tensor<T> &upstre
   T *grad_data = upstream_gradient.data();
   size_t size = input.size();
 
-  tthreads::parallel_for<size_t>(0, size, [&](size_t i) {
+  parallel_for<size_t>(0, size, [&](size_t i) {
     T tanh_val = std::tanh(input_data[i]);
     T local_grad = T(1) - tanh_val * tanh_val;
     grad_data[i] *= local_grad;

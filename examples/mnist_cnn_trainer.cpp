@@ -23,6 +23,8 @@
 #include "utils/env.hpp"
 #include "utils/misc.hpp"
 
+using namespace tnn;
+
 namespace mnist_constants {
 
 constexpr float EPSILON = 1e-15f;
@@ -43,20 +45,20 @@ int main() {
 
     // Load environment variables from .env file
     std::cout << "Loading environment variables..." << std::endl;
-    if (!::utils::load_env_file("./.env")) {
+    if (!load_env_file("./.env")) {
       std::cout << "No .env file found, using default training parameters." << std::endl;
     }
 
     // Get training parameters from environment or use defaults
-    const int epochs = ::utils::get_env<int>("EPOCHS", mnist_constants::EPOCHS);
-    const size_t batch_size = ::utils::get_env<size_t>("BATCH_SIZE", mnist_constants::BATCH_SIZE);
-    const float lr_initial = ::utils::get_env<float>("LR_INITIAL", mnist_constants::LR_INITIAL);
+    const int epochs = get_env<int>("EPOCHS", mnist_constants::EPOCHS);
+    const size_t batch_size = get_env<size_t>("BATCH_SIZE", mnist_constants::BATCH_SIZE);
+    const float lr_initial = get_env<float>("LR_INITIAL", mnist_constants::LR_INITIAL);
     const float lr_decay_factor =
-        ::utils::get_env<float>("LR_DECAY_FACTOR", mnist_constants::LR_DECAY_FACTOR);
+        get_env<float>("LR_DECAY_FACTOR", mnist_constants::LR_DECAY_FACTOR);
     const size_t lr_decay_interval =
-        ::utils::get_env<size_t>("LR_DECAY_INTERVAL", mnist_constants::LR_DECAY_INTERVAL);
+        get_env<size_t>("LR_DECAY_INTERVAL", mnist_constants::LR_DECAY_INTERVAL);
     const int progress_print_interval =
-        ::utils::get_env<int>("PROGRESS_PRINT_INTERVAL", mnist_constants::PROGRESS_PRINT_INTERVAL);
+        get_env<int>("PROGRESS_PRINT_INTERVAL", mnist_constants::PROGRESS_PRINT_INTERVAL);
 
     TrainingConfig train_config{epochs,
                                 batch_size,
@@ -68,7 +70,7 @@ int main() {
 
     train_config.print_config();
 
-    data_loading::MNISTDataLoader<float> train_loader, test_loader;
+    MNISTDataLoader<float> train_loader, test_loader;
 
     if (!train_loader.load_data("./data/mnist/train.csv")) {
       std::cerr << "Failed to load training data!" << std::endl;
@@ -86,13 +88,11 @@ int main() {
 
     std::cout << "\nBuilding CNN model architecture" << std::endl;
 
-    auto aug_strategy = data_augmentation::AugmentationBuilder<float>()
-                            .contrast(0.3f, 0.15f)
-                            .gaussian_noise(0.3f, 0.05f)
-                            .build();
+    auto aug_strategy =
+        AugmentationBuilder<float>().contrast(0.3f, 0.15f).gaussian_noise(0.3f, 0.05f).build();
     train_loader.set_augmentation(std::move(aug_strategy));
 
-    auto model = tnn::SequentialBuilder<float>("mnist_cnn_model")
+    auto model = SequentialBuilder<float>("mnist_cnn_model")
                      .input({1, ::mnist_constants::IMAGE_HEIGHT, ::mnist_constants::IMAGE_WIDTH})
                      .conv2d(8, 5, 5, 1, 1, 1, 1, true, "conv1")
                      .batchnorm(1e-5f, 0.1f, true, "bn1")
@@ -111,10 +111,10 @@ int main() {
 
     model.initialize();
 
-    auto optimizer = std::make_unique<tnn::Adam<float>>(lr_initial, 0.9f, 0.999f, 1e-8f);
+    auto optimizer = std::make_unique<Adam<float>>(lr_initial, 0.9f, 0.999f, 1e-8f);
     model.set_optimizer(std::move(optimizer));
 
-    auto loss_function = tnn::LossFactory<float>::create_softmax_crossentropy();
+    auto loss_function = LossFactory<float>::create_softmax_crossentropy();
     model.set_loss_function(std::move(loss_function));
 
     model.print_config();

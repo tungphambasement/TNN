@@ -20,7 +20,7 @@ void compute_max_pool_forward(const T *input_data, T *output_data, size_t batch_
                               size_t stride_w, std::vector<size_t> &mask_indices) {
   const T MIN_VALUE = std::numeric_limits<T>::lowest();
 
-  tthreads::parallel_for_2d(batch_size, channels, [&](size_t n, size_t c) {
+  parallel_for_2d(batch_size, channels, [&](size_t n, size_t c) {
     for (size_t out_h = 0; out_h < output_h; ++out_h) {
       for (size_t out_w = 0; out_w < output_w; ++out_w) {
         T max_val = MIN_VALUE;
@@ -52,7 +52,7 @@ template <typename T>
 void compute_max_pool_backward(const T *gradient_data, T *grad_input_data, size_t batch_size,
                                size_t channels, size_t output_h, size_t output_w,
                                const std::vector<size_t> &mask_indices) {
-  tthreads::parallel_for_2d(batch_size, channels, [&](size_t n, size_t c) {
+  parallel_for_2d(batch_size, channels, [&](size_t n, size_t c) {
     for (size_t out_h = 0; out_h < output_h; ++out_h) {
       for (size_t out_w = 0; out_w < output_w; ++out_w) {
         const size_t output_idx = ((n * channels + c) * output_h + out_h) * output_w + out_w;

@@ -16,7 +16,7 @@ template <typename T> void ELU<T>::apply(Tensor<T> &tensor) const {
   T *data = tensor.data();
   const size_t size = tensor.size();
 
-  tthreads::parallel_for<size_t>(0, size, [&](size_t i) {
+  parallel_for<size_t>(0, size, [&](size_t i) {
     data[i] = data[i] > T(0) ? data[i] : alpha_ * (std::exp(data[i]) - T(1));
   });
 }
@@ -32,7 +32,7 @@ void ELU<T>::compute_gradient_inplace(const Tensor<T> &input, Tensor<T> &upstrea
   T *grad_data = upstream_gradient.data();
   size_t size = input.size();
 
-  tthreads::parallel_for<size_t>(0, size, [&](size_t i) {
+  parallel_for<size_t>(0, size, [&](size_t i) {
     T local_grad = input_data[i] > T(0) ? T(1) : alpha_ * std::exp(input_data[i]);
     grad_data[i] *= local_grad;
   });

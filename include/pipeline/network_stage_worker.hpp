@@ -44,7 +44,7 @@ public:
     // Initialize hardware info for affinity
     if (use_ecore_affinity_) {
       hw_info_.initialize();
-      thread_affinity_ = std::make_unique<utils::ThreadAffinity>(hw_info_);
+      thread_affinity_ = std::make_unique<ThreadAffinity>(hw_info_);
 
       if (!thread_affinity_->has_efficiency_cores()) {
         std::cout << "Warning: E-core affinity requested but no E-cores detected. "
@@ -73,7 +73,7 @@ public:
 
     if (enable && !thread_affinity_) {
       hw_info_.initialize();
-      thread_affinity_ = std::make_unique<utils::ThreadAffinity>(hw_info_);
+      thread_affinity_ = std::make_unique<ThreadAffinity>(hw_info_);
     }
   }
 
@@ -81,7 +81,7 @@ public:
    * @brief Get hardware information
    * @return Reference to hardware info object
    */
-  const utils::HardwareInfo &get_hardware_info() const { return hw_info_; }
+  const HardwareInfo &get_hardware_info() const { return hw_info_; }
 
   /**
    * @brief Print affinity information for debugging
@@ -113,7 +113,7 @@ private:
   int listen_port_;
   bool use_ecore_affinity_;
   int max_ecore_threads_;
-  utils::HardwareInfo hw_info_;
-  std::unique_ptr<utils::ThreadAffinity> thread_affinity_;
+  HardwareInfo hw_info_;
+  std::unique_ptr<ThreadAffinity> thread_affinity_;
 };
 } // namespace tnn

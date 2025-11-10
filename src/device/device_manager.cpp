@@ -11,7 +11,7 @@
 #include "device/cuda/cuda_context.hpp"
 #endif
 
-namespace tdevice {
+namespace tnn {
 DeviceManager DeviceManager::instance_;
 
 DeviceManager &DeviceManager::getInstance() { return instance_; }
@@ -139,4 +139,4 @@ const Device &getCPU() {
   throw std::runtime_error("CPU device not found");
 }
 
-} // namespace tdevice
+} // namespace tnn

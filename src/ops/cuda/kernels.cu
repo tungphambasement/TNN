@@ -2,10 +2,13 @@
 
 #ifdef USE_CUDA
 
+#include "cuda/error_handler.hpp"
+
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
 #include <device_launch_parameters.h>
 
+namespace tnn {
 namespace cuda {
 
 // Kernel execution configuration helper
@@ -1067,6 +1070,108 @@ void cuda_fill_random_normal(double *data, size_t size, double mean, double stdd
   fill_random_normal_kernel<<<num_blocks, BLOCK_SIZE>>>(data, size, mean, stddev, seed);
 }
 
+// Matrix transpose kernel
+template <typename T>
+__global__ void transpose_2d_kernel(const T *input, T *output, size_t rows, size_t cols) {
+  int col = blockIdx.x * blockDim.x + threadIdx.x;
+  int row = blockIdx.y * blockDim.y + threadIdx.y;
+
+  if (row < rows && col < cols) {
+    int input_idx = row * cols + col;
+    int output_idx = col * rows + row;
+    output[output_idx] = input[input_idx];
+  }
+}
+
+// NCHW to CNHW layout conversion kernel
+template <typename T>
+__global__ void nchw_to_cnhw_kernel(const T *input, T *output, size_t n, size_t c, size_t h,
+                                    size_t w) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  size_t total_size = n * c * h * w;
+
+  if (idx < total_size) {
+    // Calculate original NCHW indices
+    int n_idx = idx / (c * h * w);
+    int remaining = idx % (c * h * w);
+    int c_idx = remaining / (h * w);
+    remaining = remaining % (h * w);
+    int h_idx = remaining / w;
+    int w_idx = remaining % w;
+
+    // Calculate CNHW output index: C * N * H * W
+    int output_idx = c_idx * (n * h * w) + n_idx * (h * w) + h_idx * w + w_idx;
+    output[output_idx] = input[idx];
+  }
+}
+
+// CNHW to NCHW layout conversion kernel
+template <typename T>
+__global__ void cnhw_to_nchw_kernel(const T *input, T *output, size_t n, size_t c, size_t h,
+                                    size_t w) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  size_t total_size = n * c * h * w;
+
+  if (idx < total_size) {
+    // Calculate original CNHW indices
+    int c_idx = idx / (n * h * w);
+    int remaining = idx % (n * h * w);
+    int n_idx = remaining / (h * w);
+    remaining = remaining % (h * w);
+    int h_idx = remaining / w;
+    int w_idx = remaining % w;
+
+    // Calculate NCHW output index: N * C * H * W
+    int output_idx = n_idx * (c * h * w) + c_idx * (h * w) + h_idx * w + w_idx;
+    output[output_idx] = input[idx];
+  }
+}
+
+// Host wrapper functions - Template implementations
+
+template <typename T> void cuda_transpose_2d(const T *input, T *output, size_t rows, size_t cols) {
+  // Use 2D block configuration for better memory coalescing
+  dim3 block(16, 16);
+  dim3 grid((cols + block.x - 1) / block.x, (rows + block.y - 1) / block.y);
+  transpose_2d_kernel<<<grid, block>>>(input, output, rows, cols);
+  cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
+  cudaDeviceSynchronize();
+}
+
+template <typename T>
+void cuda_nchw_to_cnhw(const T *input, T *output, size_t n, size_t c, size_t h, size_t w) {
+  size_t total_size = n * c * h * w;
+  int num_blocks = get_num_blocks(total_size);
+  nchw_to_cnhw_kernel<<<num_blocks, BLOCK_SIZE>>>(input, output, n, c, h, w);
+  cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
+  cudaDeviceSynchronize();
+}
+
+template <typename T>
+void cuda_cnhw_to_nchw(const T *input, T *output, size_t n, size_t c, size_t h, size_t w) {
+  size_t total_size = n * c * h * w;
+  int num_blocks = get_num_blocks(total_size);
+  cnhw_to_nchw_kernel<<<num_blocks, BLOCK_SIZE>>>(input, output, n, c, h, w);
+  cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
+  cudaDeviceSynchronize();
+}
+
+// Explicit template instantiations for common types
+template void cuda_transpose_2d<float>(const float *input, float *output, size_t rows, size_t cols);
+template void cuda_transpose_2d<double>(const double *input, double *output, size_t rows,
+                                        size_t cols);
+
+template void cuda_nchw_to_cnhw<float>(const float *input, float *output, size_t n, size_t c,
+                                       size_t h, size_t w);
+template void cuda_nchw_to_cnhw<double>(const double *input, double *output, size_t n, size_t c,
+                                        size_t h, size_t w);
+
+template void cuda_cnhw_to_nchw<float>(const float *input, float *output, size_t n, size_t c,
+                                       size_t h, size_t w);
+template void cuda_cnhw_to_nchw<double>(const double *input, double *output, size_t n, size_t c,
+                                        size_t h, size_t w);
+
 } // namespace cuda
 
 #endif // USE_CUDA
+} // namespace tnn

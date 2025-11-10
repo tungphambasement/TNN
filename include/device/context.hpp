@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <cstdlib>
 
-namespace tdevice {
+namespace tnn {
 class Context {
 public:
   Context() = default;
@@ -19,4 +19,4 @@ public:
   virtual void copyToDevice(void *dest, const void *src, size_t size) = 0;
   virtual void copyToHost(void *dest, const void *src, size_t size) = 0;
 };
-} // namespace tdevice
+} // namespace tnn

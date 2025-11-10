@@ -10,9 +10,9 @@
 #include <pipeline/network_serialization.hpp>
 #include <pipeline/network_stage_worker.hpp>
 
-namespace tpipeline {
+namespace tnn {
 /**
  * Template instantiations for commonly used types. Uncomment as needed.
  */
 template class Task<float>;
-} // namespace tpipeline
+} // namespace tnn

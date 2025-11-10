@@ -26,7 +26,7 @@ namespace tnn {
  */
 class Communicator {
 private:
-  std::vector<CommandType> all_command_types_ = utils::get_enum_vector<CommandType>();
+  std::vector<CommandType> all_command_types_ = get_enum_vector<CommandType>();
 
 public:
   Communicator() = default;

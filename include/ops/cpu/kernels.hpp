@@ -8,6 +8,7 @@
 #include <random>
 #include <type_traits>
 
+namespace tnn {
 namespace ops {
 namespace cpu {
 
@@ -409,19 +410,18 @@ void transpose_2d(const T *src, T *dst, const size_t rows, const size_t cols,
                   bool multi_threaded = true) {
   if (multi_threaded) {
     const size_t block_size = 64;
-    tthreads::parallel_for_2d((rows + block_size - 1) / block_size,
-                              (cols + block_size - 1) / block_size,
-                              [&](size_t i_block, size_t j_block) {
-                                const size_t start_row = i_block * block_size;
-                                const size_t start_col = j_block * block_size;
-                                const size_t end_row = std::min(start_row + block_size, rows);
-                                const size_t end_col = std::min(start_col + block_size, cols);
-                                for (size_t i = start_row; i < end_row; ++i) {
-                                  for (size_t j = start_col; j < end_col; ++j) {
-                                    dst[j * rows + i] = src[i * cols + j];
-                                  }
-                                }
-                              });
+    parallel_for_2d((rows + block_size - 1) / block_size, (cols + block_size - 1) / block_size,
+                    [&](size_t i_block, size_t j_block) {
+                      const size_t start_row = i_block * block_size;
+                      const size_t start_col = j_block * block_size;
+                      const size_t end_row = std::min(start_row + block_size, rows);
+                      const size_t end_col = std::min(start_col + block_size, cols);
+                      for (size_t i = start_row; i < end_row; ++i) {
+                        for (size_t j = start_col; j < end_col; ++j) {
+                          dst[j * rows + i] = src[i * cols + j];
+                        }
+                      }
+                    });
     return;
   } else {
     const size_t block_size = 64;
@@ -441,5 +441,26 @@ void transpose_2d(const T *src, T *dst, const size_t rows, const size_t cols,
   }
 }
 
+template <typename T>
+void nchw_to_cnhw(const T *src, T *dst, size_t batch_size, size_t channels, size_t height,
+                  size_t width) {
+  parallel_for_2d(batch_size, channels, [&](size_t n, size_t c) {
+    std::copy(&src[n * channels * height * width + c * height * width],
+              &src[n * channels * height * width + c * height * width + height * width],
+              &dst[c * batch_size * height * width + n * height * width]);
+  });
+}
+
+template <typename T>
+void cnhw_to_nchw(const T *src, T *dst, size_t batch_size, size_t channels, size_t height,
+                  size_t width) {
+  parallel_for_2d(batch_size, channels, [&](size_t n, size_t c) {
+    std::copy(&src[c * batch_size * height * width + n * height * width],
+              &src[c * batch_size * height * width + n * height * width + height * width],
+              &dst[n * channels * height * width + c * height * width]);
+  });
+}
+
 } // namespace cpu
 } // namespace ops
+} // namespace tnn

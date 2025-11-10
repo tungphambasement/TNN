@@ -1,6 +1,8 @@
 #include "cuda/error_handler.hpp"
 #include "cuda/tensor_kernels.hpp"
+#include <iostream>
 
+namespace tnn {
 namespace cuda {
 // Kernel execution configuration helpers
 constexpr int BLOCK_SIZE = 256;
@@ -13,49 +15,39 @@ inline dim3 get_2d_blocks(size_t height, size_t width) {
               (height + BLOCK_SIZE_2D - 1) / BLOCK_SIZE_2D);
 }
 
-// Im2col/Col2im CUDA Kernels
-
+// cuda_im2col/cuda_col2im CUDA Kernels
 template <typename T>
-__global__ void im2col_kernel(const T *input, T *col_data, size_t batch_size, size_t channels,
-                              size_t height, size_t width, size_t kernel_h, size_t kernel_w,
-                              size_t stride_h, size_t stride_w, size_t pad_h, size_t pad_w,
-                              size_t output_h, size_t output_w) {
+__global__ void cuda_im2col_kernel(const T *input, T *col_data, size_t batch_size, size_t channels,
+                                   size_t height, size_t width, size_t kernel_h, size_t kernel_w,
+                                   size_t stride_h, size_t stride_w, size_t pad_h, size_t pad_w,
+                                   size_t output_h, size_t output_w) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
   size_t col_height = channels * kernel_h * kernel_w;
-  size_t col_width = output_h * output_w;
-  size_t total_elements = batch_size * col_height * col_width;
+  size_t total_elements = batch_size * col_height * output_h * output_w;
 
   if (idx < total_elements) {
-    // Decode the linear index
-    size_t w_out = idx % col_width;
-    size_t temp = idx / col_width;
+    size_t w_out = idx % output_w;
+    size_t temp = idx / output_w;
+    size_t h_out = temp % output_h;
+    temp = temp / output_h;
     size_t c_kh_kw = temp % col_height;
     size_t n = temp / col_height;
 
-    // Further decode c_kh_kw
     size_t kw = c_kh_kw % kernel_w;
     size_t temp2 = c_kh_kw / kernel_w;
     size_t kh = temp2 % kernel_h;
     size_t c = temp2 / kernel_h;
 
-    // Decode output position to h_out and w_out
-    size_t h_out = w_out / output_w;
-    w_out = w_out % output_w;
+    int h_in = (int)h_out * (int)stride_h - (int)pad_h + (int)kh;
+    int w_in = (int)w_out * (int)stride_w - (int)pad_w + (int)kw;
 
-    // Calculate input position
-    int h_in = h_out * stride_h - pad_h + kh;
-    int w_in = w_out * stride_w - pad_w + kw;
-
-    // Check bounds and assign value
     T value = 0;
-    if (h_in >= 0 && h_in < height && w_in >= 0 && w_in < width) {
-      size_t input_idx = ((n * channels + c) * height + h_in) * width + w_in;
+    if (h_in >= 0 && (size_t)h_in < height && w_in >= 0 && (size_t)w_in < width) {
+      size_t input_idx = ((n * channels + c) * height + (size_t)h_in) * width + (size_t)w_in;
       value = input[input_idx];
     }
 
-    // Write to col_data in the format: (C*K*K, N*H_out*W_out)
-    // Column-major for the spatial dimension
     size_t col_idx = c_kh_kw * (batch_size * output_h * output_w) + n * (output_h * output_w) +
                      h_out * output_w + w_out;
     col_data[col_idx] = value;
@@ -63,24 +55,26 @@ __global__ void im2col_kernel(const T *input, T *col_data, size_t batch_size, si
 }
 
 template <typename T>
-void im2col(const T *input, T *col_data, size_t batch_size, size_t channels, size_t height,
-            size_t width, size_t kernel_h, size_t kernel_w, size_t stride_h, size_t stride_w,
-            size_t pad_h, size_t pad_w, size_t output_h, size_t output_w) {
+void cuda_im2col(const T *input, T *col_data, size_t batch_size, size_t channels, size_t height,
+                 size_t width, size_t kernel_h, size_t kernel_w, size_t stride_h, size_t stride_w,
+                 size_t pad_h, size_t pad_w, size_t output_h, size_t output_w) {
+  size_t col_height = channels * kernel_h * kernel_w;
+  size_t col_width = output_h * output_w;
+  size_t total_elements = batch_size * col_height * col_width;
+  int num_blocks = get_num_blocks(total_elements);
 
-  int num_blocks = get_num_blocks(batch_size * channels * output_h * output_w);
-  im2col_kernel<T><<<num_blocks, BLOCK_SIZE>>>(input, col_data, batch_size, channels, height, width,
-                                               kernel_h, kernel_w, stride_h, stride_w, pad_h, pad_w,
-                                               output_h, output_w);
-
+  cuda_im2col_kernel<T><<<num_blocks, BLOCK_SIZE>>>(input, col_data, batch_size, channels, height,
+                                                    width, kernel_h, kernel_w, stride_h, stride_w,
+                                                    pad_h, pad_w, output_h, output_w);
   // Check for kernel launch errors
   CUDA_CHECK(cudaGetLastError());
 }
 
 template <typename T>
-__global__ void col2im_kernel(const T *col_data, T *output, size_t batch_size, size_t channels,
-                              size_t height, size_t width, size_t kernel_h, size_t kernel_w,
-                              size_t stride_h, size_t stride_w, size_t pad_h, size_t pad_w,
-                              size_t output_h, size_t output_w) {
+__global__ void cuda_col2im_kernel(const T *col_data, T *output, size_t batch_size, size_t channels,
+                                   size_t height, size_t width, size_t kernel_h, size_t kernel_w,
+                                   size_t stride_h, size_t stride_w, size_t pad_h, size_t pad_w,
+                                   size_t output_h, size_t output_w) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
   size_t total_elements = batch_size * channels * height * width;
@@ -123,14 +117,13 @@ __global__ void col2im_kernel(const T *col_data, T *output, size_t batch_size, s
 }
 
 template <typename T>
-void col2im(const T *col_data, T *output, size_t batch_size, size_t channels, size_t height,
-            size_t width, size_t kernel_h, size_t kernel_w, size_t stride_h, size_t stride_w,
-            size_t pad_h, size_t pad_w, size_t output_h, size_t output_w) {
+void cuda_col2im(const T *col_data, T *output, size_t batch_size, size_t channels, size_t height,
+                 size_t width, size_t kernel_h, size_t kernel_w, size_t stride_h, size_t stride_w,
+                 size_t pad_h, size_t pad_w, size_t output_h, size_t output_w) {
   int num_blocks = get_num_blocks(batch_size * channels * height * width);
-  col2im_kernel<T><<<num_blocks, BLOCK_SIZE>>>(col_data, output, batch_size, channels, height,
-                                               width, kernel_h, kernel_w, stride_h, stride_w, pad_h,
-                                               pad_w, output_h, output_w);
-
+  cuda_col2im_kernel<T><<<num_blocks, BLOCK_SIZE>>>(col_data, output, batch_size, channels, height,
+                                                    width, kernel_h, kernel_w, stride_h, stride_w,
+                                                    pad_h, pad_w, output_h, output_w);
   // Check for kernel launch errors
   CUDA_CHECK(cudaGetLastError());
 }
@@ -172,8 +165,8 @@ __global__ void pad_kernel(const T *input, T *output, size_t batch_size, size_t 
 }
 
 template <typename T>
-void pad(const T *input, T *output, size_t batch_size, size_t channels, size_t height, size_t width,
-         size_t pad_h, size_t pad_w, T value) {
+void cuda_pad(const T *input, T *output, size_t batch_size, size_t channels, size_t height,
+              size_t width, size_t pad_h, size_t pad_w, T value) {
   int num_blocks =
       get_num_blocks(batch_size * channels * (height + 2 * pad_h) * (width + 2 * pad_w));
   pad_kernel<T><<<num_blocks, BLOCK_SIZE>>>(input, output, batch_size, channels, height, width,
@@ -212,8 +205,8 @@ __global__ void unpad_kernel(const T *input, T *output, size_t batch_size, size_
 }
 
 template <typename T>
-void unpad(const T *input, T *output, size_t batch_size, size_t channels, size_t height,
-           size_t width, size_t pad_h, size_t pad_w) {
+void cuda_unpad(const T *input, T *output, size_t batch_size, size_t channels, size_t height,
+                size_t width, size_t pad_h, size_t pad_w) {
   int num_blocks = get_num_blocks(batch_size * channels * height * width);
   unpad_kernel<T><<<num_blocks, BLOCK_SIZE>>>(input, output, batch_size, channels, height, width,
                                               pad_h, pad_w);
@@ -250,8 +243,8 @@ __global__ void crop_kernel(const T *input, T *output, size_t batch_size, size_t
 }
 
 template <typename T>
-void crop(const T *input, T *output, size_t batch_size, size_t channels, size_t height,
-          size_t width, size_t start_h, size_t start_w, size_t new_height, size_t new_width) {
+void cuda_crop(const T *input, T *output, size_t batch_size, size_t channels, size_t height,
+               size_t width, size_t start_h, size_t start_w, size_t new_height, size_t new_width) {
   int num_blocks = get_num_blocks(batch_size * channels * new_height * new_width);
   crop_kernel<T><<<num_blocks, BLOCK_SIZE>>>(input, output, batch_size, channels, height, width,
                                              start_h, start_w, new_height, new_width);
@@ -307,7 +300,7 @@ __global__ void softmax_kernel(T *data, size_t batch_size, size_t num_classes, s
 }
 
 template <typename T>
-void softmax(T *data, size_t batch_size, size_t num_classes, size_t height, size_t width) {
+void cuda_softmax(T *data, size_t batch_size, size_t num_classes, size_t height, size_t width) {
   int num_blocks = get_num_blocks(batch_size * height * width);
   softmax_kernel<T><<<num_blocks, BLOCK_SIZE>>>(data, batch_size, num_classes, height, width);
   // Check for kernel launch errors
@@ -315,50 +308,54 @@ void softmax(T *data, size_t batch_size, size_t num_classes, size_t height, size
 }
 
 // Explicit template instantiations
-template void im2col<float>(const float *input, float *col_data, size_t batch_size, size_t channels,
-                            size_t height, size_t width, size_t kernel_h, size_t kernel_w,
-                            size_t stride_h, size_t stride_w, size_t pad_h, size_t pad_w,
-                            size_t output_h, size_t output_w);
+template void cuda_im2col<float>(const float *input, float *col_data, size_t batch_size,
+                                 size_t channels, size_t height, size_t width, size_t kernel_h,
+                                 size_t kernel_w, size_t stride_h, size_t stride_w, size_t pad_h,
+                                 size_t pad_w, size_t output_h, size_t output_w);
 
-template void im2col<double>(const double *input, double *col_data, size_t batch_size,
-                             size_t channels, size_t height, size_t width, size_t kernel_h,
-                             size_t kernel_w, size_t stride_h, size_t stride_w, size_t pad_h,
-                             size_t pad_w, size_t output_h, size_t output_w);
+template void cuda_im2col<double>(const double *input, double *col_data, size_t batch_size,
+                                  size_t channels, size_t height, size_t width, size_t kernel_h,
+                                  size_t kernel_w, size_t stride_h, size_t stride_w, size_t pad_h,
+                                  size_t pad_w, size_t output_h, size_t output_w);
 
-template void col2im<float>(const float *col_data, float *output, size_t batch_size,
-                            size_t channels, size_t height, size_t width, size_t kernel_h,
-                            size_t kernel_w, size_t stride_h, size_t stride_w, size_t pad_h,
-                            size_t pad_w, size_t output_h, size_t output_w);
+template void cuda_col2im<float>(const float *col_data, float *output, size_t batch_size,
+                                 size_t channels, size_t height, size_t width, size_t kernel_h,
+                                 size_t kernel_w, size_t stride_h, size_t stride_w, size_t pad_h,
+                                 size_t pad_w, size_t output_h, size_t output_w);
 
-template void col2im<double>(const double *col_data, double *output, size_t batch_size,
-                             size_t channels, size_t height, size_t width, size_t kernel_h,
-                             size_t kernel_w, size_t stride_h, size_t stride_w, size_t pad_h,
-                             size_t pad_w, size_t output_h, size_t output_w);
+template void cuda_col2im<double>(const double *col_data, double *output, size_t batch_size,
+                                  size_t channels, size_t height, size_t width, size_t kernel_h,
+                                  size_t kernel_w, size_t stride_h, size_t stride_w, size_t pad_h,
+                                  size_t pad_w, size_t output_h, size_t output_w);
 
-template void pad<float>(const float *input, float *output, size_t batch_size, size_t channels,
-                         size_t height, size_t width, size_t pad_h, size_t pad_w, float value);
+template void cuda_pad<float>(const float *input, float *output, size_t batch_size, size_t channels,
+                              size_t height, size_t width, size_t pad_h, size_t pad_w, float value);
 
-template void pad<double>(const double *input, double *output, size_t batch_size, size_t channels,
-                          size_t height, size_t width, size_t pad_h, size_t pad_w, double value);
+template void cuda_pad<double>(const double *input, double *output, size_t batch_size,
+                               size_t channels, size_t height, size_t width, size_t pad_h,
+                               size_t pad_w, double value);
 
-template void unpad<float>(const float *input, float *output, size_t batch_size, size_t channels,
-                           size_t height, size_t width, size_t pad_h, size_t pad_w);
+template void cuda_unpad<float>(const float *input, float *output, size_t batch_size,
+                                size_t channels, size_t height, size_t width, size_t pad_h,
+                                size_t pad_w);
 
-template void unpad<double>(const double *input, double *output, size_t batch_size, size_t channels,
-                            size_t height, size_t width, size_t pad_h, size_t pad_w);
+template void cuda_unpad<double>(const double *input, double *output, size_t batch_size,
+                                 size_t channels, size_t height, size_t width, size_t pad_h,
+                                 size_t pad_w);
 
-template void crop<float>(const float *input, float *output, size_t batch_size, size_t channels,
-                          size_t height, size_t width, size_t start_h, size_t start_w,
-                          size_t new_height, size_t new_width);
+template void cuda_crop<float>(const float *input, float *output, size_t batch_size,
+                               size_t channels, size_t height, size_t width, size_t start_h,
+                               size_t start_w, size_t new_height, size_t new_width);
 
-template void crop<double>(const double *input, double *output, size_t batch_size, size_t channels,
-                           size_t height, size_t width, size_t start_h, size_t start_w,
-                           size_t new_height, size_t new_width);
+template void cuda_crop<double>(const double *input, double *output, size_t batch_size,
+                                size_t channels, size_t height, size_t width, size_t start_h,
+                                size_t start_w, size_t new_height, size_t new_width);
 
-template void softmax<float>(float *data, size_t batch_size, size_t num_classes, size_t height,
-                             size_t width);
+template void cuda_softmax<float>(float *data, size_t batch_size, size_t num_classes, size_t height,
+                                  size_t width);
 
-template void softmax<double>(double *data, size_t batch_size, size_t num_classes, size_t height,
-                              size_t width);
+template void cuda_softmax<double>(double *data, size_t batch_size, size_t num_classes,
+                                   size_t height, size_t width);
 
 } // namespace cuda
+} // namespace tnn

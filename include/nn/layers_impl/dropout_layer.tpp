@@ -33,7 +33,7 @@ Tensor<T> DropoutLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_id
 
   T scale = T(1) / (T(1) - dropout_rate_);
 
-  tthreads::parallel_for_2d(input.batch_size(), input.channels(), [&](size_t n, size_t c) {
+  parallel_for_2d(input.batch_size(), input.channels(), [&](size_t n, size_t c) {
     thread_local std::mt19937 local_generator(std::random_device{}());
     thread_local std::uniform_real_distribution<T> local_distribution(T(0), T(1));
     for (size_t h = 0; h < input.height(); ++h) {
@@ -68,7 +68,7 @@ Tensor<T> DropoutLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batc
 
   Tensor<T> grad_input = gradient;
 
-  tthreads::parallel_for_2d(gradient.batch_size(), gradient.channels(), [&](size_t n, size_t c) {
+  parallel_for_2d(gradient.batch_size(), gradient.channels(), [&](size_t n, size_t c) {
     for (size_t h = 0; h < gradient.height(); ++h) {
       for (size_t w = 0; w < gradient.width(); ++w) {
         grad_input(n, c, h, w) *= mask(n, c, h, w);

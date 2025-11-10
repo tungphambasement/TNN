@@ -18,7 +18,7 @@ void compute_channel_mean(const T *input_data, T *mean_data, size_t batch_size, 
   const size_t total_elements = batch_size * spatial_size;
   const T inv_total = T(1) / static_cast<T>(total_elements);
 
-  tthreads::parallel_for<size_t>(0, channels, [&](size_t c) {
+  parallel_for<size_t>(0, channels, [&](size_t c) {
     T sum = T(0);
     const size_t channel_stride = channels * spatial_size;
     const size_t c_offset = c * spatial_size;
@@ -38,7 +38,7 @@ void compute_channel_variance(const T *input_data, const T *mean_data, T *var_da
   const size_t total_elements = batch_size * spatial_size;
   const T inv_total = T(1) / static_cast<T>(total_elements);
 
-  tthreads::parallel_for<size_t>(0, channels, [&](size_t c) {
+  parallel_for<size_t>(0, channels, [&](size_t c) {
     T sum_sq = T(0);
     const T mean_val = mean_data[c];
     const size_t channel_stride = channels * spatial_size;
@@ -62,7 +62,7 @@ void normalize_and_scale_optimized(const T *input_data, const T *mean_data, cons
                                    size_t spatial_size, bool affine) {
   const size_t channel_stride = channels * spatial_size;
 
-  tthreads::parallel_for_2d(batch_size, channels, [&](size_t n, size_t c) {
+  parallel_for_2d(batch_size, channels, [&](size_t n, size_t c) {
     const T mean_val = mean_data[c];
     const T std_val = std_data[c];
     const T inv_std = T(1) / std_val;
@@ -96,7 +96,7 @@ void compute_affine_gradients_optimized(const T *gradient_data, const T *normali
                                         size_t channels, size_t spatial_size) {
   const size_t channel_stride = channels * spatial_size;
 
-  tthreads::parallel_for<size_t>(0, channels, [&](size_t c) {
+  parallel_for<size_t>(0, channels, [&](size_t c) {
     T gamma_sum = T(0);
     T beta_sum = T(0);
     const size_t c_offset = c * spatial_size;

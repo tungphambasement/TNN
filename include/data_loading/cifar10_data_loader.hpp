@@ -31,7 +31,7 @@ constexpr float NORMALIZATION_FACTOR = 255.0f;
 constexpr size_t RECORD_SIZE = 1 + IMAGE_SIZE;
 } // namespace cifar10_constants
 
-namespace data_loading {
+namespace tnn {
 
 /**
  * Enhanced CIFAR-10 data loader for binary format adapted for CNN (2D RGB
@@ -49,7 +49,7 @@ private:
   std::vector<std::string> class_names_ = {"airplane", "automobile", "bird",  "cat",  "deer",
                                            "dog",      "frog",       "horse", "ship", "truck"};
 
-  std::unique_ptr<data_augmentation::AugmentationStrategy<T>> augmentation_strategy_;
+  std::unique_ptr<AugmentationStrategy<T>> augmentation_strategy_;
 
 public:
   CIFAR10DataLoader() : ImageDataLoader<T>(), batches_prepared_(false) {
@@ -349,16 +349,15 @@ public:
   /**
    * Set augmentation strategy to apply during batch preparation and retrieval
    */
-  void
-  set_augmentation_strategy(std::unique_ptr<data_augmentation::AugmentationStrategy<T>> strategy) {
+  void set_augmentation_strategy(std::unique_ptr<AugmentationStrategy<T>> strategy) {
     augmentation_strategy_ = std::move(strategy);
   }
 
   /**
    * Set augmentation strategy using a copy
    */
-  void set_augmentation_strategy(const data_augmentation::AugmentationStrategy<T> &strategy) {
-    augmentation_strategy_ = std::make_unique<data_augmentation::AugmentationStrategy<T>>();
+  void set_augmentation_strategy(const AugmentationStrategy<T> &strategy) {
+    augmentation_strategy_ = std::make_unique<AugmentationStrategy<T>>();
     for (const auto &aug : strategy.get_augmentations()) {
       augmentation_strategy_->add_augmentation(aug->clone());
     }
@@ -432,4 +431,4 @@ void create_cifar10_dataloader(const std::string &data_path, CIFAR10DataLoader<T
 using CIFAR10DataLoaderFloat = CIFAR10DataLoader<float>;
 using CIFAR10DataLoaderDouble = CIFAR10DataLoader<double>;
 
-} // namespace data_loading
+} // namespace tnn

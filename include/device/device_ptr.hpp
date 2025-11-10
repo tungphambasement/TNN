@@ -1,14 +1,12 @@
 #pragma once
 
 #include "device.hpp"
-
+#include "device_manager.hpp"
 #include <cstddef>
-#include <iostream>
 #include <stdexcept>
 #include <type_traits>
-#include <utility>
 
-namespace tdevice {
+namespace tnn {
 
 template <typename T> class device_ptr {
   static_assert(std::is_trivially_copyable_v<T>, "Type T must be trivially copyable.");
@@ -20,7 +18,6 @@ public:
 
   device_ptr(device_ptr &&other) noexcept : ptr_(other.ptr_), device_(other.device_) {
     other.ptr_ = nullptr;
-    other.device_ = nullptr;
   }
 
   device_ptr(const device_ptr &) = delete;
@@ -48,7 +45,6 @@ public:
       device_ = other.device_;
 
       other.ptr_ = nullptr;
-      other.device_ = nullptr;
     }
     return *this;
   }
@@ -64,41 +60,12 @@ public:
 
   T *get() const { return ptr_; }
   const Device *getDevice() const { return device_; }
-  const DeviceType getDeviceType() const {
+
+  DeviceType getDeviceType() const {
     if (!device_) {
       throw std::runtime_error("No associated device to get device type from.");
     }
     return device_->getDeviceType();
-  }
-
-  device_ptr<T[]> to_cpu() const {
-    if (!device_) {
-      throw std::runtime_error("No associated device to perform to_cpu()");
-    }
-
-    if (device_->getDeviceType() == DeviceType::CPU) {
-      return device_ptr<T[]>(ptr_, device_);
-    }
-
-    Device &cpu_device = getCPU();
-    device_ptr<T[]> cpu_ptr = make_array_ptr<T[]>(std::addressof(cpu_device), 1);
-    cpu_device.copyToHost(cpu_ptr.get(), ptr_, sizeof(T));
-    return cpu_ptr;
-  }
-
-  device_ptr<T[]> to_gpu(int gpu_id = 0) const {
-    if (!device_) {
-      throw std::runtime_error("No associated device to perform to_gpu()");
-    }
-
-    if (device_->getDeviceType() == DeviceType::GPU) {
-      return device_ptr<T[]>(ptr_, device_);
-    }
-
-    Device &gpu_device = getGPU(gpu_id);
-    device_ptr<T[]> gpu_ptr = make_array_ptr<T[]>(std::addressof(gpu_device), 1);
-    gpu_device.copyToDevice(gpu_ptr.get(), ptr_, sizeof(T));
-    return gpu_ptr;
   }
 
   explicit operator bool() const { return ptr_ != nullptr; }
@@ -124,7 +91,6 @@ public:
       : ptr_(other.ptr_), device_(other.device_), count_(other.count_),
         alignment_(other.alignment_) {
     other.ptr_ = nullptr;
-    other.device_ = nullptr;
     other.count_ = 0;
   }
 
@@ -158,7 +124,6 @@ public:
       alignment_ = other.alignment_;
 
       other.ptr_ = nullptr;
-      other.device_ = nullptr;
       other.count_ = 0;
       other.alignment_ = 0;
     }
@@ -175,7 +140,6 @@ public:
   T *release() {
     T *temp = ptr_;
     ptr_ = nullptr;
-    device_ = nullptr;
     count_ = 0;
     alignment_ = 0;
     return temp;
@@ -183,13 +147,16 @@ public:
 
   T *get() const { return ptr_; }
   const Device *getDevice() const { return device_; }
-  const DeviceType getDeviceType() const {
+
+  DeviceType getDeviceType() const {
     if (!device_) {
       throw std::runtime_error("No associated device to get device type from.");
     }
     return device_->getDeviceType();
   }
+
   size_t getCount() const { return count_; }
+
   size_t getAlignment() const { return alignment_; }
 
   void resize(size_t new_count) {
@@ -260,4 +227,50 @@ make_array_ptr(const Device *device, size_t count, size_t alignment = 32) {
   return device_ptr<T>(ptr, device, count);
 }
 
-} // namespace tdevice
+template <typename T>
+typename std::enable_if<std::is_array<T>::value, device_ptr<T>>::type
+to_cpu(const device_ptr<T> &src_ptr) {
+  if (!src_ptr.getDevice()) {
+    throw std::runtime_error("No associated device to perform to_cpu()");
+  }
+
+  if (src_ptr.getDeviceType() == DeviceType::CPU) {
+    // Already on CPU, create a copy
+    const Device &cpu_device = getCPU();
+    auto cpu_ptr = make_array_ptr<T>(&cpu_device, src_ptr.getCount(), src_ptr.getAlignment());
+    cpu_device.copyToHost(cpu_ptr.get(), src_ptr.get(),
+                          sizeof(typename std::remove_extent<T>::type) * src_ptr.getCount());
+    return cpu_ptr;
+  }
+
+  const Device &cpu_device = getCPU();
+  auto cpu_ptr = make_array_ptr<T>(&cpu_device, src_ptr.getCount(), src_ptr.getAlignment());
+  cpu_device.copyToHost(cpu_ptr.get(), src_ptr.get(),
+                        sizeof(typename std::remove_extent<T>::type) * src_ptr.getCount());
+  return cpu_ptr;
+}
+
+template <typename T>
+typename std::enable_if<std::is_array<T>::value, device_ptr<T>>::type
+to_gpu(const device_ptr<T> &src_ptr, int gpu_id = 0) {
+  if (!src_ptr.getDevice()) {
+    throw std::runtime_error("No associated device to perform to_gpu()");
+  }
+
+  if (src_ptr.getDeviceType() == DeviceType::GPU) {
+    // Already on GPU, create a copy
+    const Device &gpu_device = getGPU(gpu_id);
+    auto gpu_ptr = make_array_ptr<T>(&gpu_device, src_ptr.getCount(), src_ptr.getAlignment());
+    gpu_device.copyToDevice(gpu_ptr.get(), src_ptr.get(),
+                            sizeof(typename std::remove_extent<T>::type) * src_ptr.getCount());
+    return gpu_ptr;
+  }
+
+  const Device &gpu_device = getGPU(gpu_id);
+  auto gpu_ptr = make_array_ptr<T>(&gpu_device, src_ptr.getCount(), src_ptr.getAlignment());
+  gpu_device.copyToDevice(gpu_ptr.get(), src_ptr.get(),
+                          sizeof(typename std::remove_extent<T>::type) * src_ptr.getCount());
+  return gpu_ptr;
+}
+
+} // namespace tnn

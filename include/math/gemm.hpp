@@ -13,21 +13,21 @@
 #include "cuda/gemm.hpp"
 #include "device/device_ptr.hpp"
 
-namespace tmath {
+namespace tnn {
 
 template <typename T>
-void gemm(const tdevice::device_ptr<T[]> &A, const tdevice::device_ptr<T[]> &B,
-          const tdevice::device_ptr<T[]> &C, const size_t M, const size_t N, const size_t K,
-          const bool trans_A = false, const bool trans_B = false) {
+void gemm(const device_ptr<T[]> &A, const device_ptr<T[]> &B, const device_ptr<T[]> &C,
+          const size_t M, const size_t N, const size_t K, const bool trans_A = false,
+          const bool trans_B = false) {
   if (A.getDeviceType() != B.getDeviceType() || A.getDeviceType() != C.getDeviceType()) {
     throw std::runtime_error("All device pointers must be on the same device type for gemm.");
   }
-  if (A.getDeviceType() == tdevice::DeviceType::CPU) {
+  if (A.getDeviceType() == DeviceType::CPU) {
     cpu::gemm<T>(A.get(), B.get(), C.get(), M, N, K, trans_A, trans_B);
-  } else if (A.getDeviceType() == tdevice::DeviceType::GPU) {
+  } else if (A.getDeviceType() == DeviceType::GPU) {
     cuda::gemm<T>(A.get(), B.get(), C.get(), M, N, K, static_cast<T>(1.0), trans_A, trans_B);
   } else {
     throw std::runtime_error("Unsupported device type for gemm.");
   }
 }
-} // namespace tmath
+} // namespace tnn

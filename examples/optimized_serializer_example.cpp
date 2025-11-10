@@ -8,7 +8,7 @@
 #include <chrono>
 #include <iostream>
 
-using namespace tpipeline;
+using namespace tnn;
 
 int main() {
   // Create a test message with a tensor task

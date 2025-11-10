@@ -8,11 +8,8 @@
 
 #include "tensor/tensor.hpp"
 
-#ifdef USE_CUDA
-#include "cuda/tensor_kernels.hpp"
-#endif
-
-namespace gpu_tensor_ops {
+namespace tnn {
+namespace cuda {
 /**
  * @brief GPU im2col operation
  * Branches to CPU or GPU implementation based on tensor device type
@@ -90,4 +87,6 @@ template <typename T, Layout L> void apply_softmax(Tensor<T, L> &input);
 
 template <typename T> void apply_softmax(Tensor<T, NCHW> &input);
 
-} // namespace gpu_tensor_ops
+} // namespace cuda
+
+} // namespace tnn

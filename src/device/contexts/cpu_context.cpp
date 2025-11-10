@@ -17,7 +17,7 @@
 #include <sys/types.h>
 #endif
 
-namespace tdevice {
+namespace tnn {
 CPUContext::CPUContext() : Context() {}
 
 size_t CPUContext::getTotalMemory() const {
@@ -142,4 +142,4 @@ void CPUContext::deallocateAlignedMemory(void *ptr) {
 #endif
 }
 
-} // namespace tdevice
+} // namespace tnn

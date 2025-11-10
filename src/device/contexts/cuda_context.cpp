@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace tdevice {
+namespace tnn {
 
 CUDAContext::CUDAContext(int id) : Context() {
   // Set the device for this context
@@ -116,6 +116,6 @@ void CUDAContext::deallocateAlignedMemory(void *ptr) {
   }
 }
 
-} // namespace tdevice
+} // namespace tnn
 
 #endif // USE_CUDA

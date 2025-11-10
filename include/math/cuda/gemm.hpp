@@ -8,7 +8,7 @@
 
 #include <cstddef>
 
-namespace tmath {
+namespace tnn {
 namespace cuda {
 
 /**
@@ -34,4 +34,4 @@ void gemm(const T *A, const T *B, T *C, const size_t M, const size_t N, const si
 
 } // namespace cuda
 
-} // namespace tmath
+} // namespace tnn

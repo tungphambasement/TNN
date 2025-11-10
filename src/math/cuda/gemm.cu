@@ -3,7 +3,7 @@
 
 #include <cublas_v2.h>
 
-namespace tmath {
+namespace tnn {
 namespace cuda {
 
 // Helper function to get cuBLAS handle (this should be managed globally)
@@ -28,6 +28,8 @@ void gemm<float>(const float *A, const float *B, float *C, const size_t M, const
   // Note: cuBLAS uses column-major, so we need to swap A and B
   cublasSgemm(handle, opB, opA, N, M, K, &alpha, B, trans_B ? K : N, A, trans_A ? M : K, &beta, C,
               N);
+
+  cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
 }
 
 // Specialization for double
@@ -43,7 +45,8 @@ void gemm<double>(const double *A, const double *B, double *C, const size_t M, c
   // Note: cuBLAS uses column-major, so we need to swap A and B
   cublasDgemm(handle, opB, opA, N, M, K, &alpha, B, trans_B ? K : N, A, trans_A ? M : K, &beta, C,
               N);
+  cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
 }
 
 } // namespace cuda
-} // namespace tmath
+} // namespace tnn

@@ -4,7 +4,7 @@
 
 #include <cstddef>
 
-namespace tdevice {
+namespace tnn {
 class CPUContext : public Context {
 public:
   explicit CPUContext();
@@ -18,4 +18,4 @@ public:
   void copyToDevice(void *dest, const void *src, size_t size) override;
   void copyToHost(void *dest, const void *src, size_t size) override;
 };
-} // namespace tdevice
+} // namespace tnn

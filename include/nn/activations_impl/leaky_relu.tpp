@@ -13,7 +13,7 @@ template <typename T> void LeakyReLU<T>::apply(Tensor<T> &tensor) const {
   T *data = tensor.data();
   const size_t size = tensor.size();
 
-  tthreads::parallel_for<size_t>(
+  parallel_for<size_t>(
       0, size, [&](size_t i) { data[i] = data[i] > T(0) ? data[i] : negative_slope_ * data[i]; });
 }
 
@@ -29,7 +29,7 @@ void LeakyReLU<T>::compute_gradient_inplace(const Tensor<T> &input,
   T *grad_data = upstream_gradient.data();
   size_t size = input.size();
 
-  tthreads::parallel_for<size_t>(0, size, [&](size_t i) {
+  parallel_for<size_t>(0, size, [&](size_t i) {
     T local_grad = input_data[i] > T(0) ? T(1) : negative_slope_;
     grad_data[i] *= local_grad;
   });

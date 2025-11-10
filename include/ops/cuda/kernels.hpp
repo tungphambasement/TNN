@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstddef>
 
+namespace tnn {
 namespace cuda {
 
 // Basic arithmetic operations
@@ -106,4 +107,13 @@ void cuda_fill_random_uniform(double *data, size_t size, double min_val, double 
 void cuda_fill_random_normal(double *data, size_t size, double mean, double stddev,
                              unsigned long long seed);
 
+template <typename T> void cuda_transpose_2d(const T *input, T *output, size_t rows, size_t cols);
+
+template <typename T>
+void cuda_nchw_to_cnhw(const T *input, T *output, size_t n, size_t c, size_t h, size_t w);
+
+template <typename T>
+void cuda_cnhw_to_nchw(const T *input, T *output, size_t n, size_t c, size_t h, size_t w);
+
 } // namespace cuda
+} // namespace tnn

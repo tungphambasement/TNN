@@ -3,7 +3,7 @@
 #include "augmentation.hpp"
 #include <random>
 
-namespace data_augmentation {
+namespace tnn {
 
 /**
  * Random crop augmentation with padding
@@ -72,4 +72,4 @@ private:
   }
 };
 
-} // namespace data_augmentation
+} // namespace tnn
