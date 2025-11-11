@@ -7,7 +7,6 @@
 #include "nn/layers_impl/cuda/batchnorm_ops.hpp"
 
 #include <cuda_runtime.h>
-#include <limits>
 
 namespace tnn {
 namespace cuda {
