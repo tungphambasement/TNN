@@ -37,7 +37,7 @@ if(ENABLE_CUDA)
         
         # Set CUDA properties
         set_target_properties(${test_name} PROPERTIES 
-            CUDA_ARCHITECTURES "52;60;61;70;75;80;86"
+            CUDA_ARCHITECTURES ${DETECTED_CUDA_ARCH}
             CUDA_STANDARD 17
             CUDA_SEPARABLE_COMPILATION ON
         )
