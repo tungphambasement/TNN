@@ -73,10 +73,7 @@ __global__ void normalize_and_scale_kernel(const T *input_data, const T *mean_da
   if (idx >= total_elements)
     return;
 
-  int n = idx / (channels * spatial_size);
-  int remaining = idx % (channels * spatial_size);
-  int c = remaining / spatial_size;
-  int spatial_idx = remaining % spatial_size;
+  int c = (idx / spatial_size) % channels;
 
   const T mean_val = mean_data[c];
   const T std_val = std_data[c];
