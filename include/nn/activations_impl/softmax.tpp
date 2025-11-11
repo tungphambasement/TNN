@@ -13,7 +13,6 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include <vector>
 
 namespace tnn {
 template <typename T> void Softmax<T>::apply(Tensor<T> &tensor) const {

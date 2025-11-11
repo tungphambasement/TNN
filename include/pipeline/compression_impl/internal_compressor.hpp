@@ -1,7 +1,5 @@
 #pragma once
-
-#include <cstdint>
-#include <vector>
+#include "pipeline/tbuffer.hpp"
 
 namespace tnn {
 class ZstdCompressor {

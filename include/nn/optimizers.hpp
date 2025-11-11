@@ -9,7 +9,6 @@
 #include "../tensor/tensor.hpp"
 #include <any>
 #include <cmath>
-#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>

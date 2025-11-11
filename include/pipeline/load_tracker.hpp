@@ -6,13 +6,6 @@
  */
 #pragma once
 
-#include "tbuffer.hpp"
-#include "utils/hardware_info.hpp"
-#include <iostream>
-#include <memory>
-#include <thread>
-#include <vector>
-
 namespace tnn {
 struct LoadTracker {
   /**

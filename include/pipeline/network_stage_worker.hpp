@@ -6,17 +6,11 @@
  */
 #pragma once
 
-#include "asio.hpp"
-#include "network_serialization.hpp"
-#include "nn/sequential.hpp"
 #include "pipeline_stage.hpp"
 #include "tcp_communicator.hpp"
 #include "utils/hardware_info.hpp"
 #include "utils/thread_affinity.hpp"
-#include <atomic>
-#include <chrono>
 #include <csignal>
-#include <future>
 #include <iostream>
 #include <memory>
 

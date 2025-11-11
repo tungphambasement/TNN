@@ -6,16 +6,12 @@
  */
 #pragma once
 
-#include <any>
 #include <memory>
 #include <string>
-#include <unordered_map>
-#include <vector>
 
-#include "../tensor/tensor.hpp"
 #include "activations.hpp"
 #include "layers_impl/base_layer.hpp"
-#include "optimizers.hpp"
+
 namespace tnn {
 
 template <typename T>
@@ -35,6 +31,7 @@ template <typename T> class BatchNormLayer;
 
 } // namespace tnn
 
+// Wrapper to include all layer implementations
 #include "layers_impl/activation_layer.hpp"
 #include "layers_impl/base_layer.hpp"
 #include "layers_impl/batchnorm_layer.hpp"
@@ -42,10 +39,11 @@ template <typename T> class BatchNormLayer;
 #include "layers_impl/dense_layer.hpp"
 #include "layers_impl/dropout_layer.hpp"
 #include "layers_impl/flatten_layer.hpp"
-#include "layers_impl/layer_factory.hpp"
 #include "layers_impl/maxpool2d_layer.hpp"
 #include "layers_impl/parameterized_layer.hpp"
 #include "layers_impl/stateless_layer.hpp"
+
+#include "layers_impl/layer_factory.hpp"
 
 namespace tnn {
 template <typename T = float>

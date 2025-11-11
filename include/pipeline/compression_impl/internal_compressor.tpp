@@ -1,7 +1,7 @@
 #pragma once
 
 #include "internal_compressor.hpp"
-#include <memory>
+#include "pipeline/tbuffer.hpp"
 #include <stdexcept>
 #include <zstd.h>
 

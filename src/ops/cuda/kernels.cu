@@ -1135,7 +1135,6 @@ template <typename T> void cuda_transpose_2d(const T *input, T *output, size_t r
   dim3 grid((cols + block.x - 1) / block.x, (rows + block.y - 1) / block.y);
   transpose_2d_kernel<<<grid, block>>>(input, output, rows, cols);
   cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
-  cudaDeviceSynchronize();
 }
 
 template <typename T>
@@ -1144,7 +1143,6 @@ void cuda_nchw_to_cnhw(const T *input, T *output, size_t n, size_t c, size_t h, 
   int num_blocks = get_num_blocks(total_size);
   nchw_to_cnhw_kernel<<<num_blocks, BLOCK_SIZE>>>(input, output, n, c, h, w);
   cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
-  cudaDeviceSynchronize();
 }
 
 template <typename T>
@@ -1153,7 +1151,6 @@ void cuda_cnhw_to_nchw(const T *input, T *output, size_t n, size_t c, size_t h, 
   int num_blocks = get_num_blocks(total_size);
   cnhw_to_nchw_kernel<<<num_blocks, BLOCK_SIZE>>>(input, output, n, c, h, w);
   cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
-  cudaDeviceSynchronize();
 }
 
 // Explicit template instantiations for common types

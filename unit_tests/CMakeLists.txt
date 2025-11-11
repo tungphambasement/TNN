@@ -23,6 +23,7 @@ set(TEST_FILES
     tensor_test.cpp
     device_manager_test.cpp
     cuda_kernels_test.cpp
+    gpu_tensor_test.cpp
 )
 
 foreach(test_file IN LISTS TEST_FILES)
@@ -64,6 +65,7 @@ add_custom_target(run_tests
     COMMAND ${CMAKE_CTEST_COMMAND} --verbose
     DEPENDS tensor_test 
     device_manager_test
+    gpu_tensor_test
     ${CUDA_TEST_TARGET}
     COMMENT "Running all unit tests"
 )

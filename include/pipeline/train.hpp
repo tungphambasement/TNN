@@ -6,8 +6,6 @@
  */
 #pragma once
 
-#include "data_loading/image_data_loader.hpp"
-#include "nn/sequential.hpp"
 #include "nn/train.hpp"
 #include "pipeline/distributed_coordinator.hpp"
 

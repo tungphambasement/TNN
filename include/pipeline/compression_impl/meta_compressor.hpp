@@ -2,11 +2,9 @@
 
 #include "internal_compressor.hpp"
 #include "pipeline/tbuffer.hpp"
-#include <cstdint>
 #include <cstring>
 #include <stdexcept>
 #include <string>
-#include <vector>
 
 namespace tnn {
 static void internal_compress(const TBuffer &data, const std::string name) {

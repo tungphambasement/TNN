@@ -9,10 +9,8 @@
 #include "tensor/tensor.hpp"
 
 #include <algorithm>
-#include <atomic>
 #include <fstream>
 #include <iostream>
-#include <memory>
 #include <numeric>
 #include <omp.h>
 #include <random>

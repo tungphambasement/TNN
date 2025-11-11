@@ -8,14 +8,12 @@
 #pragma once
 
 #include <cstring>
-#include <iostream>
 #include <random>
 #ifdef __AVX2__
 #include <immintrin.h>
 #endif
 #include "ops/ops.hpp"
 #include <cstdlib>
-#include <vector>
 #ifdef _WIN32
 #include <malloc.h>
 #endif
@@ -43,8 +41,12 @@ private:
 public:
   Matrix(const Device *device) : rows_(0), cols_(0), device_(device), data_(nullptr) {}
 
-  Matrix(size_t rows, size_t cols, const device_ptr<T[]> &data = nullptr,
-         const Device *device = &getCPU())
+  Matrix(size_t rows, size_t cols, const Device *device = &getCPU())
+      : rows_(rows), cols_(cols), device_(device) {
+    allocate_aligned(rows_ * cols_);
+  }
+
+  Matrix(size_t rows, size_t cols, const device_ptr<T[]> &data, const Device *device = &getCPU())
       : rows_(rows), cols_(cols), device_(device) {
     allocate_aligned(rows_ * cols_);
     if (data.get() != nullptr) {
