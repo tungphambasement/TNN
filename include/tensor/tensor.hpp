@@ -138,7 +138,6 @@ public:
   Tensor(Tensor &&other) noexcept : device_(other.device_), data_size_(other.data_size_) {
     layout_trait_ = other.layout_trait_;
     data_ = std::move(other.data_);
-    cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
   }
 
   template <typename... Indices> T &operator()(Indices... indices) {
@@ -363,8 +362,6 @@ public:
       Tensor<T, L> cpu_tensor(shape_vec, &getCPU());
       // Copy from GPU to CPU
       data_.getDevice()->copyToHost(cpu_tensor.data_.get(), data_.get(), data_size_ * sizeof(T));
-      cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
-
       return cpu_tensor;
     }
     throw std::runtime_error("Unsupported device type for to_cpu()");

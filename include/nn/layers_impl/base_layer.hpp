@@ -44,7 +44,6 @@ public:
 
   virtual void forward_inplace(Tensor<T> &input, size_t micro_batch_id = 0) {
     input = forward(input, micro_batch_id);
-    cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
   }
 
   virtual void backward_inplace(Tensor<T> &gradient, size_t micro_batch_id = 0) {

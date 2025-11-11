@@ -24,9 +24,13 @@ void gemm(const device_ptr<T[]> &A, const device_ptr<T[]> &B, const device_ptr<T
   }
   if (A.getDeviceType() == DeviceType::CPU) {
     cpu::gemm<T>(A.get(), B.get(), C.get(), M, N, K, trans_A, trans_B);
-  } else if (A.getDeviceType() == DeviceType::GPU) {
+  }
+#ifdef USE_CUDA
+  else if (A.getDeviceType() == DeviceType::GPU) {
     cuda::gemm<T>(A.get(), B.get(), C.get(), M, N, K, static_cast<T>(1.0), trans_A, trans_B);
-  } else {
+  }
+#endif
+  else {
     throw std::runtime_error("Unsupported device type for gemm.");
   }
 }

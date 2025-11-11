@@ -18,5 +18,6 @@ inline void checkCudaError(cudaError_t result, const char *func, const char *fil
 } // namespace cuda
 
 #define CUDA_CHECK(call) cuda::checkCudaError((call), __func__, __FILE__, __LINE__)
-#endif // USE_CUDA
 } // namespace tnn
+
+#endif // USE_CUDA

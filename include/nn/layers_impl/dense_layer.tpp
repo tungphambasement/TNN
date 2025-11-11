@@ -176,11 +176,13 @@ void DenseLayer<T>::compute_bias_gradients(const device_ptr<T[]> &current_grad_d
   if (current_grad_data.getDeviceType() == DeviceType::CPU) {
     cpu::compute_bias_gradients<T>(current_grad_data.get(), bias_gradient_data.get(), batch_size,
                                    output_features);
-  } else if (current_grad_data.getDeviceType() == DeviceType::GPU) {
-    throw new std::runtime_error("GPU compute_bias_gradients not implemented yet");
-  } else {
-    throw std::runtime_error("Unsupported device type in compute_bias_gradients");
   }
+#ifdef USE_CUDA
+  else {
+    cuda::compute_bias_gradients<T>(current_grad_data.get(), bias_gradient_data.get(), batch_size,
+                                    output_features);
+  }
+#endif
 }
 
 template <typename T>
@@ -191,11 +193,12 @@ void DenseLayer<T>::add_bias_vector(device_ptr<T[]> &output_data, const device_p
   }
   if (output_data.getDeviceType() == DeviceType::CPU) {
     cpu::add_bias_vector<T>(output_data.get(), bias_data.get(), batch_size, output_features);
-  } else if (output_data.getDeviceType() == DeviceType::GPU) {
-    cuda::add_bias_vector<T>(output_data.get(), bias_data.get(), batch_size, output_features);
-  } else {
-    throw std::runtime_error("Unsupported device type in add_bias_vector");
   }
+#ifdef USE_CUDA
+  else {
+    cuda::add_bias_vector<T>(output_data.get(), bias_data.get(), batch_size, output_features);
+  }
+#endif
 }
 
 template <typename T> std::string DenseLayer<T>::type() const { return "dense"; }

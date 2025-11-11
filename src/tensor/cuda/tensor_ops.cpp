@@ -330,5 +330,6 @@ template void apply_softmax<double>(Tensor<double, NCHW> &);
 
 } // namespace cuda
 
+} // namespace tnn
+
 #endif // USE_CUDA
-}

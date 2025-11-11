@@ -183,10 +183,13 @@ void Conv2DLayer<T>::compute_conv_forward(const device_ptr<T[]> &col_data,
   if (col_data.getDeviceType() == DeviceType::CPU) {
     cpu::compute_conv_forward(col_data.get(), weight_data.get(), output_data.get(), output_size,
                               kernel_size, out_channels);
-  } else {
+  }
+#ifdef USE_CUDA
+  else {
     cuda::compute_conv_forward(col_data.get(), weight_data.get(), output_data.get(), output_size,
                                kernel_size, out_channels);
   }
+#endif
   auto conv_end = std::chrono::high_resolution_clock::now();
   if (this->enable_profiling_) {
     float conv_duration = std::chrono::duration<float, std::milli>(conv_end - conv_start).count();
@@ -209,10 +212,13 @@ void Conv2DLayer<T>::compute_weight_gradients(const device_ptr<T[]> &col_data,
   if (col_data.getDeviceType() == DeviceType::CPU) {
     cpu::compute_weight_gradients(col_data.get(), gradient_data.get(), weight_grad_data.get(),
                                   output_size, kernel_size, out_channels);
-  } else {
+  }
+#ifdef USE_CUDA
+  else {
     cuda::compute_weight_gradients(col_data.get(), gradient_data.get(), weight_grad_data.get(),
                                    output_size, kernel_size, out_channels);
   }
+#endif
   auto wg_end = std::chrono::high_resolution_clock::now();
   if (this->enable_profiling_) {
     float wg_duration = std::chrono::duration<float, std::milli>(wg_end - wg_start).count();
@@ -235,10 +241,13 @@ void Conv2DLayer<T>::compute_input_gradients(const device_ptr<T[]> &gradient_dat
   if (gradient_data.getDeviceType() == DeviceType::CPU) {
     cpu::compute_input_gradients(gradient_data.get(), weight_data.get(), col_grad_data.get(),
                                  output_size, kernel_size, out_channels);
-  } else {
+  }
+#ifdef USE_CUDA
+  else {
     cuda::compute_input_gradients(gradient_data.get(), weight_data.get(), col_grad_data.get(),
                                   output_size, kernel_size, out_channels);
   }
+#endif
   auto ig_end = std::chrono::high_resolution_clock::now();
   if (this->enable_profiling_) {
     float ig_duration = std::chrono::duration<float, std::milli>(ig_end - ig_start).count();
@@ -259,10 +268,13 @@ void Conv2DLayer<T>::compute_bias_gradients(const device_ptr<T[]> &gradient_data
   if (gradient_data.getDeviceType() == DeviceType::CPU) {
     cpu::compute_bias_gradients(gradient_data.get(), bias_grad_data.get(), batch_size, output_h,
                                 output_w, out_channels);
-  } else {
+  }
+#ifdef USE_CUDA
+  else {
     cuda::compute_bias_gradients(gradient_data.get(), bias_grad_data.get(), batch_size, output_h,
                                  output_w, out_channels);
   }
+#endif
 }
 
 template <typename T>
@@ -277,10 +289,13 @@ void Conv2DLayer<T>::add_bias_to_output(device_ptr<T[]> &output_data,
   if (output_data.getDeviceType() == DeviceType::CPU) {
     cpu::add_bias_to_output(output_data.get(), bias_data.get(), batch_size, output_h, output_w,
                             out_channels);
-  } else {
+  }
+#ifdef USE_CUDA
+  else {
     cuda::add_bias_to_output(output_data.get(), bias_data.get(), batch_size, output_h, output_w,
                              out_channels);
   }
+#endif
 }
 
 template <typename T> std::string Conv2DLayer<T>::type() const { return "conv2d"; }

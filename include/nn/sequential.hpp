@@ -368,7 +368,6 @@ public:
 
           // current_output = layers_[i]->forward(current_output, micro_batch_id);
           layers_[i]->forward_inplace(current_output, micro_batch_id);
-          cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
 
           auto end_time = std::chrono::high_resolution_clock::now();
           auto duration =

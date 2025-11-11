@@ -114,11 +114,14 @@ void MaxPool2DLayer<T>::compute_max_pool_forward(const device_ptr<T[]> &input_da
     cpu::compute_max_pool_forward(input_data.get(), output_data.get(), batch_size, channels,
                                   input_h, input_w, output_h, output_w, pool_h_, pool_w_, stride_h_,
                                   stride_w_, mask_indices);
-  } else {
+  }
+#ifdef USE_CUDA
+  else {
     cuda::compute_max_pool_forward(input_data.get(), output_data.get(), batch_size, channels,
                                    input_h, input_w, output_h, output_w, pool_h_, pool_w_,
                                    stride_h_, stride_w_, mask_indices);
   }
+#endif
 }
 
 template <typename T>
@@ -134,10 +137,13 @@ void MaxPool2DLayer<T>::compute_max_pool_backward(const device_ptr<T[]> &gradien
   if (gradient_data.getDeviceType() == DeviceType::CPU) {
     cpu::compute_max_pool_backward(gradient_data.get(), grad_input_data.get(), batch_size, channels,
                                    output_h, output_w, mask_indices);
-  } else {
+  }
+#ifdef USE_CUDA
+  else {
     cuda::compute_max_pool_backward(gradient_data.get(), grad_input_data.get(), batch_size,
                                     channels, output_h, output_w, mask_indices);
   }
+#endif
 }
 
 template <typename T> std::string MaxPool2DLayer<T>::type() const { return "maxpool2d"; }

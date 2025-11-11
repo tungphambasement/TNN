@@ -4,10 +4,10 @@
 #include "device/device_ptr.hpp"
 #include <functional>
 #include <thread>
+#include <type_traits>
 #include <utility> // For std::forward
 
 namespace tnn {
-
 template <typename TRType> class AsyncContext {
 public:
   virtual device_ptr<TRType> synchronize() = 0;
@@ -16,8 +16,7 @@ public:
 
 template <typename TRType> class CPUAsyncContext : public AsyncContext<TRType> {
 private:
-  std::function<TRType()> func_;
-  device_ptr<TRType> result_;
+  std::function<void()> func_;
   std::thread thread_;
   const Device *device_;
 
@@ -28,8 +27,7 @@ public:
       return f(std::forward<Args>(a)...);
     };
 
-    result_ = make_ptr<TRType>(device_);
-    thread_ = std::thread([this]() { *(result_.get()) = func_(); });
+    thread_ = std::thread([this]() { func_(); });
   }
 
   ~CPUAsyncContext() {
@@ -38,11 +36,10 @@ public:
     }
   }
 
-  device_ptr<TRType> synchronize() override {
+  void synchronize() override {
     if (thread_.joinable()) {
       thread_.join();
     }
-    return result_;
   }
 
   CPUAsyncContext(const CPUAsyncContext &) = delete;
@@ -58,7 +55,6 @@ public:
 
 template <typename TRType> class CUDAAsyncContext : public AsyncContext<TRType> {
 private:
-  device_ptr<TRType> result_ptr_;
   cudaStream_t stream_;
   cudaEvent_t event_;
 
@@ -69,7 +65,6 @@ private:
 public:
   template <typename Func, typename... Args>
   explicit CUDAAsyncContext(Func &&func, const Device *device, Args &&...args) : device_(device) {
-    result_ptr_ = make_ptr<TRType>(device_);
 
     cudaStreamCreate(&stream_);
 
@@ -82,9 +77,7 @@ public:
     check_cuda(cudaEventCreate(&event_), "cudaEventCreate failed");
 
     launch_func_ = [f = std::forward<Func>(func), ... a = std::forward<Args>(args),
-                    result_ptr = result_ptr_.get(), stream = stream_]() mutable {
-      f(std::forward<Args>(a)..., result_ptr, stream);
-    };
+                    stream = stream_]() mutable { f(std::forward<Args>(a)..., stream); };
 
     launch_func_();
 
@@ -107,4 +100,9 @@ public:
 
 #endif // USE_CUDA
 
+void wait_all(std::vector<std::unique_ptr<AsyncContext<void>>> &contexts) {
+  for (auto &ctx : contexts) {
+    ctx->synchronize();
+  }
+}
 } // namespace tnn

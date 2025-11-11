@@ -1,11 +1,8 @@
 #pragma once
 
-#include "device/context.hpp"
-
-// Only declare class if CUDA is enabled or alternatively we can throw a compilation error
-
 #ifdef USE_CUDA
 
+#include "device/context.hpp"
 #include <cstddef>
 
 namespace tnn {
