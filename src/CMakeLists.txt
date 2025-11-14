@@ -176,6 +176,18 @@ target_link_libraries(tnn_nn PUBLIC nlohmann_json::nlohmann_json)
 if(ENABLE_CUDA)
     target_link_libraries(tnn_nn PUBLIC CUDA::cudart CUDA::cublas)
 endif()
+
+# Partitioner module
+file(GLOB_RECURSE TNN_PARTITIONER_SOURCES 
+    "partitioner/*.cpp"
+)
+add_library(tnn_partitioner STATIC ${TNN_PARTITIONER_SOURCES})
+target_include_directories(tnn_partitioner PUBLIC 
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(tnn_partitioner PUBLIC tnn_nn)
+
 # Pipeline library
 file(GLOB_RECURSE TNN_PIPELINE_SOURCES 
     "pipeline/*.cpp"
