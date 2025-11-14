@@ -6,8 +6,9 @@
  */
 #pragma once
 
-#include "../activations.hpp"
-#include "../optimizers.hpp"
+#include "nn/activations.hpp"
+#include "nn/optimizers.hpp"
+
 #include "parameterized_layer.hpp"
 #include "tensor/tensor.hpp"
 #include <memory>

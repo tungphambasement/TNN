@@ -5,10 +5,11 @@
  * project root for the full license text.
  */
 #pragma once
-#include "cuda/error_handler.hpp"
+
 #include "layers.hpp"
 #include "loss.hpp"
 #include "optimizers.hpp"
+
 #include <chrono>
 #include <filesystem>
 #include <fstream>

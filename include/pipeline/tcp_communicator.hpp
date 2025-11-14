@@ -9,20 +9,19 @@
 #pragma once
 
 #include "asio.hpp"
+#include "binary_serializer.hpp"
+
 #include "communicator.hpp"
 #include "message.hpp"
-#include "network_serialization.hpp"
 #include "tbuffer.hpp"
 #include <atomic>
 #include <deque>
-#include <functional>
 #include <iostream>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
 #include <thread>
 #include <unordered_map>
-#include <vector>
 
 namespace tnn {
 

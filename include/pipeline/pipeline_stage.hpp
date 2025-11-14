@@ -14,14 +14,12 @@
 #include "task.hpp"
 #include "utils/hardware_info.hpp"
 #include <atomic>
-#include <chrono>
 #include <condition_variable>
 #include <functional>
 #include <iostream>
 #include <memory>
 #include <mutex>
 #include <omp.h>
-#include <queue>
 #include <string>
 
 namespace tnn {

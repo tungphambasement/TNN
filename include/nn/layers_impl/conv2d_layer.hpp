@@ -6,17 +6,14 @@
  */
 #pragma once
 
+#include "device/device_ptr.hpp"
+#include "parameterized_layer.hpp"
+#include "tensor/tensor.hpp"
+
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-#include "../activations.hpp"
-#include "../optimizers.hpp"
-#include "device/device_ptr.hpp"
-#include "matrix/matrix.hpp"
-#include "parameterized_layer.hpp"
-#include "tensor/tensor.hpp"
 
 namespace tnn {
 

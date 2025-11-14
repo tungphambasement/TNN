@@ -6,14 +6,14 @@
  */
 #pragma once
 
+#include "device/device_ptr.hpp"
+#include "stateless_layer.hpp"
+#include "tensor/tensor.hpp"
+
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-#include "../layers.hpp"
-#include "device/device_ptr.hpp"
-#include "tensor/tensor.hpp"
 
 namespace tnn {
 

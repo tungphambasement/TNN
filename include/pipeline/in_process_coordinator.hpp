@@ -9,6 +9,7 @@
 
 #include "coordinator.hpp"
 #include "in_process_communicator.hpp"
+#include "pipeline_stage.hpp"
 
 namespace tnn {
 

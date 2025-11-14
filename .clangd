@@ -1,3 +1,4 @@
 CompileFlags:
   Add:
-    - -I${workspaceFolder}/include
+    - -Iinclude
+  CompilationDatabase: compile_commands.json

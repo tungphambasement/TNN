@@ -6,7 +6,6 @@
  */
 #pragma once
 
-#include "cuda/error_handler.hpp"
 #include "device/device_ptr.hpp"
 #include "layout_trait.hpp"
 #include <cassert>
@@ -34,7 +33,6 @@
 #include "device/device_manager.hpp"
 #include "device/device_ptr.hpp"
 #include "ops/ops.hpp"
-#include "threading/thread_handler.hpp"
 
 namespace tnn {
 

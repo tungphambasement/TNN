@@ -1,27 +1,15 @@
-#include <algorithm>
-#include <atomic>
-#include <chrono>
 #include <cmath>
-#include <fstream>
-#include <iomanip>
 #include <iostream>
 #include <memory>
-#include <numeric>
-#include <random>
-#include <sstream>
-#include <string_view>
 #include <vector>
 
 #include "data_augmentation/augmentation.hpp"
 #include "data_loading/mnist_data_loader.hpp"
-#include "nn/layers.hpp"
 #include "nn/loss.hpp"
 #include "nn/optimizers.hpp"
 #include "nn/sequential.hpp"
 #include "nn/train.hpp"
-#include "tensor/tensor.hpp"
 #include "utils/env.hpp"
-#include "utils/misc.hpp"
 
 using namespace tnn;
 
@@ -94,14 +82,14 @@ int main() {
 
     auto model = SequentialBuilder<float>("mnist_cnn_model")
                      .input({1, ::mnist_constants::IMAGE_HEIGHT, ::mnist_constants::IMAGE_WIDTH})
-                     .conv2d(8, 5, 5, 1, 1, 1, 1, true, "conv1")
+                     .conv2d(8, 3, 3, 1, 1, 0, 0, true, "conv1")
                      .batchnorm(1e-5f, 0.1f, true, "bn1")
                      .activation("relu", "relu1")
                      .maxpool2d(3, 3, 3, 3, 0, 0, "pool1")
-                     .conv2d(16, 1, 1, 1, 1, 1, 1, true, "conv2_1x1")
+                     .conv2d(16, 1, 1, 1, 1, 0, 0, true, "conv2_1x1")
                      .batchnorm(1e-5f, 0.1f, true, "bn2")
                      .activation("relu", "relu2")
-                     .conv2d(48, 5, 5, 1, 1, 1, 1, true, "conv3")
+                     .conv2d(48, 3, 3, 1, 1, 0, 0, true, "conv3")
                      .batchnorm(1e-5f, 0.1f, true, "bn3")
                      .activation("relu", "relu3")
                      .maxpool2d(2, 2, 2, 2, 0, 0, "pool2")
@@ -111,7 +99,8 @@ int main() {
 
     model.initialize();
 
-    auto optimizer = std::make_unique<Adam<float>>(lr_initial, 0.9f, 0.999f, 1e-8f);
+    // auto optimizer = std::make_unique<Adam<float>>(lr_initial, 0.9f, 0.999f, 1e-8f);
+    auto optimizer = std::make_unique<SGD<float>>(lr_initial, 0.9f);
     model.set_optimizer(std::move(optimizer));
 
     auto loss_function = LossFactory<float>::create_softmax_crossentropy();

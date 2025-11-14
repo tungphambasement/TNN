@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include "cuda/error_handler.hpp"
+#include "tensor/tensor.hpp"
 #include <any>
 #include <iostream>
 #include <map>

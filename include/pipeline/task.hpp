@@ -7,7 +7,6 @@
 #pragma once
 
 #include "tensor/tensor.hpp"
-#include <string>
 
 namespace tnn {
 enum TaskType { FORWARD, BACKWARD };

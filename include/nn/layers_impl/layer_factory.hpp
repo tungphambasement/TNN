@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include "../layers.hpp"
+#include "nn/layers.hpp"
 
 namespace tnn {
 

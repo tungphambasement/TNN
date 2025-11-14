@@ -7,13 +7,12 @@
 #pragma once
 
 #include "nn/loss.hpp"
-#include "nn/optimizers.hpp"
 #include "nn/sequential.hpp"
 
 #include "communicator.hpp"
 #include "partitioner/partitioner.hpp"
-#include "pipeline_stage.hpp"
-#include <algorithm>
+#include "stage_config.hpp"
+
 #include <atomic>
 #include <chrono>
 #include <condition_variable>

@@ -11,10 +11,7 @@
 #include "threading/thread_handler.hpp"
 #include <cassert>
 #include <memory>
-#include <stdexcept>
 #include <string>
-#include <type_traits>
-#include <vector>
 
 namespace tnn {
 template <typename T> ReLU<T>::ReLU(T negative_slope) : negative_slope_(negative_slope) {}

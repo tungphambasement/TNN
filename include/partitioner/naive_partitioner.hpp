@@ -1,6 +1,7 @@
 #pragma once
 
 #include "partitioner.hpp"
+#include <vector>
 
 namespace tnn {
 template <typename T> class NaivePartitioner : public Partitioner<T> {

@@ -4,14 +4,13 @@
  * This software is licensed under the MIT License. See the LICENSE file in the
  * project root for the full license text.
  */
+#pragma once
 #include "nn/layers_impl/maxpool2d_layer.hpp"
 
-#include <limits>
 #include <stdexcept>
 
 #include "nn/layers_impl/cpu/maxpool_ops.hpp"
 #include "nn/layers_impl/cuda/maxpool_ops.hpp"
-#include "threading/thread_handler.hpp"
 
 namespace tnn {
 

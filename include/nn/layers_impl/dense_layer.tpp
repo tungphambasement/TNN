@@ -15,7 +15,6 @@
 #include "math/gemm.hpp"
 #include "nn/layers_impl/parameterized_layer.hpp"
 #include "ops/ops.hpp"
-#include "threading/thread_handler.hpp"
 
 namespace tnn {
 

@@ -4,15 +4,14 @@
  * This software is licensed under the MIT License. See the LICENSE file in the
  * project root for the full license text.
  */
+#pragma once
 #include "nn/layers_impl/batchnorm_layer.hpp"
 
 #include <cmath>
-#include <iostream>
 #include <stdexcept>
 
 #include "nn/layers_impl/cpu/batchnorm_ops.hpp"
 #include "nn/layers_impl/cuda/batchnorm_ops.hpp"
-#include "ops/ops.hpp"
 
 namespace tnn {
 

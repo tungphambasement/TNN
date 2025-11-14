@@ -4,6 +4,7 @@
  * This software is licensed under the MIT License. See the LICENSE file in the
  * project root for the full license text.
  */
+#pragma once
 #include "nn/layers_impl/conv2d_layer.hpp"
 
 #include <chrono>
@@ -13,12 +14,9 @@
 #include <stdexcept>
 
 #include "device/device_manager.hpp"
-#include "math/gemm.hpp"
 #include "nn/layers_impl/cpu/conv2d_ops.hpp"
 #include "nn/layers_impl/cuda/conv2d_ops.hpp"
 #include "tensor/tensor_ops.hpp"
-#include "threading/thread_handler.hpp"
-#include "utils/mkl_utils.hpp"
 
 namespace tnn {
 
