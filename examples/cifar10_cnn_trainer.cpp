@@ -1,22 +1,14 @@
 #include "data_augmentation/augmentation.hpp"
 #include "data_loading/cifar10_data_loader.hpp"
-#include "nn/layers.hpp"
 #include "nn/loss.hpp"
 #include "nn/optimizers.hpp"
 #include "nn/sequential.hpp"
 #include "nn/train.hpp"
-#include "tensor/tensor.hpp"
 #include "utils/env.hpp"
 
-#include <algorithm>
-#include <chrono>
 #include <cmath>
-#include <fstream>
-#include <iomanip>
 #include <iostream>
 #include <omp.h>
-#include <random>
-#include <sstream>
 #include <vector>
 
 using namespace tnn;

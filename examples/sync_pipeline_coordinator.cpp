@@ -1,6 +1,4 @@
-#include "data_loading/cifar10_data_loader.hpp"
 #include "data_loading/mnist_data_loader.hpp"
-#include "nn/layers.hpp"
 #include "nn/sequential.hpp"
 #include "partitioner/naive_partitioner.hpp"
 #include "pipeline/distributed_coordinator.hpp"
@@ -11,7 +9,6 @@
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
-#include <thread>
 #include <vector>
 
 using namespace tnn;

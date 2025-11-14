@@ -2,9 +2,7 @@
 
 #include "data_augmentation/augmentation.hpp"
 #include "data_loading/cifar10_data_loader.hpp"
-#include "data_loading/mnist_data_loader.hpp"
 #include "nn/example_models.hpp"
-#include "nn/layers.hpp"
 #include "nn/sequential.hpp"
 #include "partitioner/naive_partitioner.hpp"
 #include "pipeline/distributed_coordinator.hpp"
@@ -12,13 +10,9 @@
 #include "tensor/tensor.hpp"
 #include "threading/thread_wrapper.hpp"
 #include "utils/env.hpp"
-#include "utils/mkl_utils.hpp"
 
-#include "utils/utils_extended.hpp"
-#include <chrono>
 #include <cstdlib>
 #include <iostream>
-#include <thread>
 #include <vector>
 
 using namespace tnn;
