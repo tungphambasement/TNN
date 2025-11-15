@@ -8,15 +8,10 @@
 
 #include "coordinator.hpp"
 #include "endpoint.hpp"
-#include "network_serialization.hpp"
 #include "nn/sequential.hpp"
-#include "partitioner/naive_partitioner.hpp"
 #include "tcp_communicator.hpp"
 #include <asio.hpp>
-#include <future>
-#include <iostream>
 #include <string>
-#include <thread>
 #include <vector>
 
 namespace tnn {

@@ -9,10 +9,12 @@ using namespace tnn;
 // Test fixture for GPU tensor operations
 class GPUTensorTest : public ::testing::Test {
 protected:
-  void SetUp() override {
-    // Initialize devices
+  static void SetUpTestSuite() {
+    // Initialize devices once for all tests in this suite
     initializeDefaultDevices();
+  }
 
+  void SetUp() override {
     DeviceManager &manager = DeviceManager::getInstance();
     std::vector<int> device_ids = manager.getAvailableDeviceIDs();
 
@@ -40,10 +42,12 @@ protected:
   }
 
   void TearDown() override {
-    if (has_gpu_) {
-      DeviceManager::getInstance().clearDevices();
-    }
+    // Clear tensors to release GPU memory before moving to next test
+    small_tensor = Tensor<float, NCHW>();
+    large_tensor = Tensor<float, NCHW>();
   }
+
+  static void TearDownTestSuite() {}
 
   bool has_gpu_;
   const Device *gpu_device_;
@@ -607,9 +611,14 @@ TEST_F(GPUTensorTest, CopyBatchInvalidIndex) {
 class GPUTensorSizeTest
     : public ::testing::TestWithParam<std::tuple<size_t, size_t, size_t, size_t>> {
 protected:
-  void SetUp() override {
-    initializeDefaultDevices();
+  static void SetUpTestSuite() {
+    DeviceManager &manager = DeviceManager::getInstance();
+    if (manager.getAvailableDeviceIDs().empty()) {
+      initializeDefaultDevices();
+    }
+  }
 
+  void SetUp() override {
     DeviceManager &manager = DeviceManager::getInstance();
     std::vector<int> device_ids = manager.getAvailableDeviceIDs();
 
@@ -628,11 +637,7 @@ protected:
     }
   }
 
-  void TearDown() override {
-    if (has_gpu_) {
-      DeviceManager::getInstance().clearDevices();
-    }
-  }
+  static void TearDownTestSuite() {}
 
   bool has_gpu_;
   const Device *gpu_device_;
@@ -713,6 +718,4 @@ TEST(GPUTensorFloatingPointTest, FloatingPointComparisons) {
   for (size_t i = 0; i < cpu_diff.size(); ++i) {
     EXPECT_NEAR(cpu_diff.data()[i], 0.0f, 1e-6f);
   }
-
-  manager.clearDevices();
 }

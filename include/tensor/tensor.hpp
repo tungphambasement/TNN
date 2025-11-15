@@ -186,7 +186,7 @@ public:
     }
 
     std::vector<size_t> shape_vec(shape_, shape_ + dims_);
-    Tensor<T, L> result(shape_vec);
+    Tensor<T, L> result(shape_vec, device_);
 
     ops::add(data_, other.data_, result.data_, data_size_)->synchronize();
 
@@ -199,7 +199,7 @@ public:
     }
 
     std::vector<size_t> shape_vec(shape_, shape_ + dims_);
-    Tensor<T, L> result(shape_vec);
+    Tensor<T, L> result(shape_vec, device_);
 
     ops::sub(data_, other.data_, result.data_, data_size_)->synchronize();
 
@@ -212,7 +212,7 @@ public:
     }
 
     std::vector<size_t> shape_vec(shape_, shape_ + dims_);
-    Tensor<T, L> result(shape_vec);
+    Tensor<T, L> result(shape_vec, device_);
 
     ops::mul(data_, other.data_, result.data_, data_size_)->synchronize();
 
@@ -225,7 +225,7 @@ public:
     }
 
     std::vector<size_t> shape_vec(shape_, shape_ + dims_);
-    Tensor<T, L> result(shape_vec);
+    Tensor<T, L> result(shape_vec, device_);
 
     ops::div(data_, other.data_, result.data_, data_size_)->synchronize();
 
@@ -234,7 +234,7 @@ public:
 
   Tensor<T, L> operator*(T scalar) const {
     std::vector<size_t> shape_vec(shape_, shape_ + dims_);
-    Tensor<T, L> result(shape_vec);
+    Tensor<T, L> result(shape_vec, device_);
 
     ops::mul_scalar(data_, scalar, result.data_, data_size_)->synchronize();
 
@@ -247,7 +247,7 @@ public:
     }
 
     std::vector<size_t> shape_vec(shape_, shape_ + dims_);
-    Tensor<T, L> result(shape_vec);
+    Tensor<T, L> result(shape_vec, device_);
 
     ops::div_scalar(data_, scalar, result.data_, data_size_)->synchronize();
 
@@ -383,7 +383,7 @@ public:
   }
 
   Tensor<T, L> clone() const {
-    return Tensor<T, L>(std::vector<size_t>(shape_, shape_ + dims_), data_);
+    return Tensor<T, L>(std::vector<size_t>(shape_, shape_ + dims_), data_, device_);
   }
 
   void fill(T value) { ops::set_scalar(data_, value, data_size_)->synchronize(); }
@@ -410,7 +410,7 @@ public:
     if (new_size != size()) {
       throw std::invalid_argument("New shape must have same total size");
     }
-    return Tensor<T, L>(new_shape, data_);
+    return Tensor<T, L>(new_shape, data_, device_);
   }
 
   void copy_batch(Tensor<T, L> &other, size_t src_batch_idx, size_t dest_batch_idx) {
