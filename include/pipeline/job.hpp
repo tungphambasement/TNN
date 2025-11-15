@@ -9,21 +9,21 @@
 #include "tensor/tensor.hpp"
 
 namespace tnn {
-enum TaskType { FORWARD, BACKWARD };
+enum JobType { FORWARD, BACKWARD };
 
-template <typename T = float> struct Task {
+template <typename T = float> struct Job {
   Tensor<T> data;
   size_t micro_batch_id;
 
-  Task() = default;
+  Job() = default;
 
-  Task(const Tensor<T> &d, size_t mb_id) : data(d.clone()), micro_batch_id(mb_id) {}
+  Job(const Tensor<T> &d, size_t mb_id) : data(d.clone()), micro_batch_id(mb_id) {}
 
-  Task(const Task &other) : data(other.data.clone()), micro_batch_id(other.micro_batch_id) {}
+  Job(const Job &other) : data(other.data.clone()), micro_batch_id(other.micro_batch_id) {}
 
-  Task(Task &&other) noexcept : data(std::move(other.data)), micro_batch_id(other.micro_batch_id) {}
+  Job(Job &&other) noexcept : data(std::move(other.data)), micro_batch_id(other.micro_batch_id) {}
 
-  Task &operator=(const Task &other) {
+  Job &operator=(const Job &other) {
     if (this != &other) {
       data = other.data.clone();
       micro_batch_id = other.micro_batch_id;
@@ -31,7 +31,7 @@ template <typename T = float> struct Task {
     return *this;
   }
 
-  Task &operator=(Task &&other) noexcept {
+  Job &operator=(Job &&other) noexcept {
     if (this != &other) {
       data = std::move(other.data);
       micro_batch_id = other.micro_batch_id;

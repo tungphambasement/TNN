@@ -150,35 +150,35 @@ int main() {
       coordinator.forward(micro_batches[i], i);
     }
 
-    // Wait for all forward tasks to complete with a timeout
-    coordinator.join(CommandType::FORWARD_TASK, num_microbatches, 60);
+    // Wait for all forward jobs to complete with a timeout
+    coordinator.join(CommandType::FORWARD_JOB, num_microbatches, 60);
 
     auto forward_end = std::chrono::high_resolution_clock::now();
     auto forward_duration =
         std::chrono::duration_cast<std::chrono::microseconds>(forward_end - forward_start);
     auto compute_loss_start = std::chrono::high_resolution_clock::now();
 
-    std::vector<Message> all_messages = coordinator.dequeue_all_messages(CommandType::FORWARD_TASK);
+    std::vector<Message> all_messages = coordinator.dequeue_all_messages(CommandType::FORWARD_JOB);
 
-    std::vector<Task<float>> forward_tasks;
+    std::vector<Job<float>> forward_jobs;
     for (const auto &message : all_messages) {
-      if (message.header.command_type == CommandType::FORWARD_TASK) {
-        forward_tasks.push_back(message.get<Task<float>>());
+      if (message.header.command_type == CommandType::FORWARD_JOB) {
+        forward_jobs.push_back(message.get<Job<float>>());
       }
     }
 
-    std::vector<Task<float>> backward_tasks;
-    for (auto &task : forward_tasks) {
-      loss += loss_function->compute_loss(task.data, micro_batch_labels[task.micro_batch_id]);
+    std::vector<Job<float>> backward_jobs;
+    for (auto &job : forward_jobs) {
+      loss += loss_function->compute_loss(job.data, micro_batch_labels[job.micro_batch_id]);
       avg_accuracy +=
-          compute_class_accuracy<float>(task.data, micro_batch_labels[task.micro_batch_id]);
+          compute_class_accuracy<float>(job.data, micro_batch_labels[job.micro_batch_id]);
 
       Tensor<float> gradient =
-          loss_function->compute_gradient(task.data, micro_batch_labels[task.micro_batch_id]);
+          loss_function->compute_gradient(job.data, micro_batch_labels[job.micro_batch_id]);
 
-      Task<float> backward_task{gradient, task.micro_batch_id};
+      Job<float> backward_job{gradient, job.micro_batch_id};
 
-      backward_tasks.push_back(backward_task);
+      backward_jobs.push_back(backward_job);
     }
 
     loss /= num_microbatches;
@@ -190,13 +190,13 @@ int main() {
 
     auto backward_start = std::chrono::high_resolution_clock::now();
 
-    for (const auto &task : backward_tasks) {
-      coordinator.backward(task.data, task.micro_batch_id);
+    for (const auto &job : backward_jobs) {
+      coordinator.backward(job.data, job.micro_batch_id);
     }
 
-    coordinator.join(CommandType::BACKWARD_TASK, num_microbatches, 60);
+    coordinator.join(CommandType::BACKWARD_JOB, num_microbatches, 60);
 
-    coordinator.dequeue_all_messages(CommandType::BACKWARD_TASK);
+    coordinator.dequeue_all_messages(CommandType::BACKWARD_JOB);
 
     auto backward_end = std::chrono::high_resolution_clock::now();
     auto backward_duration =
@@ -249,9 +249,9 @@ int main() {
       coordinator.forward(micro_batches[i], i);
     }
 
-    coordinator.join(CommandType::FORWARD_TASK, num_microbatches, 60);
+    coordinator.join(CommandType::FORWARD_JOB, num_microbatches, 60);
 
-    std::vector<Message> all_messages = coordinator.dequeue_all_messages(CommandType::FORWARD_TASK);
+    std::vector<Message> all_messages = coordinator.dequeue_all_messages(CommandType::FORWARD_JOB);
 
     if (all_messages.size() != static_cast<size_t>(num_microbatches)) {
       throw std::runtime_error(
@@ -259,17 +259,17 @@ int main() {
           ", expected: " + std::to_string(num_microbatches));
     }
 
-    std::vector<Task<float>> forward_tasks;
+    std::vector<Job<float>> forward_jobs;
     for (const auto &message : all_messages) {
-      if (message.header.command_type == CommandType::FORWARD_TASK) {
-        forward_tasks.push_back(message.get<Task<float>>());
+      if (message.header.command_type == CommandType::FORWARD_JOB) {
+        forward_jobs.push_back(message.get<Job<float>>());
       }
     }
 
-    for (auto &task : forward_tasks) {
-      val_loss += loss_function->compute_loss(task.data, micro_batch_labels[task.micro_batch_id]);
+    for (auto &job : forward_jobs) {
+      val_loss += loss_function->compute_loss(job.data, micro_batch_labels[job.micro_batch_id]);
       val_accuracy +=
-          compute_class_accuracy<float>(task.data, micro_batch_labels[task.micro_batch_id]);
+          compute_class_accuracy<float>(job.data, micro_batch_labels[job.micro_batch_id]);
     }
     ++val_batches;
   }

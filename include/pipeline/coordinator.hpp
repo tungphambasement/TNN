@@ -116,8 +116,8 @@ public:
 
     const std::string &first_stage = this->stage_names_[0];
 
-    Task<float> task{input, microbatch_id};
-    Message forward_msg(first_stage, CommandType::FORWARD_TASK, task);
+    Job<float> job{input, microbatch_id};
+    Message forward_msg(first_stage, CommandType::FORWARD_JOB, job);
 
     this->coordinator_comm_->send_message(forward_msg);
   }
@@ -134,8 +134,8 @@ public:
 
     const std::string &last_stage = this->stage_names_.back();
 
-    Task<float> task{gradient, microbatch_id};
-    Message backward_msg(last_stage, CommandType::BACKWARD_TASK, task);
+    Job<float> job{gradient, microbatch_id};
+    Message backward_msg(last_stage, CommandType::BACKWARD_JOB, job);
 
     this->coordinator_comm_->send_message(backward_msg);
   }
@@ -282,22 +282,22 @@ public:
     while (processed_microbatches_ < this->num_microbatches_) {
       std::unique_lock<std::mutex> lock(message_notification_mutex_);
       message_notification_cv_.wait(lock, [this]() {
-        return this->coordinator_comm_->message_count(CommandType::FORWARD_TASK) > 0;
+        return this->coordinator_comm_->message_count(CommandType::FORWARD_JOB) > 0;
       });
-      std::vector<Message> FORWARD_TASKs =
-          this->coordinator_comm_->dequeue_all_messages_by_type(CommandType::FORWARD_TASK);
+      std::vector<Message> FORWARD_JOBs =
+          this->coordinator_comm_->dequeue_all_messages_by_type(CommandType::FORWARD_JOB);
 
-      for (const auto &forward_msg : FORWARD_TASKs) {
-        if (forward_msg.has_type<Task<float>>()) {
+      for (const auto &forward_msg : FORWARD_JOBs) {
+        if (forward_msg.has_type<Job<float>>()) {
           ++processed_microbatches_;
 
-          const Task<float> &task = forward_msg.get<Task<float>>();
-          Tensor<float> predictions = task.data;
-          Tensor<float> targets = microbatch_labels[task.micro_batch_id];
+          const Job<float> &job = forward_msg.get<Job<float>>();
+          Tensor<float> predictions = job.data;
+          Tensor<float> targets = microbatch_labels[job.micro_batch_id];
           float loss = loss_function_->compute_loss(predictions, targets);
           total_loss += loss;
           Tensor<float> gradient = loss_function_->compute_gradient(predictions, targets);
-          this->backward(gradient, task.micro_batch_id);
+          this->backward(gradient, job.micro_batch_id);
         }
       }
     }
@@ -305,11 +305,11 @@ public:
     std::unique_lock<std::mutex> lock(message_notification_mutex_);
 
     message_notification_cv_.wait(lock, [this]() {
-      return this->coordinator_comm_->message_count(CommandType::BACKWARD_TASK) >=
+      return this->coordinator_comm_->message_count(CommandType::BACKWARD_JOB) >=
              static_cast<size_t>(this->num_microbatches_);
     });
 
-    this->coordinator_comm_->dequeue_all_messages_by_type(CommandType::BACKWARD_TASK);
+    this->coordinator_comm_->dequeue_all_messages_by_type(CommandType::BACKWARD_JOB);
 
     return total_loss;
   }

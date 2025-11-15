@@ -81,9 +81,9 @@ ClassResult validate_semi_async_epoch(DistributedCoordinator &coordinator,
       coordinator.forward(micro_batches[i], i);
     }
 
-    coordinator.join(CommandType::FORWARD_TASK, coordinator.num_microbatches(), 60);
+    coordinator.join(CommandType::FORWARD_JOB, coordinator.num_microbatches(), 60);
 
-    std::vector<Message> all_messages = coordinator.dequeue_all_messages(CommandType::FORWARD_TASK);
+    std::vector<Message> all_messages = coordinator.dequeue_all_messages(CommandType::FORWARD_JOB);
 
     if (all_messages.size() != static_cast<size_t>(coordinator.num_microbatches())) {
       throw std::runtime_error(
@@ -91,20 +91,20 @@ ClassResult validate_semi_async_epoch(DistributedCoordinator &coordinator,
           ", expected: " + std::to_string(coordinator.num_microbatches()));
     }
 
-    std::vector<Task<float>> forward_tasks;
+    std::vector<Job<float>> forward_jobs;
     for (const auto &message : all_messages) {
-      if (message.header.command_type == CommandType::FORWARD_TASK) {
-        forward_tasks.push_back(message.get<Task<float>>());
+      if (message.header.command_type == CommandType::FORWARD_JOB) {
+        forward_jobs.push_back(message.get<Job<float>>());
       }
     }
 
     auto val_loss = 0.0f;
     auto val_correct = 0.0f;
 
-    for (auto &task : forward_tasks) {
-      val_loss += coordinator.compute_loss(task.data, micro_batch_labels[task.micro_batch_id]);
+    for (auto &job : forward_jobs) {
+      val_loss += coordinator.compute_loss(job.data, micro_batch_labels[job.micro_batch_id]);
       val_correct +=
-          compute_class_corrects<float>(task.data, micro_batch_labels[task.micro_batch_id]);
+          compute_class_corrects<float>(job.data, micro_batch_labels[job.micro_batch_id]);
     }
     total_val_loss += val_loss;
     total_val_correct += val_correct;

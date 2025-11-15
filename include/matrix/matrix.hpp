@@ -50,7 +50,7 @@ public:
       : rows_(rows), cols_(cols), device_(device) {
     allocate_aligned(rows_ * cols_);
     if (data.get() != nullptr) {
-      ops::copy(data, data_, rows_ * cols_);
+      ops::copy(data, data_, rows_ * cols_)->synchronize();
     }
   }
 
@@ -59,7 +59,7 @@ public:
     this->cols_ = other.cols_;
     this->device_ = other.device_;
     allocate_aligned(rows_ * cols_);
-    ops::copy(other.data_, data_, rows_ * cols_);
+    ops::copy(other.data_, data_, rows_ * cols_)->synchronize();
   }
 
   Matrix(Matrix<T> &&other) noexcept
@@ -89,7 +89,7 @@ public:
   const T *data() const { return data_.get(); }
   T *data() { return data_.get(); }
 
-  void fill(T value) { ops::set_scalar(data_, value, rows_ * cols_); }
+  void fill(T value) { ops::set_scalar(data_, value, rows_ * cols_)->synchronize(); }
 
   inline Matrix<T> operator+(const Matrix<T> &other) const {
     if (rows_ != other.rows_ || cols_ != other.cols_) {
@@ -98,7 +98,7 @@ public:
     Matrix<T> result(rows_, cols_);
     size_t size = rows_ * cols_;
 
-    ops::add(data_, other.data_, result.data_, size);
+    ops::add(data_, other.data_, result.data_, size)->synchronize();
     return result;
   }
 
@@ -108,7 +108,7 @@ public:
     }
     size_t size = rows_ * cols_;
 
-    ops::add(data_, other.data_, data_, size);
+    ops::add(data_, other.data_, data_, size)->synchronize();
     return *this;
   }
 
@@ -119,7 +119,7 @@ public:
     Matrix<T> result(rows_, cols_);
     size_t size = rows_ * cols_;
 
-    ops::sub(data_, other.data_, result.data_, size);
+    ops::sub(data_, other.data_, result.data_, size)->synchronize();
     return result;
   }
 
@@ -129,7 +129,7 @@ public:
     }
     size_t size = rows_ * cols_;
 
-    ops::sub(data_, other.data_, data_, size);
+    ops::sub(data_, other.data_, data_, size)->synchronize();
 
     return *this;
   }
@@ -138,14 +138,14 @@ public:
     Matrix<T> result(rows_, cols_);
     size_t size = rows_ * cols_;
 
-    ops::mul_scalar(data_, scalar, result.data_, size);
+    ops::mul_scalar(data_, scalar, result.data_, size)->synchronize();
     return result;
   }
 
   inline Matrix<T> &operator*=(T scalar) {
     size_t size = rows_ * cols_;
 
-    ops::mul_scalar(data_, scalar, data_, size);
+    ops::mul_scalar(data_, scalar, data_, size)->synchronize();
     return *this;
   }
 
@@ -156,7 +156,7 @@ public:
     Matrix<T> result(rows_, cols_);
     size_t size = rows_ * cols_;
 
-    ops::div_scalar(data_, scalar, result.data_, size);
+    ops::div_scalar(data_, scalar, result.data_, size)->synchronize();
     return result;
   }
 
@@ -166,7 +166,7 @@ public:
     }
     size_t size = rows_ * cols_;
 
-    ops::div_scalar(data_, scalar, data_, size);
+    ops::div_scalar(data_, scalar, data_, size)->synchronize();
 
     return *this;
   }
@@ -178,7 +178,7 @@ public:
     Matrix<T> result(rows_, other.cols_);
     result.fill(0.0);
 
-    ops::mul(data_, other.data_, result.data_, size());
+    ops::mul(data_, other.data_, result.data_, size())->synchronize();
     return result;
   }
 
@@ -209,12 +209,14 @@ public:
 
   void fill_random_uniform(T range) {
     ops::fill_random_uniform(data_, rows_ * cols_, -range, range,
-                             static_cast<unsigned long long>(std::random_device{}()));
+                             static_cast<unsigned long long>(std::random_device{}()))
+        ->synchronize();
   }
 
   void fill_random_normal(T mean, T stddev) {
     ops::fill_random_normal(data_, rows_ * cols_, mean, stddev,
-                            static_cast<unsigned long long>(std::random_device{}()));
+                            static_cast<unsigned long long>(std::random_device{}()))
+        ->synchronize();
   }
 };
 } // namespace tnn

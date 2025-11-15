@@ -1,51 +1,47 @@
 #pragma once
 
-#include "device/device.hpp"
-#include "device/device_ptr.hpp"
-#include <functional>
-#include <thread>
-#include <type_traits>
-#include <utility> // For std::forward
+#include "device/device.hpp" // Assuming this is defined elsewhere
+#include "threadpool.hpp"
+
+#include <future>
+#include <memory>
+#include <system_error>
+#include <tuple>
+#include <utility>
 
 namespace tnn {
-template <typename TRType> class AsyncContext {
+
+using ErrorStatus = std::error_code;
+
+class Task {
 public:
-  virtual device_ptr<TRType> synchronize() = 0;
-  virtual ~AsyncContext() = default;
+  virtual ~Task() = default;
+  virtual ErrorStatus synchronize() = 0;
 };
 
-template <typename TRType> class CPUAsyncContext : public AsyncContext<TRType> {
+class CPUTask : public Task {
 private:
-  std::function<void()> func_;
-  std::thread thread_;
   const Device *device_;
 
 public:
   template <typename Func, typename... Args>
-  explicit CPUAsyncContext(Func &&func, const Device *device, Args &&...args) : device_(device) {
-    func_ = [f = std::forward<Func>(func), ... a = std::forward<Args>(args)]() mutable -> TRType {
-      return f(std::forward<Args>(a)...);
+  explicit CPUTask(Func &&func, const Device *device, Args &&...args) : device_(device) {
+    auto bound_work = [f = std::forward<Func>(func),
+                       args_tuple = std::make_tuple(std::forward<Args>(args)...)]() mutable {
+      std::apply(f, std::move(args_tuple));
     };
 
-    thread_ = std::thread([this]() { func_(); });
+    bound_work();
   }
 
-  ~CPUAsyncContext() {
-    if (thread_.joinable()) {
-      thread_.join();
-    }
-  }
+  ~CPUTask() {}
 
-  void synchronize() override {
-    if (thread_.joinable()) {
-      thread_.join();
-    }
-  }
+  ErrorStatus synchronize() override { return ErrorStatus{}; }
 
-  CPUAsyncContext(const CPUAsyncContext &) = delete;
-  CPUAsyncContext &operator=(const CPUAsyncContext &) = delete;
-  CPUAsyncContext(CPUAsyncContext &&) = delete;
-  CPUAsyncContext &operator=(CPUAsyncContext &&) = delete;
+  CPUTask(const CPUTask &) = delete;
+  CPUTask &operator=(const CPUTask &) = delete;
+  CPUTask(CPUTask &&) = delete;
+  CPUTask &operator=(CPUTask &&) = delete;
 };
 
 #ifdef USE_CUDA
@@ -53,56 +49,59 @@ public:
 #include <cuda_runtime.h>
 #include <stdexcept>
 
-template <typename TRType> class CUDAAsyncContext : public AsyncContext<TRType> {
+inline ErrorStatus cuda_error_to_status(cudaError_t err) {
+  if (err == cudaSuccess) {
+    return ErrorStatus{};
+  }
+  // In production, map specific CUDA errors to a custom error category
+  return std::make_error_code(std::errc::resource_unavailable_try_again);
+}
+
+class CUDATask : public Task {
 private:
   cudaStream_t stream_;
   cudaEvent_t event_;
-
-  std::function<void()> launch_func_;
-
   const Device *device_;
 
 public:
   template <typename Func, typename... Args>
-  explicit CUDAAsyncContext(Func &&func, const Device *device, Args &&...args) : device_(device) {
-
+  explicit CUDATask(Func &&func, const Device *device, Args &&...args) : device_(device) {
     cudaStreamCreate(&stream_);
 
-    auto check_cuda = [](cudaError_t err, const char *msg) {
-      if (err != cudaSuccess) {
-        throw std::runtime_error(std::string(msg) + ": " + cudaGetErrorString(err));
-      }
+    cudaEventCreate(&event_);
+
+    auto launch_func = [f = std::forward<Func>(func),
+                        args_tuple = std::make_tuple(std::forward<Args>(args)...),
+                        stream = stream_]() mutable {
+      std::apply([stream](auto &&f_inner,
+                          auto &&...a) { f_inner(std::forward<decltype(a)>(a)..., stream); },
+                 std::tuple_cat(std::forward_as_tuple(f), std::move(args_tuple)));
     };
 
-    check_cuda(cudaEventCreate(&event_), "cudaEventCreate failed");
-
-    launch_func_ = [f = std::forward<Func>(func), ... a = std::forward<Args>(args),
-                    stream = stream_]() mutable { f(std::forward<Args>(a)..., stream); };
-
-    launch_func_();
-
-    check_cuda(cudaEventRecord(event_, stream_), "cudaEventRecord failed");
+    launch_func();
+    cudaEventRecord(event_, stream_);
   }
 
-  ~CUDAAsyncContext() { cudaEventDestroy(event_); }
-
-  device_ptr<TRType> synchronize() override {
-    cudaEventSynchronize(event_);
-
-    return result_ptr_;
+  ~CUDATask() {
+    cudaStreamDestroy(stream_);
+    cudaEventDestroy(event_);
   }
 
-  CUDAAsyncContext(const CUDAAsyncContext &) = delete;
-  CUDAAsyncContext &operator=(const CUDAAsyncContext &) = delete;
-  CUDAAsyncContext(CUDAAsyncContext &&) = delete;
-  CUDAAsyncContext &operator=(CUDAAsyncContext &&) = delete;
+  ErrorStatus synchronize() override {
+    cudaError_t err = cudaEventSynchronize(event_);
+
+    return cuda_error_to_status(err);
+  }
 };
 
 #endif // USE_CUDA
 
-void wait_all(std::vector<std::unique_ptr<AsyncContext<void>>> &contexts) {
+inline void wait_all(std::vector<std::unique_ptr<Task>> &contexts) {
   for (auto &ctx : contexts) {
-    ctx->synchronize();
+    ErrorStatus status = ctx->synchronize();
+    if (status) {
+      throw std::runtime_error("Synchronization failed: " + status.message());
+    }
   }
 }
 } // namespace tnn

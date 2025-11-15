@@ -86,7 +86,7 @@ public:
     layout_trait_.compute_strides();
     data_size_ = std::accumulate(shape_, shape_ + dims_, size_t(1), std::multiplies<size_t>());
     allocate_data(data_size_);
-    ops::set_scalar(data_, T(0), data_size_);
+    ops::set_scalar(data_, T(0), data_size_)->synchronize();
   }
 
   Tensor(std::initializer_list<size_t> shape_list, const device_ptr<T[]> &data,
@@ -98,7 +98,7 @@ public:
     data_size_ = std::accumulate(shape_, shape_ + dims_, size_t(1), std::multiplies<size_t>());
     allocate_data(data_size_);
     if (data.get() != nullptr) {
-      ops::copy(data, data_, data_size_);
+      ops::copy(data, data_, data_size_)->synchronize();
     }
   }
 
@@ -108,7 +108,7 @@ public:
     layout_trait_.compute_strides();
     data_size_ = std::accumulate(shape.begin(), shape.end(), size_t(1), std::multiplies<size_t>());
     allocate_data(data_size_);
-    ops::set_scalar(data_, T(0), data_size_);
+    ops::set_scalar(data_, T(0), data_size_)->synchronize();
   }
 
   Tensor(std::vector<size_t> shape, const device_ptr<T[]> &data, const Device *dt = &getCPU())
@@ -119,7 +119,7 @@ public:
     data_size_ = std::accumulate(shape.begin(), shape.end(), size_t(1), std::multiplies<size_t>());
     allocate_data(data_size_);
     if (data.get() != nullptr) {
-      ops::copy(data, data_, data_size_);
+      ops::copy(data, data_, data_size_)->synchronize();
     }
   }
 
@@ -129,7 +129,7 @@ public:
       : layout_trait_(other.layout_trait_), device_(other.device_), data_size_(other.data_size_) {
     if (data_size_ > 0) {
       allocate_data(data_size_);
-      ops::copy(other.data_, data_, data_size_);
+      ops::copy(other.data_, data_, data_size_)->synchronize();
     }
   }
 
@@ -188,7 +188,7 @@ public:
     std::vector<size_t> shape_vec(shape_, shape_ + dims_);
     Tensor<T, L> result(shape_vec);
 
-    ops::add(data_, other.data_, result.data_, data_size_);
+    ops::add(data_, other.data_, result.data_, data_size_)->synchronize();
 
     return result;
   }
@@ -201,7 +201,7 @@ public:
     std::vector<size_t> shape_vec(shape_, shape_ + dims_);
     Tensor<T, L> result(shape_vec);
 
-    ops::sub(data_, other.data_, result.data_, data_size_);
+    ops::sub(data_, other.data_, result.data_, data_size_)->synchronize();
 
     return result;
   }
@@ -214,7 +214,7 @@ public:
     std::vector<size_t> shape_vec(shape_, shape_ + dims_);
     Tensor<T, L> result(shape_vec);
 
-    ops::mul(data_, other.data_, result.data_, data_size_);
+    ops::mul(data_, other.data_, result.data_, data_size_)->synchronize();
 
     return result;
   }
@@ -227,7 +227,7 @@ public:
     std::vector<size_t> shape_vec(shape_, shape_ + dims_);
     Tensor<T, L> result(shape_vec);
 
-    ops::div(data_, other.data_, result.data_, data_size_);
+    ops::div(data_, other.data_, result.data_, data_size_)->synchronize();
 
     return result;
   }
@@ -236,7 +236,7 @@ public:
     std::vector<size_t> shape_vec(shape_, shape_ + dims_);
     Tensor<T, L> result(shape_vec);
 
-    ops::mul_scalar(data_, scalar, result.data_, data_size_);
+    ops::mul_scalar(data_, scalar, result.data_, data_size_)->synchronize();
 
     return result;
   }
@@ -249,7 +249,7 @@ public:
     std::vector<size_t> shape_vec(shape_, shape_ + dims_);
     Tensor<T, L> result(shape_vec);
 
-    ops::div_scalar(data_, scalar, result.data_, data_size_);
+    ops::div_scalar(data_, scalar, result.data_, data_size_)->synchronize();
 
     return result;
   }
@@ -259,7 +259,7 @@ public:
       throw std::invalid_argument("Tensor shapes must match for addition");
     }
 
-    ops::add(data_, other.data_, data_, data_size_);
+    ops::add(data_, other.data_, data_, data_size_)->synchronize();
 
     return *this;
   }
@@ -269,7 +269,7 @@ public:
       throw std::invalid_argument("Tensor shapes must match for subtraction");
     }
 
-    ops::sub(data_, other.data_, data_, data_size_);
+    ops::sub(data_, other.data_, data_, data_size_)->synchronize();
 
     return *this;
   }
@@ -279,13 +279,13 @@ public:
       throw std::invalid_argument("Tensor shapes must match for element-wise multiplication");
     }
 
-    ops::mul(data_, other.data_, data_, data_size_);
+    ops::mul(data_, other.data_, data_, data_size_)->synchronize();
 
     return *this;
   }
 
   Tensor<T, L> &operator*=(T scalar) {
-    ops::mul_scalar(data_, scalar, data_, data_size_);
+    ops::mul_scalar(data_, scalar, data_, data_size_)->synchronize();
     return *this;
   }
 
@@ -293,7 +293,7 @@ public:
     if (scalar == T(0)) {
       throw std::invalid_argument("Division by zero");
     }
-    ops::div_scalar(data_, scalar, data_, data_size_);
+    ops::div_scalar(data_, scalar, data_, data_size_)->synchronize();
     return *this;
   }
 
@@ -386,14 +386,14 @@ public:
     return Tensor<T, L>(std::vector<size_t>(shape_, shape_ + dims_), data_);
   }
 
-  void fill(T value) { ops::set_scalar(data_, value, data_size_); }
+  void fill(T value) { ops::set_scalar(data_, value, data_size_)->synchronize(); }
 
   void fill_random_uniform(T range) {
     // Generate seed from current time and pointer address for uniqueness
     unsigned long long seed = static_cast<unsigned long long>(
         std::chrono::high_resolution_clock::now().time_since_epoch().count() ^
         reinterpret_cast<uintptr_t>(data_.get()));
-    ops::fill_random_uniform(data_, data_size_, T(0), range, seed);
+    ops::fill_random_uniform(data_, data_size_, T(0), range, seed)->synchronize();
   }
 
   void fill_random_normal(T mean, T stddev) {
@@ -401,7 +401,7 @@ public:
     unsigned long long seed = static_cast<unsigned long long>(
         std::chrono::high_resolution_clock::now().time_since_epoch().count() ^
         reinterpret_cast<uintptr_t>(data_.get()));
-    ops::fill_random_normal(data_, data_size_, mean, stddev, seed);
+    ops::fill_random_normal(data_, data_size_, mean, stddev, seed)->synchronize();
   }
 
   Tensor<T, L> reshape(const std::vector<size_t> &new_shape) const {
@@ -427,7 +427,7 @@ public:
     size_t src_offset = src_batch_idx * other.strides_[0];
     size_t dest_offset = dest_batch_idx * batch_stride;
 
-    ops::copy(other.data_, data_, batch_stride, src_offset, dest_offset);
+    ops::copy(other.data_, data_, batch_stride, src_offset, dest_offset)->synchronize();
   }
 
   T mean() const {

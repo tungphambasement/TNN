@@ -20,7 +20,7 @@ namespace tnn {
  * @brief Network-based pipeline stage worker
  *
  * Standalone worker process that listens for stage configurations
- * from a coordinator and processes distributed pipeline tasks.
+ * from a coordinator and processes distributed pipeline jobs.
  */
 template <typename T = float> class NetworkStageWorker : public PipelineStage {
 public:

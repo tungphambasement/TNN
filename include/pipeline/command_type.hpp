@@ -21,8 +21,8 @@ enum CommandType : uint16_t {
   _START,
 
   // core commands
-  FORWARD_TASK,
-  BACKWARD_TASK,
+  FORWARD_JOB,
+  BACKWARD_JOB,
   UPDATE_PARAMETERS,
 
   // mode switching
@@ -46,7 +46,7 @@ enum CommandType : uint16_t {
 
   // error handling
   ERROR_REPORT,
-  TASK_FAILURE,
+  JOB_FAILURE,
 
   // advanced features
   BARRIER_SYNC,

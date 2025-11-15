@@ -5,7 +5,6 @@
 #include <cstddef>
 #include <stdexcept>
 #include <type_traits>
-
 namespace tnn {
 
 template <typename T> class device_ptr {

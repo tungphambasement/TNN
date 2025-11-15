@@ -169,7 +169,7 @@ Tensor<T, L> slice_batch(const Tensor<T, L> &input, size_t start_batch, size_t e
   T *result_data = result.data_ptr().get();
 
   size_t copy_size = (end_batch - start_batch) * strides[0];
-  cuda::cuda_copy(&input_data[start_batch * strides[0]], result_data, copy_size);
+  cuda::cuda_copy(&input_data[start_batch * strides[0]], result_data, copy_size, 0);
   cuda::synchronize();
   return result;
 }
@@ -202,7 +202,7 @@ Tensor<T, NCHW> slice_channels(const Tensor<T, NCHW> &input, size_t start_ch, si
     size_t dst_offset = n * new_channels * channel_size;
     size_t copy_size = new_channels * channel_size;
 
-    cuda_copy(&input_data[src_offset], &result_data[dst_offset], copy_size);
+    cuda_copy(&input_data[src_offset], &result_data[dst_offset], copy_size, 0);
   }
 
   cuda::synchronize();

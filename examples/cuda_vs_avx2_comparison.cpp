@@ -149,7 +149,7 @@ int main() {
         for (int i = 0; i < ITERATIONS; ++i) {
           gpuDevice.copyToDevice(gpu_a.get(), cpu_a.get(), SIZE * sizeof(float));
           gpuDevice.copyToDevice(gpu_b.get(), cpu_b.get(), SIZE * sizeof(float));
-          cuda::cuda_add(gpu_a.get(), gpu_b.get(), gpu_c.get(), SIZE);
+          cuda::cuda_add(gpu_a.get(), gpu_b.get(), gpu_c.get(), SIZE, 0);
           gpuDevice.copyToHost(cpu_c_cuda.get(), gpu_c.get(), SIZE * sizeof(float));
         }
         cudaDeviceSynchronize();
@@ -162,7 +162,7 @@ int main() {
   double cudaComputeTime = timeFunction(
       [&]() {
         for (int i = 0; i < ITERATIONS; ++i) {
-          cuda::cuda_add(gpu_a.get(), gpu_b.get(), gpu_c.get(), SIZE);
+          cuda::cuda_add(gpu_a.get(), gpu_b.get(), gpu_c.get(), SIZE, 0);
         }
         cudaDeviceSynchronize();
       },
@@ -172,7 +172,7 @@ int main() {
   timeFunction(
       [&]() {
         for (int i = 0; i < ITERATIONS; ++i) {
-          cuda::cuda_mul(gpu_a.get(), gpu_b.get(), gpu_c.get(), SIZE);
+          cuda::cuda_mul(gpu_a.get(), gpu_b.get(), gpu_c.get(), SIZE, 0);
         }
         cudaDeviceSynchronize();
       },
@@ -181,7 +181,7 @@ int main() {
   timeFunction(
       [&]() {
         for (int i = 0; i < ITERATIONS; ++i) {
-          cuda::cuda_add_scalar(gpu_a.get(), 3.14f, gpu_c.get(), SIZE);
+          cuda::cuda_add_scalar(gpu_a.get(), 3.14f, gpu_c.get(), SIZE, 0);
         }
         cudaDeviceSynchronize();
       },
@@ -190,7 +190,7 @@ int main() {
   timeFunction(
       [&]() {
         for (int i = 0; i < ITERATIONS; ++i) {
-          cuda::cuda_sqrt(gpu_a.get(), gpu_c.get(), SIZE);
+          cuda::cuda_sqrt(gpu_a.get(), gpu_c.get(), SIZE, 0);
         }
         cudaDeviceSynchronize();
       },

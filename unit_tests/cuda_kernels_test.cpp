@@ -69,7 +69,7 @@ TEST_F(CudaKernelsTest, AddTest) {
   }
 
   // Test CUDA implementation
-  cuda::cuda_add(dev_a, dev_b, dev_c, size);
+  cuda::cuda_add(dev_a, dev_b, dev_c, size, 0);
   CompareCudaWithCPU(host_expected);
 }
 
@@ -80,7 +80,7 @@ TEST_F(CudaKernelsTest, SubTest) {
   }
 
   // Test CUDA implementation
-  cuda::cuda_sub(dev_a, dev_b, dev_c, size);
+  cuda::cuda_sub(dev_a, dev_b, dev_c, size, 0);
   CompareCudaWithCPU(host_expected);
 }
 
@@ -91,7 +91,7 @@ TEST_F(CudaKernelsTest, MulTest) {
   }
 
   // Test CUDA implementation
-  cuda::cuda_mul(dev_a, dev_b, dev_c, size);
+  cuda::cuda_mul(dev_a, dev_b, dev_c, size, 0);
   CompareCudaWithCPU(host_expected);
 }
 
@@ -102,7 +102,7 @@ TEST_F(CudaKernelsTest, DivTest) {
   }
 
   // Test CUDA implementation
-  cuda::cuda_div(dev_a, dev_b, dev_c, size);
+  cuda::cuda_div(dev_a, dev_b, dev_c, size, 0);
   CompareCudaWithCPU(host_expected);
 }
 
@@ -115,7 +115,7 @@ TEST_F(CudaKernelsTest, AddScalarTest) {
   }
 
   // Test CUDA implementation
-  cuda::cuda_add_scalar(dev_a, scalar, dev_c, size);
+  cuda::cuda_add_scalar(dev_a, scalar, dev_c, size, 0);
   CompareCudaWithCPU(host_expected);
 }
 
@@ -130,7 +130,7 @@ TEST_F(CudaKernelsTest, SqrtTest) {
   cudaMemcpy(dev_a, host_a.data(), size * sizeof(float), cudaMemcpyHostToDevice);
 
   // Test CUDA implementation
-  cuda::cuda_sqrt(dev_a, dev_c, size);
+  cuda::cuda_sqrt(dev_a, dev_c, size, 0);
   CompareCudaWithCPU(host_expected);
 }
 
@@ -141,7 +141,7 @@ TEST_F(CudaKernelsTest, MaxTest) {
   }
 
   // Test CUDA implementation
-  cuda::cuda_max(dev_a, dev_b, dev_c, size);
+  cuda::cuda_max(dev_a, dev_b, dev_c, size, 0);
   CompareCudaWithCPU(host_expected);
 }
 
@@ -153,7 +153,7 @@ TEST_F(CudaKernelsTest, SumReductionTest) {
   }
 
   // Test CUDA implementation
-  float result = cuda::cuda_sum(dev_a, size);
+  float result = cuda::cuda_sum(dev_a, size, 0);
   EXPECT_NEAR(result, expected_sum, 1e-3f); // Allow for some reduction precision loss
 }
 
@@ -165,7 +165,7 @@ TEST_F(CudaKernelsTest, DotProductTest) {
   }
 
   // Test CUDA implementation
-  float result = cuda::cuda_dot_product(dev_a, dev_b, size);
+  float result = cuda::cuda_dot_product(dev_a, dev_b, size, 0);
   EXPECT_NEAR(
       result, expected_dot,
       std::max(1e-3f, std::abs(expected_dot) * 1e-5f)); // Allow for some reduction precision loss
@@ -181,7 +181,7 @@ TEST_F(CudaKernelsTest, BatchNormOperationsTest) {
   }
 
   // Test CUDA implementation
-  cuda::cuda_sub_mul_scalar(dev_a, sub_scalar, mul_scalar, dev_c, size);
+  cuda::cuda_sub_mul_scalar(dev_a, sub_scalar, mul_scalar, dev_c, size, 0);
   CompareCudaWithCPU(host_expected);
 }
 
@@ -229,7 +229,7 @@ TEST_F(CudaKernelsDoubleTest, AddDoubleTest) {
     expected[i] = host_a[i] + host_b[i];
   }
 
-  cuda::cuda_add(dev_a, dev_b, dev_c, size);
+  cuda::cuda_add(dev_a, dev_b, dev_c, size, 0);
   cudaMemcpy(host_c.data(), dev_c, size * sizeof(double), cudaMemcpyDeviceToHost);
   cudaDeviceSynchronize();
 

@@ -268,10 +268,10 @@ void train_ips_model(Sequential<float> &model, WiFiDataLoader &train_loader,
   auto classification_loss = LossFactory<float>::create_crossentropy(ips_constants::EPSILON);
 
   const bool is_regression = train_loader.is_regression();
-  const std::string task_type = is_regression ? "Coordinate Prediction" : "Classification";
+  const std::string job_type = is_regression ? "Coordinate Prediction" : "Classification";
 
   std::cout << "Starting IPS model training..." << std::endl;
-  std::cout << "Task: " << task_type << std::endl;
+  std::cout << "Job: " << job_type << std::endl;
   std::cout << "Epochs: " << epochs << ", Batch size: " << batch_size
             << ", Learning rate: " << learning_rate << std::endl;
   std::cout << "Features: " << train_loader.num_features()

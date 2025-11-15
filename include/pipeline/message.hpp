@@ -8,8 +8,8 @@
 
 #include "command_type.hpp"
 #include "endian.hpp"
+#include "job.hpp"
 #include "load_tracker.hpp"
-#include "task.hpp"
 #include "tensor/tensor.hpp"
 #include <arpa/inet.h>
 #include <cstring>
@@ -18,7 +18,7 @@
 #include <vector>
 
 namespace tnn {
-using PayloadType = std::variant<std::monostate, Task<float>, std::string, bool, LoadTracker>;
+using PayloadType = std::variant<std::monostate, Job<float>, std::string, bool, LoadTracker>;
 
 struct FixedHeader {
   uint8_t PROTOCOL_VERSION = 1;
@@ -79,14 +79,14 @@ struct MessageData {
     if (std::holds_alternative<std::monostate>(payload)) {
       // No additional size for monostate
 
-    } else if (std::holds_alternative<Task<float>>(payload)) {
-      const auto &task = std::get<Task<float>>(payload);
+    } else if (std::holds_alternative<Job<float>>(payload)) {
+      const auto &job = std::get<Job<float>>(payload);
       size += sizeof(uint64_t); // micro_batch_id
       size += sizeof(uint64_t); // shape size (uint64_t in serialization)
       size +=
-          task.data.shape().size() * sizeof(uint64_t); // each dimension (uint64_t in serialization)
+          job.data.shape().size() * sizeof(uint64_t); // each dimension (uint64_t in serialization)
       // No size prefix for tensor data itself
-      size += task.data.size() * sizeof(float); // data
+      size += job.data.size() * sizeof(float); // data
 
     } else if (std::holds_alternative<std::string>(payload)) {
       const auto &str = std::get<std::string>(payload);

@@ -9,9 +9,9 @@
 #include "nn/sequential.hpp"
 
 #include "communicator.hpp"
+#include "job.hpp"
 #include "load_tracker.hpp"
 #include "stage_config.hpp"
-#include "task.hpp"
 #include "utils/hardware_info.hpp"
 #include <atomic>
 #include <condition_variable>
@@ -92,24 +92,24 @@ public:
 protected:
   virtual void process_message(const Message &message) {
     switch (message.header.command_type) {
-    case CommandType::FORWARD_TASK: {
-      const Task<float> forward_task = message.get<Task<float>>();
+    case CommandType::FORWARD_JOB: {
+      const Job<float> forward_job = message.get<Job<float>>();
       Tensor<float> output_data =
-          this->model_->forward(forward_task.data, forward_task.micro_batch_id);
-      Task<float> output_task(std::move(output_data), forward_task.micro_batch_id);
+          this->model_->forward(forward_job.data, forward_job.micro_batch_id);
+      Job<float> output_job(std::move(output_data), forward_job.micro_batch_id);
 
-      Message output_message("next_stage", CommandType::FORWARD_TASK, output_task);
+      Message output_message("next_stage", CommandType::FORWARD_JOB, output_job);
       output_message.header.sender_id = name_;
 
       communicator_->send_message(output_message);
     } break;
-    case CommandType::BACKWARD_TASK: {
-      const Task<float> backward_task = message.get<Task<float>>();
+    case CommandType::BACKWARD_JOB: {
+      const Job<float> backward_job = message.get<Job<float>>();
       Tensor<float> output_data =
-          this->model_->backward(backward_task.data, backward_task.micro_batch_id);
-      Task<float> output_task(std::move(output_data), backward_task.micro_batch_id);
+          this->model_->backward(backward_job.data, backward_job.micro_batch_id);
+      Job<float> output_job(std::move(output_data), backward_job.micro_batch_id);
 
-      Message output_message("prev_stage", CommandType::BACKWARD_TASK, output_task);
+      Message output_message("prev_stage", CommandType::BACKWARD_JOB, output_job);
       output_message.header.sender_id = name_;
 
       communicator_->send_message(output_message);
