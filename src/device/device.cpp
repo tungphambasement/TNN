@@ -1,8 +1,6 @@
 #include "device/device.hpp"
 #include "device/context.hpp"
 
-#include <stdexcept>
-
 namespace tnn {
 Device::Device(DeviceType type, int id, std::unique_ptr<Context> context)
     : type_(type), id_(id), context_(std::move(context)) {}

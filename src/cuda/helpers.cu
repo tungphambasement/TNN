@@ -1,4 +1,3 @@
-#include "cuda/error_handler.hpp"
 #include "cuda/helpers.hpp"
 
 #include <cuda_runtime.h>

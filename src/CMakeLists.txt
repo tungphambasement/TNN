@@ -11,7 +11,7 @@ if(ENABLE_CUDA)
         $<INSTALL_INTERFACE:include>
     )
     set_target_properties(tnn_cuda PROPERTIES 
-        CUDA_ARCHITECTURES "89"
+        CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES}
         CUDA_STANDARD 17
     )
     target_link_libraries(tnn_cuda PUBLIC CUDA::cudart CUDA::cublas)
@@ -149,7 +149,7 @@ target_include_directories(tnn_math PUBLIC
 target_link_libraries(tnn_math PUBLIC tnn_utils)
 if(ENABLE_CUDA)
     set_target_properties(tnn_math PROPERTIES 
-        CUDA_ARCHITECTURES "89"
+        CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES}
         CUDA_STANDARD 17
     )
     target_link_libraries(tnn_math PUBLIC CUDA::cudart CUDA::cublas)

@@ -1,4 +1,7 @@
 CompileFlags:
   Add:
     - -Iinclude
-  CompilationDatabase: compile_commands.json
+  Remove:
+    - -forward-unknown-to-host-compiler
+    - --options-file
+    - --generate-code=*

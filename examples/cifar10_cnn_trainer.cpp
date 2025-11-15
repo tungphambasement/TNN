@@ -5,7 +5,6 @@
 #include "nn/sequential.hpp"
 #include "nn/train.hpp"
 #include "utils/env.hpp"
-
 #include <cmath>
 #include <iostream>
 #include <omp.h>
