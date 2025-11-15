@@ -130,6 +130,17 @@ target_include_directories(tnn_data_loading PUBLIC
 )
 target_link_libraries(tnn_data_loading PUBLIC tnn_utils tnn_tensor tnn_matrix)
 
+# Data augmentation library
+file(GLOB_RECURSE TNN_DATA_AUGMENTATION_SOURCES
+    "data_augmentation/*.cpp"
+)
+add_library(tnn_data_augmentation STATIC ${TNN_DATA_AUGMENTATION_SOURCES})
+target_include_directories(tnn_data_augmentation PUBLIC 
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(tnn_data_augmentation PUBLIC tnn_tensor)
+
 # Math library
 file(GLOB_RECURSE TNN_MATH_SOURCES 
     "math/*.cpp"
