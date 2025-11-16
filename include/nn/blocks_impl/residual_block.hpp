@@ -11,6 +11,7 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace tnn {
@@ -93,7 +94,7 @@ public:
     for (auto &layer : main_path_) {
       layer->forward_inplace(current, micro_batch_id);
     }
-    main_output_cache_ = current.clone();
+    main_output_cache_ = std::move(current);
 
     // Shortcut path: x or projection(x)
     if (shortcut_) {
@@ -105,14 +106,13 @@ public:
     // Residual connection: F(x) + x
     pre_activation_cache_ = main_output_cache_ + shortcut_output_cache_;
 
-    // Final activation
+    Tensor<T> output = pre_activation_cache_.clone();
+
     if (final_activation_) {
-      Tensor<T> output = pre_activation_cache_.clone();
       final_activation_->apply(output);
-      return output;
     }
 
-    return pre_activation_cache_;
+    return output;
   }
 
   Tensor<T> backward(const Tensor<T> &gradient, size_t micro_batch_id = 0) override {
@@ -124,9 +124,9 @@ public:
     }
 
     // Backward through main path
-    Tensor<T> grad_main = grad;
+    Tensor<T> grad_main = grad.clone();
     for (int i = static_cast<int>(main_path_.size()) - 1; i >= 0; --i) {
-      grad_main = main_path_[i]->backward(grad_main, micro_batch_id);
+      main_path_[i]->backward_inplace(grad_main, micro_batch_id);
     }
 
     // Backward through shortcut
@@ -190,7 +190,6 @@ public:
   }
 
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override {
-    // Output shape is determined by main path
     std::vector<size_t> shape = input_shape;
     for (const auto &layer : main_path_) {
       shape = layer->compute_output_shape(shape);

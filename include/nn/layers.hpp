@@ -209,6 +209,181 @@ public:
   }
 };
 
+template <typename T = float> class LayerBuilder {
+private:
+  std::vector<std::unique_ptr<Layer<T>>> layers_;
+  std::vector<size_t> input_shape_;
+  bool input_shape_set_ = false;
+
+public:
+  explicit LayerBuilder(const std::string &name = "Block") {}
+
+  std::vector<size_t> get_current_shape() const {
+    if (!input_shape_set_) {
+      throw std::runtime_error("Input shape must be set before adding layers. "
+                               "Use .input() method first.");
+    }
+
+    std::vector<size_t> shape_with_batch = {1};
+    shape_with_batch.insert(shape_with_batch.end(), input_shape_.begin(), input_shape_.end());
+
+    // Compute output shape by passing through all layers
+    std::vector<size_t> current_shape = shape_with_batch;
+    for (const auto &layer : layers_) {
+      current_shape = layer->compute_output_shape(current_shape);
+    }
+    return current_shape;
+  }
+
+  size_t get_feature_count() const {
+    std::vector<size_t> current_shape = get_current_shape();
+
+    if (current_shape.empty()) {
+      throw std::runtime_error("Cannot compute feature count from empty shape");
+    }
+
+    size_t feature_count = 1;
+    for (size_t i = 1; i < current_shape.size(); ++i) {
+      feature_count *= current_shape[i];
+    }
+
+    return feature_count;
+  }
+
+  LayerBuilder &input(const std::vector<size_t> &shape) {
+    input_shape_ = shape;
+    input_shape_set_ = true;
+    return *this;
+  }
+
+  LayerBuilder &dense(size_t output_features, const std::string &activation = "none",
+                      bool use_bias = true, const std::string &name = "") {
+
+    size_t input_features = get_feature_count();
+
+    auto layer = dense_layer<T>(input_features, output_features, activation, use_bias,
+                                name.empty() ? "dense_" + std::to_string(layers_.size()) : name);
+    layers_.push_back(std::move(layer));
+    return *this;
+  }
+
+  LayerBuilder &conv2d(size_t out_channels, size_t kernel_h, size_t kernel_w, size_t stride_h = 1,
+                       size_t stride_w = 1, size_t pad_h = 0, size_t pad_w = 0,
+                       bool use_bias = true, const std::string &name = "") {
+    std::vector<size_t> current_shape = get_current_shape();
+
+    if (current_shape.size() < 4) {
+      throw std::runtime_error("Conv2D requires 4D input (batch, channels, "
+                               "height, width). Current shape has " +
+                               std::to_string(current_shape.size()) + " dimensions.");
+    }
+
+    size_t in_channels = current_shape[1];
+
+    auto layer = conv2d_layer<T>(in_channels, out_channels, kernel_h, kernel_w, stride_h, stride_w,
+                                 pad_h, pad_w, use_bias,
+                                 name.empty() ? "conv2d_" + std::to_string(layers_.size()) : name);
+    layers_.push_back(std::move(layer));
+    return *this;
+  }
+
+  LayerBuilder &batchnorm(T epsilon = T(1e-5), T momentum = T(0.1), bool affine = true,
+                          const std::string &name = "") {
+    std::vector<size_t> current_shape = get_current_shape();
+
+    if (current_shape.size() < 2) {
+      throw std::runtime_error("BatchNorm requires at least 2D input (batch, features)");
+    }
+
+    size_t num_features;
+    if (current_shape.size() == 2) {
+
+      num_features = current_shape[1];
+    } else if (current_shape.size() >= 4) {
+
+      num_features = current_shape[1];
+    } else {
+
+      num_features = current_shape[1];
+    }
+
+    auto layer =
+        batchnorm_layer<T>(num_features, epsilon, momentum, affine,
+                           name.empty() ? "batchnorm_" + std::to_string(layers_.size()) : name);
+    layers_.push_back(std::move(layer));
+    return *this;
+  }
+
+  LayerBuilder &activation(const std::string &activation_name, const std::string &name = "") {
+    auto layer = activation_layer<T>(
+        activation_name, name.empty() ? "activation_" + std::to_string(layers_.size()) : name);
+    layers_.push_back(std::move(layer));
+    return *this;
+  }
+
+  LayerBuilder &maxpool2d(size_t pool_h, size_t pool_w, size_t stride_h = 0, size_t stride_w = 0,
+                          size_t pad_h = 0, size_t pad_w = 0, const std::string &name = "") {
+    auto layer =
+        maxpool2d_layer<T>(pool_h, pool_w, stride_h, stride_w, pad_h, pad_w,
+                           name.empty() ? "maxpool2d_" + std::to_string(layers_.size()) : name);
+    layers_.push_back(std::move(layer));
+    return *this;
+  }
+
+  LayerBuilder &dropout(T dropout_rate, const std::string &name = "") {
+    auto layer = dropout_layer<T>(
+        dropout_rate, name.empty() ? "dropout_" + std::to_string(layers_.size()) : name);
+    layers_.push_back(std::move(layer));
+    return *this;
+  }
+
+  LayerBuilder &flatten(const std::string &name = "") {
+    auto layer =
+        flatten_layer<T>(name.empty() ? "flatten_" + std::to_string(layers_.size()) : name);
+    layers_.push_back(std::move(layer));
+    return *this;
+  }
+
+  LayerBuilder &add_layer(std::unique_ptr<Layer<T>> layer) {
+    layers_.push_back(std::move(layer));
+    return *this;
+  }
+
+  std::vector<std::unique_ptr<Layer<T>>> build() {
+    if (!input_shape_set_) {
+      throw std::runtime_error("Input shape must be set before building block. "
+                               "Use .input() method.");
+    }
+    try {
+      std::vector<size_t> shape_with_batch = {1};
+      shape_with_batch.insert(shape_with_batch.end(), input_shape_.begin(), input_shape_.end());
+
+      std::vector<size_t> output_shape = get_current_shape();
+      std::cout << "Block built successfully. Input shape (without batch): (";
+      for (size_t i = 0; i < input_shape_.size(); ++i) {
+        if (i > 0)
+          std::cout << ", ";
+        std::cout << input_shape_[i];
+      }
+      std::cout << ") -> Output shape (without batch): (";
+
+      for (size_t i = 1; i < output_shape.size(); ++i) {
+        if (i > 1)
+          std::cout << ", ";
+        std::cout << output_shape[i];
+      }
+      std::cout << ")" << std::endl;
+    } catch (const std::exception &e) {
+      throw std::runtime_error("Shape inference failed during build: " + std::string(e.what()));
+    }
+
+    return std::move(layers_);
+  }
+
+  const std::vector<size_t> &get_input_shape() const { return input_shape_; }
+  bool is_input_shape_set() const { return input_shape_set_; }
+};
+
 template <typename T>
 std::unordered_map<std::string, std::function<std::unique_ptr<Layer<T>>(const LayerConfig &)>>
     LayerFactory<T>::creators_;
