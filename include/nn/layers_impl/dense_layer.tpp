@@ -13,6 +13,7 @@
 
 #include "cpu/dense_ops.hpp"
 #include "cuda/dense_ops.hpp"
+#include "device/task.hpp"
 #include "nn/layers_impl/parameterized_layer.hpp"
 
 namespace tnn {
@@ -64,10 +65,10 @@ Tensor<T> DenseLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_id) 
   Tensor<T> output({batch_size, output_features_, size_t(1), size_t(1)}, this->device_);
 
   compute_dense_forward(current.data_ptr(), weights_.data_ptr(), output.data_ptr(), batch_size,
-                        input_features_, output_features_);
+                        input_features_, output_features_, "default");
 
   if (use_bias_) {
-    add_bias_vector(output.data_ptr(), bias_.data_ptr(), batch_size, output_features_);
+    add_bias_vector(output.data_ptr(), bias_.data_ptr(), batch_size, output_features_, "default");
   }
 
   micro_batch_pre_activations_[micro_batch_id] = output.clone();
@@ -117,25 +118,24 @@ Tensor<T> DenseLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch_
 
   compute_weight_gradients(last_input.data_ptr(), current_grad.data_ptr(),
                            weight_gradients_.data_ptr(), batch_size, input_features_,
-                           output_features_);
+                           output_features_, "default");
 
   if (use_bias_) {
     compute_bias_gradients(current_grad.data_ptr(), bias_gradients_.data_ptr(), batch_size,
-                           output_features_);
+                           output_features_, "default");
   }
 
   compute_input_gradients(current_grad.data_ptr(), weights_.data_ptr(), grad_input.data_ptr(),
-                          batch_size, input_features_, output_features_);
+                          batch_size, input_features_, output_features_, "default");
 
   return grad_input;
 }
 
 template <typename T>
-void DenseLayer<T>::compute_dense_forward(const device_ptr<T[]> &input_data,
-                                          const device_ptr<T[]> &weight_data,
-                                          device_ptr<T[]> &output_data, const size_t batch_size,
-                                          const size_t input_features,
-                                          const size_t output_features) const {
+std::unique_ptr<Task> DenseLayer<T>::compute_dense_forward(
+    const device_ptr<T[]> &input_data, const device_ptr<T[]> &weight_data,
+    device_ptr<T[]> &output_data, const size_t batch_size, const size_t input_features,
+    const size_t output_features, const std::string &flow_id) const {
   if (input_data.getDeviceType() != weight_data.getDeviceType() ||
       input_data.getDeviceType() != output_data.getDeviceType()) {
     throw std::runtime_error(
@@ -143,26 +143,28 @@ void DenseLayer<T>::compute_dense_forward(const device_ptr<T[]> &input_data,
   }
 
   if (input_data.getDeviceType() == DeviceType::CPU) {
-    cpu::dense::compute_dense_forward(input_data.get(), weight_data.get(), output_data.get(),
-                                      batch_size, input_features, output_features);
+    return create_cpu_task(flow_id, cpu::dense::compute_dense_forward<T>, input_data.get(),
+                           weight_data.get(), output_data.get(), batch_size, input_features,
+                           output_features);
   }
 #ifdef USE_CUDA
   else if (input_data.getDeviceType() == DeviceType::GPU) {
-    cuda::dense::compute_dense_forward(input_data.get(), weight_data.get(), output_data.get(),
-                                       batch_size, input_features, output_features);
+    return create_gpu_task(flow_id, cuda::dense::compute_dense_forward<T>, input_data.get(),
+                           weight_data.get(), output_data.get(), batch_size, input_features,
+                           output_features);
   }
 #endif
   else {
     throw std::runtime_error("Unsupported device type for compute_dense_forward.");
   }
+  return nullptr;
 }
 
 template <typename T>
-void DenseLayer<T>::compute_weight_gradients(const device_ptr<T[]> &input_data,
-                                             const device_ptr<T[]> &gradient_data,
-                                             device_ptr<T[]> &weight_grad_data,
-                                             const size_t batch_size, const size_t input_features,
-                                             const size_t output_features) const {
+std::unique_ptr<Task> DenseLayer<T>::compute_weight_gradients(
+    const device_ptr<T[]> &input_data, const device_ptr<T[]> &gradient_data,
+    device_ptr<T[]> &weight_grad_data, const size_t batch_size, const size_t input_features,
+    const size_t output_features, const std::string &flow_id) const {
   if (input_data.getDeviceType() != gradient_data.getDeviceType() ||
       input_data.getDeviceType() != weight_grad_data.getDeviceType()) {
     throw std::runtime_error(
@@ -170,83 +172,97 @@ void DenseLayer<T>::compute_weight_gradients(const device_ptr<T[]> &input_data,
   }
 
   if (input_data.getDeviceType() == DeviceType::CPU) {
-    cpu::dense::compute_weight_gradients(input_data.get(), gradient_data.get(),
-                                         weight_grad_data.get(), batch_size, input_features,
-                                         output_features);
+    return create_cpu_task(flow_id, cpu::dense::compute_weight_gradients<T>, input_data.get(),
+                           gradient_data.get(), weight_grad_data.get(), batch_size, input_features,
+                           output_features);
   }
 #ifdef USE_CUDA
   else if (input_data.getDeviceType() == DeviceType::GPU) {
-    cuda::dense::compute_weight_gradients(input_data.get(), gradient_data.get(),
-                                          weight_grad_data.get(), batch_size, input_features,
-                                          output_features);
+    return create_gpu_task(flow_id, cuda::dense::compute_weight_gradients<T>, input_data.get(),
+                           gradient_data.get(), weight_grad_data.get(), batch_size, input_features,
+                           output_features);
   }
 #endif
   else {
     throw std::runtime_error("Unsupported device type for compute_weight_gradients.");
   }
+  return nullptr;
 }
 
 template <typename T>
-void DenseLayer<T>::compute_input_gradients(const device_ptr<T[]> &gradient_data,
-                                            const device_ptr<T[]> &weight_data,
-                                            device_ptr<T[]> &grad_input_data, size_t batch_size,
-                                            size_t input_features, size_t output_features) const {
+std::unique_ptr<Task> DenseLayer<T>::compute_input_gradients(
+    const device_ptr<T[]> &gradient_data, const device_ptr<T[]> &weight_data,
+    device_ptr<T[]> &grad_input_data, size_t batch_size, size_t input_features,
+    size_t output_features, const std::string &flow_id) const {
   if (gradient_data.getDeviceType() != weight_data.getDeviceType() ||
       gradient_data.getDeviceType() != grad_input_data.getDeviceType()) {
     throw std::runtime_error(
         "All device pointers must be on the same device type for compute_input_gradients.");
   }
   if (gradient_data.getDeviceType() == DeviceType::CPU) {
-    cpu::dense::compute_input_gradients(gradient_data.get(), weight_data.get(),
-                                        grad_input_data.get(), batch_size, input_features,
-                                        output_features);
+    return create_cpu_task(flow_id, cpu::dense::compute_input_gradients<T>, gradient_data.get(),
+                           weight_data.get(), grad_input_data.get(), batch_size, input_features,
+                           output_features);
   }
 #ifdef USE_CUDA
   else if (gradient_data.getDeviceType() == DeviceType::GPU) {
-    cuda::dense::compute_input_gradients(gradient_data.get(), weight_data.get(),
-                                         grad_input_data.get(), batch_size, input_features,
-                                         output_features);
+    return create_gpu_task(flow_id, cuda::dense::compute_input_gradients<T>, gradient_data.get(),
+                           weight_data.get(), grad_input_data.get(), batch_size, input_features,
+                           output_features);
   }
 #endif
   else {
     throw std::runtime_error("Unsupported device type for compute_input_gradients.");
   }
+  return nullptr;
 }
 
 template <typename T>
-void DenseLayer<T>::compute_bias_gradients(const device_ptr<T[]> &current_grad_data,
-                                           device_ptr<T[]> &bias_gradient_data, size_t batch_size,
-                                           size_t output_features) const {
+std::unique_ptr<Task>
+DenseLayer<T>::compute_bias_gradients(const device_ptr<T[]> &current_grad_data,
+                                      device_ptr<T[]> &bias_gradient_data, size_t batch_size,
+                                      size_t output_features, const std::string &flow_id) const {
   if (current_grad_data.getDeviceType() != bias_gradient_data.getDeviceType()) {
     throw std::runtime_error("Device type mismatch in compute_bias_gradients");
   }
   if (current_grad_data.getDeviceType() == DeviceType::CPU) {
-    cpu::dense::compute_bias_gradients<T>(current_grad_data.get(), bias_gradient_data.get(),
-                                          batch_size, output_features);
+    return create_cpu_task(flow_id, cpu::dense::compute_bias_gradients<T>, current_grad_data.get(),
+                           bias_gradient_data.get(), batch_size, output_features);
   }
 #ifdef USE_CUDA
-  else {
-    cuda::dense::compute_bias_gradients<T>(current_grad_data.get(), bias_gradient_data.get(),
-                                           batch_size, output_features);
+  else if (current_grad_data.getDeviceType() == DeviceType::GPU) {
+    return create_gpu_task(flow_id, cuda::dense::compute_bias_gradients<T>, current_grad_data.get(),
+                           bias_gradient_data.get(), batch_size, output_features);
   }
 #endif
+  else {
+    throw std::runtime_error("Unsupported device type for compute_bias_gradients");
+  }
+  return nullptr;
 }
 
 template <typename T>
-void DenseLayer<T>::add_bias_vector(device_ptr<T[]> &output_data, const device_ptr<T[]> &bias_data,
-                                    size_t batch_size, size_t output_features) const {
+std::unique_ptr<Task> DenseLayer<T>::add_bias_vector(device_ptr<T[]> &output_data,
+                                                     const device_ptr<T[]> &bias_data,
+                                                     size_t batch_size, size_t output_features,
+                                                     const std::string &flow_id) const {
   if (output_data.getDeviceType() != bias_data.getDeviceType()) {
     throw std::runtime_error("Device type mismatch in add_bias_vector");
   }
   if (output_data.getDeviceType() == DeviceType::CPU) {
-    cpu::dense::add_bias_vector<T>(output_data.get(), bias_data.get(), batch_size, output_features);
+    return create_cpu_task(flow_id, cpu::dense::add_bias_vector<T>, output_data.get(),
+                           bias_data.get(), batch_size, output_features);
   }
 #ifdef USE_CUDA
-  else {
-    cuda::dense::add_bias_vector<T>(output_data.get(), bias_data.get(), batch_size,
-                                    output_features);
+  else if (output_data.getDeviceType() == DeviceType::GPU) {
+    return create_gpu_task(flow_id, cuda::dense::add_bias_vector<T>, output_data.get(),
+                           bias_data.get(), batch_size, output_features);
   }
 #endif
+  else {
+    throw std::runtime_error("Unsupported device type for add_bias_vector");
+  }
+  return nullptr;
 }
 
 template <typename T> std::string DenseLayer<T>::type() const { return "dense"; }

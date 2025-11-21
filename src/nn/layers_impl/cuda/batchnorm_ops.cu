@@ -275,11 +275,11 @@ __global__ void compute_mean_variance_fused_kernel(const T *input_data, T *mean_
 
 template <typename T>
 void compute_mean_variance_fused(const T *input_data, T *mean_data, T *var_data, size_t batch_size,
-                                 size_t channels, size_t spatial_size) {
+                                 size_t channels, size_t spatial_size, cudaStream_t stream) {
   int threads_per_block = THREADS_PER_BLOCK;
   int num_blocks = channels;
 
-  compute_mean_variance_fused_kernel<<<num_blocks, threads_per_block>>>(
+  compute_mean_variance_fused_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
       input_data, mean_data, var_data, batch_size, channels, spatial_size);
 }
 
@@ -535,7 +535,8 @@ template <typename T>
 void compute_batchnorm_backward_fused(const T *gradient_data, const T *normalized_data,
                                       const T *std_data, const T *gamma_data, T *grad_input_data,
                                       T *gamma_grad, T *beta_grad, size_t batch_size,
-                                      size_t channels, size_t spatial_size, bool affine) {
+                                      size_t channels, size_t spatial_size, bool affine,
+                                      cudaStream_t stream) {
   const size_t total_elements = batch_size * spatial_size;
 
   // Allocate temporary buffers for sums
@@ -549,7 +550,8 @@ void compute_batchnorm_backward_fused(const T *gradient_data, const T *normalize
   int num_blocks = channels;
   size_t shared_mem_size = 4 * threads_per_block * sizeof(T);
 
-  compute_batchnorm_backward_sums_fused_kernel<<<num_blocks, threads_per_block, shared_mem_size>>>(
+  compute_batchnorm_backward_sums_fused_kernel<<<num_blocks, threads_per_block, shared_mem_size,
+                                                 stream>>>(
       gradient_data, normalized_data, gamma_data, sum_grad_normalized_data,
       sum_grad_norm_times_norm_data, gamma_grad, beta_grad, batch_size, channels, spatial_size,
       affine);
@@ -558,7 +560,7 @@ void compute_batchnorm_backward_fused(const T *gradient_data, const T *normalize
   size_t total_size = batch_size * channels * spatial_size;
   num_blocks = (total_size + threads_per_block - 1) / threads_per_block;
 
-  compute_input_gradients_batchnorm_fused_kernel<<<num_blocks, threads_per_block>>>(
+  compute_input_gradients_batchnorm_fused_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
       gradient_data, normalized_data, std_data, gamma_data, sum_grad_normalized_data,
       sum_grad_norm_times_norm_data, grad_input_data, batch_size, channels, spatial_size,
       total_elements, affine);
@@ -569,25 +571,26 @@ void compute_batchnorm_backward_fused(const T *gradient_data, const T *normalize
 
 template <typename T>
 void compute_channel_mean(const T *input_data, T *mean_data, size_t batch_size, size_t channels,
-                          size_t spatial_size) {
+                          size_t spatial_size, cudaStream_t stream) {
   int threads_per_block = THREADS_PER_BLOCK;
   int num_blocks = channels;
 
   size_t shared_mem_size = threads_per_block * sizeof(T);
 
-  compute_channel_mean_kernel<<<num_blocks, threads_per_block, shared_mem_size>>>(
+  compute_channel_mean_kernel<<<num_blocks, threads_per_block, shared_mem_size, stream>>>(
       input_data, mean_data, batch_size, channels, spatial_size);
 }
 
 template <typename T>
 void compute_channel_variance(const T *input_data, const T *mean_data, T *var_data,
-                              size_t batch_size, size_t channels, size_t spatial_size) {
+                              size_t batch_size, size_t channels, size_t spatial_size,
+                              cudaStream_t stream) {
   int threads_per_block = THREADS_PER_BLOCK;
   int num_blocks = channels;
 
   size_t shared_mem_size = threads_per_block * sizeof(T);
 
-  compute_channel_variance_kernel<<<num_blocks, threads_per_block, shared_mem_size>>>(
+  compute_channel_variance_kernel<<<num_blocks, threads_per_block, shared_mem_size, stream>>>(
       input_data, mean_data, var_data, batch_size, channels, spatial_size);
 }
 
@@ -595,12 +598,12 @@ template <typename T>
 void normalize_and_scale_optimized(const T *input_data, const T *mean_data, const T *std_data,
                                    const T *gamma_data, const T *beta_data, T *output_data,
                                    T *normalized_data, size_t batch_size, size_t channels,
-                                   size_t spatial_size, bool affine) {
+                                   size_t spatial_size, bool affine, cudaStream_t stream) {
   size_t total_elements = batch_size * channels * spatial_size;
   int threads_per_block = THREADS_PER_BLOCK;
   int num_blocks = (total_elements + threads_per_block - 1) / threads_per_block;
 
-  normalize_and_scale_kernel<<<num_blocks, threads_per_block>>>(
+  normalize_and_scale_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
       input_data, mean_data, std_data, gamma_data, beta_data, output_data, normalized_data,
       batch_size, channels, spatial_size, affine);
 }
@@ -608,32 +611,34 @@ void normalize_and_scale_optimized(const T *input_data, const T *mean_data, cons
 template <typename T>
 void compute_affine_gradients_optimized(const T *gradient_data, const T *normalized_data,
                                         T *gamma_grad, T *beta_grad, size_t batch_size,
-                                        size_t channels, size_t spatial_size) {
+                                        size_t channels, size_t spatial_size, cudaStream_t stream) {
   int threads_per_block = THREADS_PER_BLOCK;
   int num_blocks = channels;
 
   size_t shared_mem_size = 2 * threads_per_block * sizeof(T);
 
-  compute_affine_gradients_kernel<<<num_blocks, threads_per_block, shared_mem_size>>>(
+  compute_affine_gradients_kernel<<<num_blocks, threads_per_block, shared_mem_size, stream>>>(
       gradient_data, normalized_data, gamma_grad, beta_grad, batch_size, channels, spatial_size);
 }
 
 template <typename T>
-void compute_batch_std(const T *batch_var_data, T *batch_std_data, size_t channels, T epsilon) {
+void compute_batch_std(const T *batch_var_data, T *batch_std_data, size_t channels, T epsilon,
+                       cudaStream_t stream) {
   int threads_per_block = THREADS_PER_BLOCK;
   int num_blocks = (channels + threads_per_block - 1) / threads_per_block;
 
-  compute_batch_std_kernel<<<num_blocks, threads_per_block>>>(batch_var_data, batch_std_data,
-                                                              channels, epsilon);
+  compute_batch_std_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
+      batch_var_data, batch_std_data, channels, epsilon);
 }
 
 template <typename T>
 void update_running_stats(T *running_mean_data, T *running_var_data, const T *batch_mean_data,
-                          const T *batch_var_data, size_t channels, T momentum) {
+                          const T *batch_var_data, size_t channels, T momentum,
+                          cudaStream_t stream) {
   int threads_per_block = THREADS_PER_BLOCK;
   int num_blocks = (channels + threads_per_block - 1) / threads_per_block;
 
-  update_running_stats_kernel<<<num_blocks, threads_per_block>>>(
+  update_running_stats_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
       running_mean_data, running_var_data, batch_mean_data, batch_var_data, channels, momentum);
 }
 
@@ -641,38 +646,40 @@ template <typename T>
 void compute_inference_output(const T *input_data, const T *running_mean_data,
                               const T *running_var_data, const T *gamma_data, const T *beta_data,
                               T *output_data, size_t batch_size, size_t channels,
-                              size_t spatial_size, T epsilon, bool affine) {
+                              size_t spatial_size, T epsilon, bool affine, cudaStream_t stream) {
   size_t total_elements = batch_size * channels * spatial_size;
   int threads_per_block = THREADS_PER_BLOCK;
   int num_blocks = (total_elements + threads_per_block - 1) / threads_per_block;
 
-  compute_inference_output_kernel<<<num_blocks, threads_per_block>>>(
+  compute_inference_output_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
       input_data, running_mean_data, running_var_data, gamma_data, beta_data, output_data,
       batch_size, channels, spatial_size, epsilon, affine);
 }
 
 template <typename T>
 void compute_grad_normalized(const T *gradient_data, const T *gamma_data, T *grad_normalized_data,
-                             size_t batch_size, size_t channels, size_t spatial_size, bool affine) {
+                             size_t batch_size, size_t channels, size_t spatial_size, bool affine,
+                             cudaStream_t stream) {
   size_t total_elements = batch_size * channels * spatial_size;
   int threads_per_block = THREADS_PER_BLOCK;
   int num_blocks = (total_elements + threads_per_block - 1) / threads_per_block;
 
-  compute_grad_normalized_kernel<<<num_blocks, threads_per_block>>>(
+  compute_grad_normalized_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
       gradient_data, gamma_data, grad_normalized_data, batch_size, channels, spatial_size, affine);
 }
 
 template <typename T>
 void compute_backward_sums(const T *grad_normalized_data, const T *normalized_data,
                            T *sum_grad_normalized_data, T *sum_grad_norm_times_norm_data,
-                           size_t batch_size, size_t channels, size_t spatial_size) {
+                           size_t batch_size, size_t channels, size_t spatial_size,
+                           cudaStream_t stream) {
 
   int threads_per_block = THREADS_PER_BLOCK;
   int num_blocks = channels;
 
   size_t shared_mem_size = 2 * threads_per_block * sizeof(T);
 
-  compute_backward_sums_kernel<<<num_blocks, threads_per_block, shared_mem_size>>>(
+  compute_backward_sums_kernel<<<num_blocks, threads_per_block, shared_mem_size, stream>>>(
       grad_normalized_data, normalized_data, sum_grad_normalized_data,
       sum_grad_norm_times_norm_data, batch_size, channels, spatial_size);
 }
@@ -682,120 +689,125 @@ void compute_input_gradients_batchnorm(const T *grad_normalized_data, const T *n
                                        const T *std_data, const T *sum_grad_normalized_data,
                                        const T *sum_grad_norm_times_norm_data, T *grad_input_data,
                                        size_t batch_size, size_t channels, size_t spatial_size,
-                                       size_t total_elements) {
+                                       size_t total_elements, cudaStream_t stream) {
   size_t total_size = batch_size * channels * spatial_size;
   int threads_per_block = THREADS_PER_BLOCK;
   int num_blocks = (total_size + threads_per_block - 1) / threads_per_block;
 
-  compute_input_gradients_batchnorm_kernel<<<num_blocks, threads_per_block>>>(
+  compute_input_gradients_batchnorm_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
       grad_normalized_data, normalized_data, std_data, sum_grad_normalized_data,
       sum_grad_norm_times_norm_data, grad_input_data, batch_size, channels, spatial_size,
       total_elements);
 }
 
 template void compute_channel_mean<float>(const float *input_data, float *mean_data,
-                                          size_t batch_size, size_t channels, size_t spatial_size);
+                                          size_t batch_size, size_t channels, size_t spatial_size,
+                                          cudaStream_t stream);
 template void compute_channel_mean<double>(const double *input_data, double *mean_data,
-                                           size_t batch_size, size_t channels, size_t spatial_size);
+                                           size_t batch_size, size_t channels, size_t spatial_size,
+                                           cudaStream_t stream);
 
 template void compute_channel_variance<float>(const float *input_data, const float *mean_data,
                                               float *var_data, size_t batch_size, size_t channels,
-                                              size_t spatial_size);
+                                              size_t spatial_size, cudaStream_t stream);
 template void compute_channel_variance<double>(const double *input_data, const double *mean_data,
                                                double *var_data, size_t batch_size, size_t channels,
-                                               size_t spatial_size);
+                                               size_t spatial_size, cudaStream_t stream);
 
 template void compute_mean_variance_fused<float>(const float *input_data, float *mean_data,
                                                  float *var_data, size_t batch_size,
-                                                 size_t channels, size_t spatial_size);
+                                                 size_t channels, size_t spatial_size,
+                                                 cudaStream_t stream);
 template void compute_mean_variance_fused<double>(const double *input_data, double *mean_data,
                                                   double *var_data, size_t batch_size,
-                                                  size_t channels, size_t spatial_size);
+                                                  size_t channels, size_t spatial_size,
+                                                  cudaStream_t stream);
 
 template void normalize_and_scale_optimized<float>(const float *input_data, const float *mean_data,
                                                    const float *std_data, const float *gamma_data,
                                                    const float *beta_data, float *output_data,
                                                    float *normalized_data, size_t batch_size,
                                                    size_t channels, size_t spatial_size,
-                                                   bool affine);
+                                                   bool affine, cudaStream_t stream);
 template void normalize_and_scale_optimized<double>(
     const double *input_data, const double *mean_data, const double *std_data,
     const double *gamma_data, const double *beta_data, double *output_data, double *normalized_data,
-    size_t batch_size, size_t channels, size_t spatial_size, bool affine);
+    size_t batch_size, size_t channels, size_t spatial_size, bool affine, cudaStream_t stream);
 
 template void compute_batch_std<float>(const float *batch_var_data, float *batch_std_data,
-                                       size_t channels, float epsilon);
+                                       size_t channels, float epsilon, cudaStream_t stream);
 template void compute_batch_std<double>(const double *batch_var_data, double *batch_std_data,
-                                        size_t channels, double epsilon);
+                                        size_t channels, double epsilon, cudaStream_t stream);
 
 template void update_running_stats<float>(float *running_mean_data, float *running_var_data,
                                           const float *batch_mean_data, const float *batch_var_data,
-                                          size_t channels, float momentum);
+                                          size_t channels, float momentum, cudaStream_t stream);
 template void update_running_stats<double>(double *running_mean_data, double *running_var_data,
                                            const double *batch_mean_data,
                                            const double *batch_var_data, size_t channels,
-                                           double momentum);
+                                           double momentum, cudaStream_t stream);
 
-template void
-compute_inference_output<float>(const float *input_data, const float *running_mean_data,
-                                const float *running_var_data, const float *gamma_data,
-                                const float *beta_data, float *output_data, size_t batch_size,
-                                size_t channels, size_t spatial_size, float epsilon, bool affine);
-template void
-compute_inference_output<double>(const double *input_data, const double *running_mean_data,
-                                 const double *running_var_data, const double *gamma_data,
-                                 const double *beta_data, double *output_data, size_t batch_size,
-                                 size_t channels, size_t spatial_size, double epsilon, bool affine);
+template void compute_inference_output<float>(
+    const float *input_data, const float *running_mean_data, const float *running_var_data,
+    const float *gamma_data, const float *beta_data, float *output_data, size_t batch_size,
+    size_t channels, size_t spatial_size, float epsilon, bool affine, cudaStream_t stream);
+template void compute_inference_output<double>(
+    const double *input_data, const double *running_mean_data, const double *running_var_data,
+    const double *gamma_data, const double *beta_data, double *output_data, size_t batch_size,
+    size_t channels, size_t spatial_size, double epsilon, bool affine, cudaStream_t stream);
 
 template void compute_affine_gradients_optimized<float>(const float *gradient_data,
                                                         const float *normalized_data,
                                                         float *gamma_grad, float *beta_grad,
                                                         size_t batch_size, size_t channels,
-                                                        size_t spatial_size);
+                                                        size_t spatial_size, cudaStream_t stream);
 template void compute_affine_gradients_optimized<double>(const double *gradient_data,
                                                          const double *normalized_data,
                                                          double *gamma_grad, double *beta_grad,
                                                          size_t batch_size, size_t channels,
-                                                         size_t spatial_size);
+                                                         size_t spatial_size, cudaStream_t stream);
 
 template void compute_grad_normalized<float>(const float *gradient_data, const float *gamma_data,
                                              float *grad_normalized_data, size_t batch_size,
-                                             size_t channels, size_t spatial_size, bool affine);
+                                             size_t channels, size_t spatial_size, bool affine,
+                                             cudaStream_t stream);
 template void compute_grad_normalized<double>(const double *gradient_data, const double *gamma_data,
                                               double *grad_normalized_data, size_t batch_size,
-                                              size_t channels, size_t spatial_size, bool affine);
+                                              size_t channels, size_t spatial_size, bool affine,
+                                              cudaStream_t stream);
 
 template void compute_backward_sums<float>(const float *grad_normalized_data,
                                            const float *normalized_data,
                                            float *sum_grad_normalized_data,
                                            float *sum_grad_norm_times_norm_data, size_t batch_size,
-                                           size_t channels, size_t spatial_size);
+                                           size_t channels, size_t spatial_size,
+                                           cudaStream_t stream);
 template void compute_backward_sums<double>(const double *grad_normalized_data,
                                             const double *normalized_data,
                                             double *sum_grad_normalized_data,
                                             double *sum_grad_norm_times_norm_data,
-                                            size_t batch_size, size_t channels,
-                                            size_t spatial_size);
+                                            size_t batch_size, size_t channels, size_t spatial_size,
+                                            cudaStream_t stream);
 
 template void compute_input_gradients_batchnorm<float>(
     const float *grad_normalized_data, const float *normalized_data, const float *std_data,
     const float *sum_grad_normalized_data, const float *sum_grad_norm_times_norm_data,
     float *grad_input_data, size_t batch_size, size_t channels, size_t spatial_size,
-    size_t total_elements);
+    size_t total_elements, cudaStream_t stream);
 template void compute_input_gradients_batchnorm<double>(
     const double *grad_normalized_data, const double *normalized_data, const double *std_data,
     const double *sum_grad_normalized_data, const double *sum_grad_norm_times_norm_data,
     double *grad_input_data, size_t batch_size, size_t channels, size_t spatial_size,
-    size_t total_elements);
+    size_t total_elements, cudaStream_t stream);
 
 template void compute_batchnorm_backward_fused<float>(
     const float *gradient_data, const float *normalized_data, const float *std_data,
     const float *gamma_data, float *grad_input_data, float *gamma_grad, float *beta_grad,
-    size_t batch_size, size_t channels, size_t spatial_size, bool affine);
+    size_t batch_size, size_t channels, size_t spatial_size, bool affine, cudaStream_t stream);
 template void compute_batchnorm_backward_fused<double>(
     const double *gradient_data, const double *normalized_data, const double *std_data,
     const double *gamma_data, double *grad_input_data, double *gamma_grad, double *beta_grad,
-    size_t batch_size, size_t channels, size_t spatial_size, bool affine);
+    size_t batch_size, size_t channels, size_t spatial_size, bool affine, cudaStream_t stream);
 
 } // namespace batchnorm
 } // namespace cuda

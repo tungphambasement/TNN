@@ -5,6 +5,7 @@
  * project root for the full license text.
  */
 #pragma once
+#include "device/task.hpp"
 #include "nn/layers_impl/maxpool2d_layer.hpp"
 #include "tensor/tensor_ops.hpp"
 #include <stdexcept>
@@ -60,7 +61,7 @@ Tensor<T> MaxPool2DLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_
   device_ptr<size_t[]> mask_indices = make_array_ptr<size_t[]>(this->device_, total_outputs);
 
   compute_max_pool_forward(padded_input->data_ptr(), output.data_ptr(), batch_size, channels,
-                           padded_h, padded_w, output_h, output_w, mask_indices);
+                           padded_h, padded_w, output_h, output_w, mask_indices, "default");
 
   micro_batch_mask_indices_[micro_batch_id] = std::move(mask_indices);
   micro_batch_inputs_[micro_batch_id] = padded_input->clone();
@@ -97,7 +98,7 @@ Tensor<T> MaxPool2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_ba
   grad_padded_input.fill(T(0));
 
   compute_max_pool_backward(current_gradient.data_ptr(), grad_padded_input.data_ptr(), batch_size,
-                            channels, output_h, output_w, mask_indices);
+                            channels, output_h, output_w, mask_indices, "default");
 
   if (pad_h_ > 0 || pad_w_ > 0) {
     Tensor<T> grad_input;
@@ -109,49 +110,57 @@ Tensor<T> MaxPool2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_ba
 }
 
 template <typename T>
-void MaxPool2DLayer<T>::compute_max_pool_forward(const device_ptr<T[]> &input_data,
-                                                 device_ptr<T[]> &output_data, size_t batch_size,
-                                                 size_t channels, size_t input_h, size_t input_w,
-                                                 size_t output_h, size_t output_w,
-                                                 device_ptr<size_t[]> &mask_indices) const {
+std::unique_ptr<Task> MaxPool2DLayer<T>::compute_max_pool_forward(
+    const device_ptr<T[]> &input_data, device_ptr<T[]> &output_data, size_t batch_size,
+    size_t channels, size_t input_h, size_t input_w, size_t output_h, size_t output_w,
+    device_ptr<size_t[]> &mask_indices, const std::string &flow_id) const {
   if (input_data.getDeviceType() != output_data.getDeviceType()) {
     throw std::runtime_error("Input and output tensors must be on the same device");
   }
 
   if (input_data.getDeviceType() == DeviceType::CPU) {
-    cpu::maxpool::compute_max_pool_forward(input_data.get(), output_data.get(), batch_size,
-                                           channels, input_h, input_w, output_h, output_w, pool_h_,
-                                           pool_w_, stride_h_, stride_w_, mask_indices);
+    return create_cpu_task(flow_id, cpu::maxpool::compute_max_pool_forward<T>, input_data.get(),
+                           output_data.get(), batch_size, channels, input_h, input_w, output_h,
+                           output_w, pool_h_, pool_w_, stride_h_, stride_w_, mask_indices);
   }
 #ifdef USE_CUDA
-  else {
-    cuda::maxpool::compute_max_pool_forward(input_data.get(), output_data.get(), batch_size,
-                                            channels, input_h, input_w, output_h, output_w, pool_h_,
-                                            pool_w_, stride_h_, stride_w_, mask_indices);
+  else if (input_data.getDeviceType() == DeviceType::GPU) {
+    return create_gpu_task(flow_id, cuda::maxpool::compute_max_pool_forward<T>, input_data.get(),
+                           output_data.get(), batch_size, channels, input_h, input_w, output_h,
+                           output_w, pool_h_, pool_w_, stride_h_, stride_w_, mask_indices);
   }
 #endif
+  else {
+    throw std::runtime_error("Unsupported device type for compute_max_pool_forward");
+  }
+  return nullptr;
 }
 
 template <typename T>
-void MaxPool2DLayer<T>::compute_max_pool_backward(const device_ptr<T[]> &gradient_data,
-                                                  device_ptr<T[]> &grad_input_data,
-                                                  size_t batch_size, size_t channels,
-                                                  size_t output_h, size_t output_w,
-                                                  const device_ptr<size_t[]> &mask_indices) const {
+std::unique_ptr<Task> MaxPool2DLayer<T>::compute_max_pool_backward(
+    const device_ptr<T[]> &gradient_data, device_ptr<T[]> &grad_input_data, size_t batch_size,
+    size_t channels, size_t output_h, size_t output_w, const device_ptr<size_t[]> &mask_indices,
+    const std::string &flow_id) const {
   if (gradient_data.getDeviceType() != grad_input_data.getDeviceType()) {
     throw std::runtime_error("Gradient and input gradient tensors must be on the same device");
   }
 
   if (gradient_data.getDeviceType() == DeviceType::CPU) {
-    cpu::maxpool::compute_max_pool_backward(gradient_data.get(), grad_input_data.get(), batch_size,
-                                            channels, output_h, output_w, mask_indices);
+    return create_cpu_task(flow_id, cpu::maxpool::compute_max_pool_backward<T>, gradient_data.get(),
+                           grad_input_data.get(), batch_size, channels, output_h, output_w,
+                           mask_indices);
   }
 #ifdef USE_CUDA
-  else {
-    cuda::maxpool::compute_max_pool_backward(gradient_data.get(), grad_input_data.get(), batch_size,
-                                             channels, output_h, output_w, mask_indices);
+  else if (gradient_data.getDeviceType() == DeviceType::GPU) {
+    return create_gpu_task(flow_id, cuda::maxpool::compute_max_pool_backward<T>,
+                           gradient_data.get(), grad_input_data.get(), batch_size, channels,
+                           output_h, output_w, mask_indices);
   }
 #endif
+  else {
+    throw std::runtime_error("Unsupported device type for compute_max_pool_backward");
+  }
+  return nullptr;
 }
 
 template <typename T> std::string MaxPool2DLayer<T>::type() const { return "maxpool2d"; }

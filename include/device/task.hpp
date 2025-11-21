@@ -165,4 +165,16 @@ std::unique_ptr<Task> create_gpu_task(std::string flow_id, Func &&func, Args &&.
 }
 #endif
 
+inline void task_sync_all(const std::initializer_list<std::unique_ptr<Task>> &tasks) {
+  for (const auto &task : tasks) {
+    if (task) {
+      auto errorStatus = task->sync();
+      if (errorStatus != ErrorStatus{}) {
+        throw std::runtime_error("Task synchronization failed with error: " +
+                                 errorStatus.message());
+      }
+    }
+  }
+}
+
 } // namespace tnn

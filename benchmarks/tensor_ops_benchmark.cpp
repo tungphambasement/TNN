@@ -472,21 +472,24 @@ void benchmark_cpu_conv2d_gradients(const BenchmarkConfig &config, int warmup_ru
 
   // Warmup
   for (int i = 0; i < warmup_runs; ++i) {
-    cpu::conv2d::compute_weight_gradients(col_data.data(), gradient_data.data(),
-                                          weight_grad_data.data(), output_size, kernel_size,
-                                          out_channels);
-    cpu::conv2d::compute_input_gradients(gradient_data.data(), weight_data.data(),
-                                         col_grad_data.data(), output_size, kernel_size,
-                                         out_channels);
+    auto weight_task = create_cpu_task(
+        "benchmark_weight_grad", cpu::conv2d::compute_weight_gradients<float>, col_data.data(),
+        gradient_data.data(), weight_grad_data.data(), output_size, kernel_size, out_channels);
+    weight_task->sync();
+    auto input_task = create_cpu_task(
+        "benchmark_input_grad", cpu::conv2d::compute_input_gradients<float>, gradient_data.data(),
+        weight_data.data(), col_grad_data.data(), output_size, kernel_size, out_channels);
+    input_task->sync();
   }
 
   // Benchmark compute_weight_gradients
   std::vector<double> weight_grad_times;
   for (int i = 0; i < bench_runs; ++i) {
     auto start = std::chrono::high_resolution_clock::now();
-    cpu::conv2d::compute_weight_gradients(col_data.data(), gradient_data.data(),
-                                          weight_grad_data.data(), output_size, kernel_size,
-                                          out_channels);
+    auto weight_task = create_cpu_task(
+        "benchmark_weight_grad", cpu::conv2d::compute_weight_gradients<float>, col_data.data(),
+        gradient_data.data(), weight_grad_data.data(), output_size, kernel_size, out_channels);
+    weight_task->sync();
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> duration = end - start;
     weight_grad_times.push_back(duration.count());
@@ -496,9 +499,10 @@ void benchmark_cpu_conv2d_gradients(const BenchmarkConfig &config, int warmup_ru
   std::vector<double> input_grad_times;
   for (int i = 0; i < bench_runs; ++i) {
     auto start = std::chrono::high_resolution_clock::now();
-    cpu::conv2d::compute_input_gradients(gradient_data.data(), weight_data.data(),
-                                         col_grad_data.data(), output_size, kernel_size,
-                                         out_channels);
+    auto input_task = create_cpu_task(
+        "benchmark_input_grad", cpu::conv2d::compute_input_gradients<float>, gradient_data.data(),
+        weight_data.data(), col_grad_data.data(), output_size, kernel_size, out_channels);
+    input_task->sync();
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> duration = end - start;
     input_grad_times.push_back(duration.count());
@@ -564,10 +568,14 @@ void benchmark_cuda_conv2d_gradients(const BenchmarkConfig &config, int warmup_r
 
   // Warmup
   for (int i = 0; i < warmup_runs; ++i) {
-    cuda::conv2d::compute_weight_gradients(col_data, gradient_data, weight_grad_data, output_size,
-                                           kernel_size, out_channels);
-    cuda::conv2d::compute_input_gradients(gradient_data, weight_data, col_grad_data, output_size,
-                                          kernel_size, out_channels);
+    auto weight_task = create_gpu_task(
+        "benchmark_weight_grad", cuda::conv2d::compute_weight_gradients<float>, col_data,
+        gradient_data, weight_grad_data, output_size, kernel_size, out_channels);
+    weight_task->sync();
+    auto input_task = create_gpu_task(
+        "benchmark_input_grad", cuda::conv2d::compute_input_gradients<float>, gradient_data,
+        weight_data, col_grad_data, output_size, kernel_size, out_channels);
+    input_task->sync();
   }
   CUDA_CHECK(cudaDeviceSynchronize());
 
@@ -576,8 +584,10 @@ void benchmark_cuda_conv2d_gradients(const BenchmarkConfig &config, int warmup_r
   for (int i = 0; i < bench_runs; ++i) {
     CUDA_CHECK(cudaDeviceSynchronize());
     auto start = std::chrono::high_resolution_clock::now();
-    cuda::conv2d::compute_weight_gradients(col_data, gradient_data, weight_grad_data, output_size,
-                                           kernel_size, out_channels);
+    auto weight_task = create_gpu_task(
+        "benchmark_weight_grad", cuda::conv2d::compute_weight_gradients<float>, col_data,
+        gradient_data, weight_grad_data, output_size, kernel_size, out_channels);
+    weight_task->sync();
     CUDA_CHECK(cudaDeviceSynchronize());
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> duration = end - start;
@@ -589,8 +599,10 @@ void benchmark_cuda_conv2d_gradients(const BenchmarkConfig &config, int warmup_r
   for (int i = 0; i < bench_runs; ++i) {
     CUDA_CHECK(cudaDeviceSynchronize());
     auto start = std::chrono::high_resolution_clock::now();
-    cuda::conv2d::compute_input_gradients(gradient_data, weight_data, col_grad_data, output_size,
-                                          kernel_size, out_channels);
+    auto input_task = create_gpu_task(
+        "benchmark_input_grad", cuda::conv2d::compute_input_gradients<float>, gradient_data,
+        weight_data, col_grad_data, output_size, kernel_size, out_channels);
+    input_task->sync();
     CUDA_CHECK(cudaDeviceSynchronize());
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> duration = end - start;

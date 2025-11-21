@@ -7,6 +7,7 @@
 #pragma once
 
 #include "device/device_ptr.hpp"
+#include "device/task.hpp"
 #include "stateless_layer.hpp"
 #include "tensor/tensor.hpp"
 
@@ -28,14 +29,16 @@ private:
 
   std::unordered_map<size_t, Tensor<T>> micro_batch_inputs_;
 
-  void compute_avg_pool_forward(const device_ptr<T[]> &input_data, device_ptr<T[]> &output_data,
-                                size_t batch_size, size_t channels, size_t input_h, size_t input_w,
-                                size_t output_h, size_t output_w) const;
+  std::unique_ptr<Task> compute_avg_pool_forward(const device_ptr<T[]> &input_data,
+                                                 device_ptr<T[]> &output_data, size_t batch_size,
+                                                 size_t channels, size_t input_h, size_t input_w,
+                                                 size_t output_h, size_t output_w,
+                                                 const std::string &flow_id) const;
 
-  void compute_avg_pool_backward(const device_ptr<T[]> &gradient_data,
-                                 device_ptr<T[]> &grad_input_data, size_t batch_size,
-                                 size_t channels, size_t input_h, size_t input_w, size_t output_h,
-                                 size_t output_w) const;
+  std::unique_ptr<Task>
+  compute_avg_pool_backward(const device_ptr<T[]> &gradient_data, device_ptr<T[]> &grad_input_data,
+                            size_t batch_size, size_t channels, size_t input_h, size_t input_w,
+                            size_t output_h, size_t output_w, const std::string &flow_id) const;
 
 public:
   AvgPool2DLayer(size_t pool_h, size_t pool_w, size_t stride_h = 0, size_t stride_w = 0,

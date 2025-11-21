@@ -5,6 +5,7 @@
  * project root for the full license text.
  */
 #pragma once
+#include "device/task.hpp"
 #include "nn/layers_impl/avgpool2d_layer.hpp"
 #include "tensor/tensor_ops.hpp"
 #include <stdexcept>
@@ -56,7 +57,7 @@ Tensor<T> AvgPool2DLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_
   Tensor<T> output({batch_size, channels, output_h, output_w}, this->device_);
 
   compute_avg_pool_forward(padded_input->data_ptr(), output.data_ptr(), batch_size, channels,
-                           padded_h, padded_w, output_h, output_w);
+                           padded_h, padded_w, output_h, output_w, "default");
 
   micro_batch_inputs_[micro_batch_id] = padded_input->clone();
 
@@ -87,7 +88,7 @@ Tensor<T> AvgPool2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_ba
   Tensor<T> grad_padded_input(cached_padded_input.shape(), this->device_);
 
   compute_avg_pool_backward(current_gradient.data_ptr(), grad_padded_input.data_ptr(), batch_size,
-                            channels, padded_h, padded_w, output_h, output_w);
+                            channels, padded_h, padded_w, output_h, output_w, "default");
 
   if (pad_h_ > 0 || pad_w_ > 0) {
     Tensor<T> grad_input;
@@ -97,52 +98,59 @@ Tensor<T> AvgPool2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_ba
     return grad_padded_input;
   }
 }
-
 template <typename T>
-void AvgPool2DLayer<T>::compute_avg_pool_forward(const device_ptr<T[]> &input_data,
-                                                 device_ptr<T[]> &output_data, size_t batch_size,
-                                                 size_t channels, size_t input_h, size_t input_w,
-                                                 size_t output_h, size_t output_w) const {
+std::unique_ptr<Task> AvgPool2DLayer<T>::compute_avg_pool_forward(
+    const device_ptr<T[]> &input_data, device_ptr<T[]> &output_data, size_t batch_size,
+    size_t channels, size_t input_h, size_t input_w, size_t output_h, size_t output_w,
+    const std::string &flow_id) const {
   if (input_data.getDeviceType() != output_data.getDeviceType()) {
     throw std::runtime_error("Input and output tensors must be on the same device");
   }
 
   if (input_data.getDeviceType() == DeviceType::CPU) {
-    cpu::avgpool::compute_avg_pool_forward<T>(input_data.get(), output_data.get(), batch_size,
-                                              channels, input_h, input_w, output_h, output_w,
-                                              pool_h_, pool_w_, stride_h_, stride_w_);
+    return create_cpu_task(flow_id, cpu::avgpool::compute_avg_pool_forward<T>, input_data.get(),
+                           output_data.get(), batch_size, channels, input_h, input_w, output_h,
+                           output_w, pool_h_, pool_w_, stride_h_, stride_w_);
   }
 #ifdef USE_CUDA
-  else {
-    cuda::avgpool::compute_avg_pool_forward<T>(input_data.get(), output_data.get(), batch_size,
-                                               channels, input_h, input_w, output_h, output_w,
-                                               pool_h_, pool_w_, stride_h_, stride_w_);
+  else if (input_data.getDeviceType() == DeviceType::GPU) {
+    return create_gpu_task(flow_id, cuda::avgpool::compute_avg_pool_forward<T>, input_data.get(),
+                           output_data.get(), batch_size, channels, input_h, input_w, output_h,
+                           output_w, pool_h_, pool_w_, stride_h_, stride_w_);
   }
 #endif
+  else {
+    throw std::runtime_error("Unsupported device type for compute_avg_pool_forward");
+  }
+  return nullptr;
 }
 
 template <typename T>
-void AvgPool2DLayer<T>::compute_avg_pool_backward(const device_ptr<T[]> &gradient_data,
-                                                  device_ptr<T[]> &grad_input_data,
-                                                  size_t batch_size, size_t channels,
-                                                  size_t input_h, size_t input_w, size_t output_h,
-                                                  size_t output_w) const {
+std::unique_ptr<Task> AvgPool2DLayer<T>::compute_avg_pool_backward(
+    const device_ptr<T[]> &gradient_data, device_ptr<T[]> &grad_input_data, size_t batch_size,
+    size_t channels, size_t input_h, size_t input_w, size_t output_h, size_t output_w,
+    const std::string &flow_id) const {
   if (gradient_data.getDeviceType() != grad_input_data.getDeviceType()) {
     throw std::runtime_error("Gradient and input gradient tensors must be on the same device");
   }
 
   if (gradient_data.getDeviceType() == DeviceType::CPU) {
-    cpu::avgpool::compute_avg_pool_backward<T>(gradient_data.get(), grad_input_data.get(),
-                                               batch_size, channels, input_h, input_w, output_h,
-                                               output_w, pool_h_, pool_w_, stride_h_, stride_w_);
+    return create_cpu_task(flow_id, cpu::avgpool::compute_avg_pool_backward<T>, gradient_data.get(),
+                           grad_input_data.get(), batch_size, channels, input_h, input_w, output_h,
+                           output_w, pool_h_, pool_w_, stride_h_, stride_w_);
   }
 #ifdef USE_CUDA
-  else {
-    cuda::avgpool::compute_avg_pool_backward<T>(gradient_data.get(), grad_input_data.get(),
-                                                batch_size, channels, input_h, input_w, output_h,
-                                                output_w, pool_h_, pool_w_, stride_h_, stride_w_);
+  else if (gradient_data.getDeviceType() == DeviceType::GPU) {
+    return create_gpu_task(flow_id, cuda::avgpool::compute_avg_pool_backward<T>,
+                           gradient_data.get(), grad_input_data.get(), batch_size, channels,
+                           input_h, input_w, output_h, output_w, pool_h_, pool_w_, stride_h_,
+                           stride_w_);
   }
 #endif
+  else {
+    throw std::runtime_error("Unsupported device type for compute_avg_pool_backward");
+  }
+  return nullptr;
 }
 
 template <typename T> std::string AvgPool2DLayer<T>::type() const { return "avgpool2d"; }
