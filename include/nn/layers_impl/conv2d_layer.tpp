@@ -165,17 +165,6 @@ Tensor<T> Conv2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch
   compute_weight_gradients(it_col_buffer->second, temp_gradient_buffer_,
                            weight_gradients_.data_ptr(), output_size, kernel_size, out_channels_);
 
-  if (use_bias_) {
-    auto bias_start = std::chrono::high_resolution_clock::now();
-    compute_bias_gradients(current_gradient.data_ptr(), bias_gradients_.data_ptr(), batch_size,
-                           output_h, output_w, out_channels_);
-    auto bias_end = std::chrono::high_resolution_clock::now();
-    if (this->enable_profiling_) {
-      float bias_duration = std::chrono::duration<float, std::milli>(bias_end - bias_start).count();
-      this->perf_timers_["bias_gradients"] += bias_duration;
-    }
-  }
-
   compute_input_gradients(temp_gradient_buffer_, weights_.data_ptr(), temp_col_grad_matrix_buffer_,
                           output_size, kernel_size, out_channels_);
 
@@ -189,6 +178,17 @@ Tensor<T> Conv2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch
     float col2im_duration =
         std::chrono::duration<float, std::milli>(col2im_end - col2im_start).count();
     this->perf_timers_["col2im"] += col2im_duration;
+  }
+
+  if (use_bias_) {
+    auto bias_start = std::chrono::high_resolution_clock::now();
+    compute_bias_gradients(current_gradient.data_ptr(), bias_gradients_.data_ptr(), batch_size,
+                           output_h, output_w, out_channels_);
+    auto bias_end = std::chrono::high_resolution_clock::now();
+    if (this->enable_profiling_) {
+      float bias_duration = std::chrono::duration<float, std::milli>(bias_end - bias_start).count();
+      this->perf_timers_["bias_gradients"] += bias_duration;
+    }
   }
 
   return grad_input;

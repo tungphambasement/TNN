@@ -47,7 +47,7 @@ private:
                                const size_t output_features) const;
 
   void compute_bias_gradients(const device_ptr<T[]> &current_grad_data,
-                              const device_ptr<T[]> &bias_gradient_data, const size_t batch_size,
+                              device_ptr<T[]> &bias_gradient_data, const size_t batch_size,
                               const size_t output_features) const;
 
   void add_bias_vector(device_ptr<T[]> &output_data, const device_ptr<T[]> &bias_data,

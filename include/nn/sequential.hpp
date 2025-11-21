@@ -28,6 +28,10 @@
 #include <string>
 #include <vector>
 
+#ifdef USE_CUDA
+#include <cuda_runtime.h>
+#endif
+
 namespace tnn {
 struct Partition {
   size_t start_layer;
@@ -392,7 +396,9 @@ public:
         if (enable_profiling_) {
           auto start_time = std::chrono::high_resolution_clock::now();
           layers_[i]->forward_inplace(input, micro_batch_id);
-
+#ifdef USE_CUDA
+          cudaDeviceSynchronize();
+#endif
           auto end_time = std::chrono::high_resolution_clock::now();
           auto duration =
               std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);

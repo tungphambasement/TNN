@@ -74,6 +74,14 @@ struct TrainingConfig {
     lr_decay_factor = get_env<float>("LR_DECAY_FACTOR", DEFAULT_LR_DECAY_FACTOR);
     lr_decay_interval = get_env<size_t>("LR_DECAY_INTERVAL", DEFAULT_LR_DECAY_INTERVAL);
     progress_print_interval = get_env<int>("PROGRESS_PRINT_INTERVAL", DEFAULT_PRINT_INTERVAL);
+    std::string profiler_type_str = get_env<std::string>("PROFILER_TYPE", "NONE");
+    if (profiler_type_str == "NORMAL") {
+      profiler_type = ProfilerType::NORMAL;
+    } else if (profiler_type_str == "CUMULATIVE") {
+      profiler_type = ProfilerType::CUMULATIVE;
+    } else {
+      profiler_type = ProfilerType::NONE;
+    }
     num_threads = get_env<size_t>("NUM_THREADS", DEFAULT_NUM_THREADS);
   }
 };

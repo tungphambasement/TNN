@@ -1,6 +1,7 @@
 #pragma once
 
-#include "device/device.hpp"
+#include "device/device_manager.hpp"
+#include "flow.hpp"
 
 #include <atomic>
 #include <functional>
@@ -41,17 +42,15 @@ protected:
 };
 
 class CPUTask : public Task {
-  friend class TaskHandler;
-
 private:
   std::function<void()> work_function_;
-  const Device *device_;
+  CPUFlow *flow_;
 
 public:
   template <typename Func, typename... Args>
-  explicit CPUTask(const Device *device, Func &&func, Args &&...args) : device_(device) {
+  explicit CPUTask(CPUFlow *flow, Func &&func, Args &&...args) : flow_(flow) {
     auto bound_work = [f = std::forward<Func>(func),
-                       args_tuple = std::make_tuple(std::forward<Args>(args)...)]() mutable {
+                       args_tuple = std::tuple<Args...>(std::forward<Args>(args)...)]() mutable {
       std::apply(f, std::move(args_tuple));
     };
 
@@ -92,26 +91,22 @@ inline tnn::ErrorStatus cuda_error_to_status(cudaError_t err) {
 }
 
 class CUDATask : public Task {
-  friend class TaskHandler;
-
 private:
-  cudaStream_t stream_ = nullptr;
+  CUDAFlow *flow_;
   cudaEvent_t event_ = nullptr;
-  const Device *device_;
   std::function<void()> launch_function_;
 
 public:
   template <typename Func, typename... Args>
-  explicit CUDATask(const Device *device, Func &&func, Args &&...args) : device_(device) {
-    cudaStreamCreate(&stream_);
+  explicit CUDATask(CUDAFlow *flow, Func &&func, Args &&...args) : flow_(flow) {
     cudaEventCreate(&event_);
 
+    cudaStream_t stream = flow_->get_stream();
+
     // Automatically append cudaStream_t as the last parameter
-    // This eliminates the need for lambda wrapping in user code
     auto launch_func = [f = std::forward<Func>(func),
-                        args_tuple = std::make_tuple(std::forward<Args>(args)...),
-                        stream = stream_]() mutable {
-      // Concatenate user args with stream parameter and apply to function
+                        args_tuple = std::tuple<Args...>(std::forward<Args>(args)...),
+                        stream]() mutable {
       std::apply(f, std::tuple_cat(std::move(args_tuple), std::make_tuple(stream)));
     };
 
@@ -121,7 +116,7 @@ public:
 
   void execute() override {
     launch_function_();
-    cudaEventRecord(event_, stream_);
+    cudaEventRecord(event_, flow_->get_stream());
   }
 
   ErrorStatus sync() override {
@@ -137,8 +132,6 @@ public:
   }
 
   ~CUDATask() override {
-    if (stream_)
-      cudaStreamDestroy(stream_);
     if (event_)
       cudaEventDestroy(event_);
   }
@@ -149,4 +142,27 @@ public:
   CUDATask &operator=(CUDATask &&) = delete;
 };
 #endif
+
+template <typename Func, typename... Args>
+std::unique_ptr<Task> create_cpu_task(std::string flow_id, Func &&func, Args &&...args) {
+  auto CPUDevice = &getCPU();
+  CPUFlow *flow = dynamic_cast<CPUFlow *>(CPUDevice->getFlow(flow_id));
+  if (!flow) {
+    throw std::runtime_error("Failed to get CPU flow with ID: " + flow_id);
+  }
+  return std::make_unique<CPUTask>(flow, std::forward<Func>(func), std::forward<Args>(args)...);
+}
+
+#ifdef USE_CUDA
+template <typename Func, typename... Args>
+std::unique_ptr<Task> create_gpu_task(std::string flow_id, Func &&func, Args &&...args) {
+  auto GPUDevice = &getGPU();
+  CUDAFlow *flow = dynamic_cast<CUDAFlow *>(GPUDevice->getFlow(flow_id));
+  if (!flow) {
+    throw std::runtime_error("Failed to get CUDA flow with ID: " + flow_id);
+  }
+  return std::make_unique<CUDATask>(flow, std::forward<Func>(func), std::forward<Args>(args)...);
+}
+#endif
+
 } // namespace tnn

@@ -215,8 +215,8 @@ void DenseLayer<T>::compute_input_gradients(const device_ptr<T[]> &gradient_data
 
 template <typename T>
 void DenseLayer<T>::compute_bias_gradients(const device_ptr<T[]> &current_grad_data,
-                                           const device_ptr<T[]> &bias_gradient_data,
-                                           size_t batch_size, size_t output_features) const {
+                                           device_ptr<T[]> &bias_gradient_data, size_t batch_size,
+                                           size_t output_features) const {
   if (current_grad_data.getDeviceType() != bias_gradient_data.getDeviceType()) {
     throw std::runtime_error("Device type mismatch in compute_bias_gradients");
   }
