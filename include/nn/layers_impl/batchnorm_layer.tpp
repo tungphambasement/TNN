@@ -80,15 +80,12 @@ void BatchNormLayer<T>::forward_inplace(Tensor<T> &input, size_t micro_batch_id)
     Tensor<T> batch_var({channels, 1, 1, 1}, this->device_);
     Tensor<T> batch_std({channels, 1, 1, 1}, this->device_);
     Tensor<T> normalized(input.shape(), this->device_);
-    normalized.fill(T(0));
 
     // Use fused mean+variance computation
-    auto mean_var_task = compute_mean_variance_fused(input, batch_mean, batch_var, batch_size,
-                                                     channels, spatial_size, "default");
+    compute_mean_variance_fused(input, batch_mean, batch_var, batch_size, channels, spatial_size,
+                                "default");
 
-    auto std_task = compute_batch_std(batch_var, batch_std, channels, "default");
-
-    task_sync_all({std::move(mean_var_task), std::move(std_task)});
+    compute_batch_std(batch_var, batch_std, channels, "default");
 
     std::unique_ptr<Task> norm_task = nullptr;
     if (affine_) {

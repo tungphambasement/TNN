@@ -7,18 +7,18 @@
 #pragma once
 #include "nn/layers_impl/conv2d_layer.hpp"
 
+#include "device/device_manager.hpp"
+#include "device/task.hpp"
+#include "nn/layers_impl/cpu/conv2d_ops.hpp"
+#include "nn/layers_impl/cuda/conv2d_ops.hpp"
+#include "tensor/tensor_ops.hpp"
 #include <chrono>
 #include <cmath>
 #include <cstring>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
-
-#include "device/device_manager.hpp"
-#include "device/task.hpp"
-#include "nn/layers_impl/cpu/conv2d_ops.hpp"
-#include "nn/layers_impl/cuda/conv2d_ops.hpp"
-#include "tensor/tensor_ops.hpp"
+#include <string>
 
 namespace tnn {
 
@@ -139,6 +139,9 @@ Tensor<T> Conv2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch
   const size_t output_h = gradient.height();
   const size_t output_w = gradient.width();
 
+  Tensor<T> grad_input({batch_size, in_channels_, input_h, input_w}, this->device_);
+  grad_input.fill(T(0));
+
   size_t kernel_size = in_channels_ * kernel_h_ * kernel_w_;
   size_t output_size = batch_size * output_h * output_w;
   size_t col_grad_matrix_size = kernel_size * output_size;
@@ -147,25 +150,34 @@ Tensor<T> Conv2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch
   temp_gradient_buffer_.ensure(gradient_buffer_size);
   temp_col_grad_matrix_buffer_.ensure(col_grad_matrix_size);
 
-  ops::nchw_to_cnhw(current_gradient.data_ptr(), temp_gradient_buffer_, batch_size, out_channels_,
-                    output_h, output_w);
+  nchw_to_cnhw_task_ = ops::nchw_to_cnhw(current_gradient.data_ptr(), temp_gradient_buffer_,
+                                         batch_size, out_channels_, output_h, output_w, "default");
 
-  compute_weight_gradients(it_col_buffer->second, temp_gradient_buffer_,
-                           weight_gradients_.data_ptr(), output_size, kernel_size, out_channels_,
-                           "default");
+  auto err = nchw_to_cnhw_task_->sync();
+  if (err != ErrorStatus{}) {
+    throw std::runtime_error("Error in nchw_to_cnhw_task_ sync: " + err.message());
+  }
 
-  compute_input_gradients(temp_gradient_buffer_, weights_.data_ptr(), temp_col_grad_matrix_buffer_,
-                          output_size, kernel_size, out_channels_, "default");
+  weight_grad_task_ = compute_weight_gradients(it_col_buffer->second, temp_gradient_buffer_,
+                                               weight_gradients_.data_ptr(), output_size,
+                                               kernel_size, out_channels_, "default");
 
-  Tensor<T> grad_input({batch_size, in_channels_, input_h, input_w}, this->device_);
-  grad_input.fill(T(0));
-  col2im(temp_col_grad_matrix_buffer_, grad_input.data_ptr(), batch_size, in_channels_, input_h,
-         input_w, kernel_h_, kernel_w_, stride_h_, stride_w_, pad_h_, pad_w_);
+  input_grad_task_ = compute_input_gradients(temp_gradient_buffer_, weights_.data_ptr(),
+                                             temp_col_grad_matrix_buffer_, output_size, kernel_size,
+                                             out_channels_, "default");
+
+  col2im_task_ =
+      col2im(temp_col_grad_matrix_buffer_, grad_input.data_ptr(), batch_size, in_channels_, input_h,
+             input_w, kernel_h_, kernel_w_, stride_h_, stride_w_, pad_h_, pad_w_, "default");
 
   if (use_bias_) {
-    compute_bias_gradients(current_gradient.data_ptr(), bias_gradients_.data_ptr(), batch_size,
-                           output_h, output_w, out_channels_, "default");
+    bias_grad_task_ =
+        compute_bias_gradients(current_gradient.data_ptr(), bias_gradients_.data_ptr(), batch_size,
+                               output_h, output_w, out_channels_, "default");
   }
+
+  task_sync_all(
+      {weight_grad_task_.get(), input_grad_task_.get(), col2im_task_.get(), bias_grad_task_.get()});
 
   return grad_input;
 }

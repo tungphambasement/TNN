@@ -7,6 +7,7 @@
 #pragma once
 #include "device/task.hpp"
 #include "nn/layers_impl/maxpool2d_layer.hpp"
+#include "tensor/layout_trait.hpp"
 #include "tensor/tensor_ops.hpp"
 #include <stdexcept>
 
@@ -31,19 +32,22 @@ MaxPool2DLayer<T>::MaxPool2DLayer(size_t pool_h, size_t pool_w, size_t stride_h,
 }
 
 template <typename T>
-Tensor<T> MaxPool2DLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_id) {
+Tensor<T, NCHW> MaxPool2DLayer<T>::forward(const Tensor<T, NCHW> &input, size_t micro_batch_id) {
 
-  const Tensor<T> &current =
+  const Tensor<T, NCHW> &current =
       input.device() == this->device_ ? input : input.to_device(this->device_);
 
   const size_t batch_size = current.batch_size();
   const size_t channels = current.channels();
 
-  const Tensor<T> *padded_input = nullptr;
+  const Tensor<T, NCHW> *padded_input = nullptr;
+  Tensor<T, NCHW> temp; // Move outside if block so it survives
 
   if (pad_h_ > 0 || pad_w_ > 0) {
-    Tensor<T> temp;
-    pad(current, temp, pad_h_, pad_w_, T(0));
+    temp = Tensor<T, NCHW>(
+        {batch_size, channels, current.height() + 2 * pad_h_, current.width() + 2 * pad_w_},
+        this->device_);
+    pad(current, temp, pad_h_, pad_w_, T(0))->sync();
     padded_input = &temp;
   } else {
     padded_input = &current;
@@ -55,7 +59,7 @@ Tensor<T> MaxPool2DLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_
   const size_t output_h = (padded_h - pool_h_) / stride_h_ + 1;
   const size_t output_w = (padded_w - pool_w_) / stride_w_ + 1;
 
-  Tensor<T> output({batch_size, channels, output_h, output_w}, this->device_);
+  Tensor<T, NCHW> output({batch_size, channels, output_h, output_w}, this->device_);
 
   const size_t total_outputs = batch_size * channels * output_h * output_w;
   device_ptr<size_t[]> mask_indices = make_array_ptr<size_t[]>(this->device_, total_outputs);
@@ -70,7 +74,8 @@ Tensor<T> MaxPool2DLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_
 }
 
 template <typename T>
-Tensor<T> MaxPool2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch_id) {
+Tensor<T, NCHW> MaxPool2DLayer<T>::backward(const Tensor<T, NCHW> &gradient,
+                                            size_t micro_batch_id) {
   auto it_input = micro_batch_inputs_.find(micro_batch_id);
   auto it_mask = micro_batch_mask_indices_.find(micro_batch_id);
 
@@ -83,10 +88,10 @@ Tensor<T> MaxPool2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_ba
                              std::to_string(micro_batch_id));
   }
 
-  const Tensor<T> &current_gradient =
+  const Tensor<T, NCHW> &current_gradient =
       gradient.device() == this->device_ ? gradient : gradient.to_device(this->device_);
 
-  const Tensor<T> &cached_padded_input = it_input->second;
+  const Tensor<T, NCHW> &cached_padded_input = it_input->second;
   const device_ptr<size_t[]> &mask_indices = it_mask->second;
 
   const size_t batch_size = cached_padded_input.batch_size();
@@ -94,15 +99,17 @@ Tensor<T> MaxPool2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_ba
   const size_t output_h = gradient.height();
   const size_t output_w = gradient.width();
 
-  Tensor<T> grad_padded_input(cached_padded_input.shape(), this->device_);
+  Tensor<T, NCHW> grad_padded_input(cached_padded_input.shape(), this->device_);
   grad_padded_input.fill(T(0));
 
   compute_max_pool_backward(current_gradient.data_ptr(), grad_padded_input.data_ptr(), batch_size,
                             channels, output_h, output_w, mask_indices, "default");
 
   if (pad_h_ > 0 || pad_w_ > 0) {
-    Tensor<T> grad_input;
-    unpad(grad_padded_input, grad_input, pad_h_, pad_w_);
+    Tensor<T, NCHW> grad_input({batch_size, channels, cached_padded_input.height() - 2 * pad_h_,
+                                cached_padded_input.width() - 2 * pad_w_},
+                               this->device_);
+    unpad(grad_padded_input, grad_input, pad_h_, pad_w_)->sync();
     return grad_input;
   } else {
     return grad_padded_input;

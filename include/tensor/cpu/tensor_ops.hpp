@@ -233,9 +233,9 @@ void im2col_padded(const Tensor<T, NCHW> &input_tensor, T *col_data, const size_
             T *col_row_base = col_data + col_row_idx * col_stride + batch_offset;
 
             const size_t h_start = (pad_h > kh) ? ((pad_h - kh + stride_h - 1) / stride_h) : 0;
-            const size_t h_end = std::min(out_h, (in_h + pad_h - kh) / stride_h);
+            const size_t h_end = std::min(out_h, (in_h + pad_h - kh + stride_h - 1) / stride_h);
             const size_t w_start = (pad_w > kw) ? ((pad_w - kw + stride_w - 1) / stride_w) : 0;
-            const size_t w_end = std::min(out_w, (in_w + pad_w - kw) / stride_w);
+            const size_t w_end = std::min(out_w, (in_w + pad_w - kw + stride_w - 1) / stride_w);
 
             std::fill(col_row_base, col_row_base + h_start * out_w, T(0));
 
@@ -360,10 +360,11 @@ static void col2im_padded(const T *col_data, T *result_data, size_t batch_size, 
                 col_data + col_row_idx * (batch_size * col_width) + n * col_width;
 
             const size_t h_start = pad_h > kh ? ((pad_h - kh + stride_h - 1) / stride_h) : 0;
-            const size_t h_end = std::min(output_h, (height + pad_h - kh) / stride_h);
+            const size_t h_end =
+                std::min(output_h, (height + pad_h - kh + stride_h - 1) / stride_h);
 
             const size_t w_start = pad_w > kw ? ((pad_w - kw + stride_w - 1) / stride_w) : 0;
-            const size_t w_end = std::min(output_w, (width + pad_w - kw) / stride_w);
+            const size_t w_end = std::min(output_w, (width + pad_w - kw + stride_w - 1) / stride_w);
 
             col_row_ptr += h_start * output_w;
 

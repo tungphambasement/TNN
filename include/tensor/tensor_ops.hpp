@@ -11,9 +11,10 @@ namespace tnn {
 // im2col/col2im operations
 
 template <typename T>
-void im2col(const Tensor<T, NCHW> &input_tensor, device_ptr<T[]> &col_data, size_t kernel_h,
-            size_t kernel_w, size_t stride_h = 1, size_t stride_w = 1, size_t pad_h = 0,
-            size_t pad_w = 0, const std::string &flow_id = "default") {
+std::unique_ptr<Task> im2col(const Tensor<T, NCHW> &input_tensor, device_ptr<T[]> &col_data,
+                             size_t kernel_h, size_t kernel_w, size_t stride_h = 1,
+                             size_t stride_w = 1, size_t pad_h = 0, size_t pad_w = 0,
+                             const std::string &flow_id = "default") {
   if (col_data.getDeviceType() != input_tensor.device_type()) {
     throw std::runtime_error("im2col: Mismatched device types between col_data and input_tensor");
   }
@@ -21,12 +22,13 @@ void im2col(const Tensor<T, NCHW> &input_tensor, device_ptr<T[]> &col_data, size
     throw std::runtime_error("im2col: Mismatched device types between input tensor and col_data");
   }
   if (input_tensor.is_on_cpu()) {
-    cpu::im2col(input_tensor, col_data.get(), kernel_h, kernel_w, stride_h, stride_w, pad_h, pad_w);
+    return create_cpu_task(flow_id, cpu::im2col<T>, input_tensor, col_data.get(), kernel_h,
+                           kernel_w, stride_h, stride_w, pad_h, pad_w);
   }
 #ifdef USE_CUDA
   else if (input_tensor.is_on_gpu()) {
-    cuda::im2col(input_tensor, col_data.get(), kernel_h, kernel_w, stride_h, stride_w, pad_h,
-                 pad_w);
+    return create_gpu_task(flow_id, cuda::im2col<T>, input_tensor, col_data.get(), kernel_h,
+                           kernel_w, stride_h, stride_w, pad_h, pad_w);
   }
 #endif
   else {
@@ -35,21 +37,23 @@ void im2col(const Tensor<T, NCHW> &input_tensor, device_ptr<T[]> &col_data, size
 }
 
 template <typename T>
-void col2im(const device_ptr<T[]> &col_data, device_ptr<T[]> &result_data, size_t batch_size,
-            size_t channels, size_t height, size_t width, size_t kernel_h, size_t kernel_w,
-            size_t stride_h, size_t stride_w, size_t pad_h, size_t pad_w,
-            const std::string &flow_id = "default") {
+std::unique_ptr<Task> col2im(const device_ptr<T[]> &col_data, device_ptr<T[]> &result_data,
+                             size_t batch_size, size_t channels, size_t height, size_t width,
+                             size_t kernel_h, size_t kernel_w, size_t stride_h, size_t stride_w,
+                             size_t pad_h, size_t pad_w, const std::string &flow_id = "default") {
   if (col_data.getDeviceType() != result_data.getDeviceType()) {
     throw std::runtime_error("col2im: Mismatched device types between col_data and result_data");
   }
   if (col_data.getDeviceType() == DeviceType::CPU) {
-    cpu::col2im(col_data.get(), result_data.get(), batch_size, channels, height, width, kernel_h,
-                kernel_w, stride_h, stride_w, pad_h, pad_w);
+    return create_cpu_task(flow_id, cpu::col2im<T>, col_data.get(), result_data.get(), batch_size,
+                           channels, height, width, kernel_h, kernel_w, stride_h, stride_w, pad_h,
+                           pad_w);
   }
 #ifdef USE_CUDA
   else if (col_data.getDeviceType() == DeviceType::GPU) {
-    cuda::col2im(col_data.get(), result_data.get(), batch_size, channels, height, width, kernel_h,
-                 kernel_w, stride_h, stride_w, pad_h, pad_w);
+    return create_gpu_task(flow_id, cuda::col2im<T>, col_data.get(), result_data.get(), batch_size,
+                           channels, height, width, kernel_h, kernel_w, stride_h, stride_w, pad_h,
+                           pad_w);
   }
 #endif
   else {
@@ -59,31 +63,15 @@ void col2im(const device_ptr<T[]> &col_data, device_ptr<T[]> &result_data, size_
 
 // Padding operations
 
-template <typename T, Layout L>
-std::unique_ptr<Task> pad(const Tensor<T, L> &input, Tensor<T, L> &result, size_t pad_h,
-                          size_t pad_w, T value = T(0), const std::string &flow_id = "default") {
-  if (input.is_on_cpu()) {
-    return create_cpu_task(flow_id, cpu::pad<T, L>, input, result, pad_h, pad_w, value);
-  }
-#ifdef USE_CUDA
-  else if (input.is_on_gpu()) {
-    return create_gpu_task(flow_id, cuda::pad<T, L>, input, result, pad_h, pad_w, value);
-  }
-#endif
-  else {
-    throw std::runtime_error("pad: Unsupported device type");
-  }
-}
-
 template <typename T>
 std::unique_ptr<Task> pad(const Tensor<T, NCHW> &input, Tensor<T, NCHW> &result, size_t pad_h,
                           size_t pad_w, T value = T(0), const std::string &flow_id = "default") {
   if (input.is_on_cpu()) {
-    return create_cpu_task(flow_id, cpu::pad<T, NCHW>, input, result, pad_h, pad_w, value);
+    return create_cpu_task(flow_id, cpu::pad<T>, input, result, pad_h, pad_w, value);
   }
 #ifdef USE_CUDA
   else if (input.is_on_gpu()) {
-    return create_gpu_task(flow_id, cuda::pad<T, NCHW>, input, result, pad_h, pad_w, value);
+    return create_gpu_task(flow_id, cuda::pad<T>, input, result, pad_h, pad_w, value);
   }
 #endif
   else {
@@ -91,31 +79,15 @@ std::unique_ptr<Task> pad(const Tensor<T, NCHW> &input, Tensor<T, NCHW> &result,
   }
 }
 
-template <typename T, Layout L>
-std::unique_ptr<Task> unpad(const Tensor<T, L> &input, Tensor<T, NCHW> &result, size_t pad_h,
-                            size_t pad_w, const std::string &flow_id = "default") {
-  if (input.is_on_cpu()) {
-    return create_cpu_task(flow_id, cpu::unpad<T, L>, input, result, pad_h, pad_w);
-  }
-#ifdef USE_CUDA
-  else if (input.is_on_gpu()) {
-    return create_gpu_task(flow_id, cuda::unpad<T, L>, input, result, pad_h, pad_w);
-  }
-#endif
-  else {
-    throw std::runtime_error("unpad: Unsupported device type");
-  }
-}
-
 template <typename T>
-std::unique_ptr<Task> unpad(const Tensor<T, NCHW> &input, Tensor<T, NCHW> &result, size_t pad_h,
+std::unique_ptr<Task> unpad(const Tensor<T> &input, Tensor<T, NCHW> &result, size_t pad_h,
                             size_t pad_w, const std::string &flow_id = "default") {
   if (input.is_on_cpu()) {
-    return create_cpu_task(flow_id, cpu::unpad<T, NCHW>, input, result, pad_h, pad_w);
+    return create_cpu_task(flow_id, cpu::unpad<T>, input, result, pad_h, pad_w);
   }
 #ifdef USE_CUDA
   else if (input.is_on_gpu()) {
-    return create_gpu_task(flow_id, cuda::unpad<T, NCHW>, input, result, pad_h, pad_w);
+    return create_gpu_task(flow_id, cuda::unpad<T>, input, result, pad_h, pad_w);
   }
 #endif
   else {

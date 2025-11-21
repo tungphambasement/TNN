@@ -1,4 +1,5 @@
 #include "device/cuda/cuda_context.hpp"
+#include "device/flow.hpp"
 
 #ifdef USE_CUDA
 
@@ -89,12 +90,15 @@ void CUDAContext::createFlow(const std::string &flow_id) {
 }
 
 Flow *CUDAContext::getFlow(const std::string &flow_id) {
-  if (flows_.find(flow_id) == flows_.end()) {
+  auto it = flows_.find(flow_id);
+  if (it == flows_.end()) {
     std::cerr << "WARN: Creating new CUDAFlow with ID: " << flow_id
               << ". Are we using the right flow?" << std::endl;
     flows_[flow_id] = std::make_unique<CUDAFlow>(flow_id);
+    return flows_[flow_id].get();
+  } else {
+    return it->second.get();
   }
-  return flows_[flow_id].get();
 }
 
 } // namespace tnn

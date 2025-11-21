@@ -39,6 +39,15 @@ private:
   mutable std::unordered_map<size_t, Tensor<T>> micro_batch_pre_activations_;
   mutable std::unordered_map<size_t, device_ptr<T[]>> micro_batch_col_buffers_;
 
+  std::unique_ptr<Task> forward_task_;
+  std::unique_ptr<Task> add_bias_task_;
+
+  std::unique_ptr<Task> nchw_to_cnhw_task_;
+  std::unique_ptr<Task> weight_grad_task_;
+  std::unique_ptr<Task> input_grad_task_;
+  std::unique_ptr<Task> col2im_task_;
+  std::unique_ptr<Task> bias_grad_task_;
+
   // Reusable temporary buffers to avoid allocation overhead
   mutable device_ptr<T[]> temp_output_buffer_;
   mutable device_ptr<T[]> temp_gradient_buffer_;

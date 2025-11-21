@@ -18,6 +18,7 @@
 #include <numeric>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 #include <type_traits>
 #include <vector>
 #ifdef _WIN32

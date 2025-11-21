@@ -61,12 +61,6 @@ void col2im(const T *col_data, T *result_data, size_t batch_size, size_t channel
                 stride_h, stride_w, pad_h, pad_w, stream);
 }
 
-template <typename T, Layout L>
-void pad(const Tensor<T, L> &input, Tensor<T, L> &result, size_t pad_h, size_t pad_w, T value,
-         cudaStream_t stream) {
-  throw std::runtime_error("Unsupported tensor layout for GPU padding");
-}
-
 template <typename T>
 void pad(const Tensor<T, NCHW> &input, Tensor<T, NCHW> &result, size_t pad_h, size_t pad_w, T value,
          cudaStream_t stream) {
@@ -81,12 +75,6 @@ void pad(const Tensor<T, NCHW> &input, Tensor<T, NCHW> &result, size_t pad_h, si
 
   cuda_pad(input_data, result_data, batch_size, channels, height, width, pad_h, pad_w, value,
            stream);
-}
-
-template <typename T, Layout L>
-void unpad(const Tensor<T, L> &input, Tensor<T, NCHW> &result, size_t pad_h, size_t pad_w,
-           cudaStream_t stream) {
-  throw std::runtime_error("Unsupported tensor layout for GPU unpadding");
 }
 
 template <typename T>
@@ -242,13 +230,9 @@ template void col2im_padded<float>(const float *, float *, size_t, size_t, size_
 template void col2im<float>(const float *, float *, size_t, size_t, size_t, size_t, size_t, size_t,
                             size_t, size_t, size_t, size_t, cudaStream_t);
 
-template void pad<float, NCHW>(const Tensor<float, NCHW> &, Tensor<float, NCHW> &, size_t, size_t,
-                               float, cudaStream_t);
 template void pad<float>(const Tensor<float, NCHW> &, Tensor<float, NCHW> &, size_t, size_t, float,
                          cudaStream_t);
 
-template void unpad<float, NCHW>(const Tensor<float, NCHW> &, Tensor<float, NCHW> &, size_t, size_t,
-                                 cudaStream_t);
 template void unpad<float>(const Tensor<float, NCHW> &, Tensor<float, NCHW> &, size_t, size_t,
                            cudaStream_t);
 
@@ -281,13 +265,9 @@ template void col2im_padded<double>(const double *, double *, size_t, size_t, si
 template void col2im<double>(const double *, double *, size_t, size_t, size_t, size_t, size_t,
                              size_t, size_t, size_t, size_t, size_t, cudaStream_t);
 
-template void pad<double, NCHW>(const Tensor<double, NCHW> &, Tensor<double, NCHW> &, size_t,
-                                size_t, double, cudaStream_t);
 template void pad<double>(const Tensor<double, NCHW> &, Tensor<double, NCHW> &, size_t, size_t,
                           double, cudaStream_t);
 
-template void unpad<double, NCHW>(const Tensor<double, NCHW> &, Tensor<double, NCHW> &, size_t,
-                                  size_t, cudaStream_t);
 template void unpad<double>(const Tensor<double, NCHW> &, Tensor<double, NCHW> &, size_t, size_t,
                             cudaStream_t);
 

@@ -172,10 +172,16 @@ void cuda_col2im(const T *col_data, T *output, size_t batch_size, size_t channel
                  size_t width, size_t kernel_h, size_t kernel_w, size_t stride_h, size_t stride_w,
                  size_t pad_h, size_t pad_w, size_t output_h, size_t output_w,
                  cudaStream_t stream) {
+  // Initialize output to zero since col2im kernel uses atomicAdd
   size_t output_size = batch_size * channels * height * width;
-  int num_blocks = get_num_blocks(output_size);
+  cudaMemsetAsync(output, 0, output_size * sizeof(T), stream);
 
-  cuda_col2im_kernel_optimized<T><<<num_blocks, BLOCK_SIZE, 0, stream>>>(
+  // Use non-optimized kernel which handles all stride configurations correctly
+  size_t col_height = channels * kernel_h * kernel_w;
+  size_t total_elements = batch_size * col_height * output_h * output_w;
+  int num_blocks = get_num_blocks(total_elements);
+
+  cuda_col2im_kernel<T><<<num_blocks, BLOCK_SIZE, 0, stream>>>(
       col_data, output, batch_size, channels, height, width, kernel_h, kernel_w, stride_h, stride_w,
       pad_h, pad_w, output_h, output_w);
 }

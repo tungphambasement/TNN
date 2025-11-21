@@ -98,6 +98,7 @@ Tensor<T> AvgPool2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_ba
     return grad_padded_input;
   }
 }
+
 template <typename T>
 std::unique_ptr<Task> AvgPool2DLayer<T>::compute_avg_pool_forward(
     const device_ptr<T[]> &input_data, device_ptr<T[]> &output_data, size_t batch_size,

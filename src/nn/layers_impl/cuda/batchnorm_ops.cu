@@ -220,55 +220,66 @@ __global__ void compute_mean_variance_fused_kernel(const T *input_data, T *mean_
   const size_t channel_stride = channels * spatial_size;
   const size_t c_offset = c * spatial_size;
 
-  // Welford's algorithm for parallel mean and variance
-  T thread_mean = T(0);
-  T thread_m2 = T(0);
-  size_t thread_count = 0;
+  // First pass: compute sum for mean
+  T thread_sum = T(0);
+
+  for (size_t i = threadIdx.x; i < total_elements_per_channel; i += block_size) {
+    const size_t n = i / spatial_size;
+    const size_t i_local = i % spatial_size;
+    const size_t global_idx = n * channel_stride + c_offset + i_local;
+    thread_sum += input_data[global_idx];
+  }
+
+  shared_mean[threadIdx.x] = thread_sum;
+  __syncthreads();
+
+  // Reduce to get total sum
+  for (unsigned int s = block_size / 2; s > 0; s /= 2) {
+    if (threadIdx.x < s) {
+      shared_mean[threadIdx.x] += shared_mean[threadIdx.x + s];
+    }
+    __syncthreads();
+  }
+
+  // Compute mean
+  T mean_val;
+  if (threadIdx.x == 0) {
+    mean_val = shared_mean[0] / static_cast<T>(total_elements_per_channel);
+    mean_data[c] = mean_val;
+  }
+  __syncthreads();
+
+  // Broadcast mean to all threads
+  if (threadIdx.x == 0) {
+    shared_mean[0] = mean_val;
+  }
+  __syncthreads();
+  mean_val = shared_mean[0];
+
+  // Second pass: compute variance
+  T thread_sum_sq = T(0);
 
   for (size_t i = threadIdx.x; i < total_elements_per_channel; i += block_size) {
     const size_t n = i / spatial_size;
     const size_t i_local = i % spatial_size;
     const size_t global_idx = n * channel_stride + c_offset + i_local;
 
-    thread_count++;
-    const T val = input_data[global_idx];
-    const T delta = val - thread_mean;
-    thread_mean += delta / static_cast<T>(thread_count);
-    const T delta2 = val - thread_mean;
-    thread_m2 += delta * delta2;
+    const T diff = input_data[global_idx] - mean_val;
+    thread_sum_sq += diff * diff;
   }
 
-  shared_mean[threadIdx.x] = thread_mean;
-  shared_m2[threadIdx.x] = thread_m2;
+  shared_m2[threadIdx.x] = thread_sum_sq;
   __syncthreads();
 
-  // Combine results from all threads using Welford's combining formula
+  // Reduce to get total sum of squares
   for (unsigned int s = block_size / 2; s > 0; s /= 2) {
-    if (threadIdx.x < s && threadIdx.x + s < block_size) {
-      const size_t count_a = (threadIdx.x + 1) * (total_elements_per_channel / block_size);
-      const size_t count_b = (threadIdx.x + s + 1) * (total_elements_per_channel / block_size);
-      const T mean_a = shared_mean[threadIdx.x];
-      const T mean_b = shared_mean[threadIdx.x + s];
-      const T m2_a = shared_m2[threadIdx.x];
-      const T m2_b = shared_m2[threadIdx.x + s];
-
-      const size_t count_combined = count_a + count_b;
-      const T delta = mean_b - mean_a;
-      const T mean_combined =
-          (mean_a * static_cast<T>(count_a) + mean_b * static_cast<T>(count_b)) /
-          static_cast<T>(count_combined);
-      const T m2_combined = m2_a + m2_b +
-                            delta * delta * static_cast<T>(count_a) * static_cast<T>(count_b) /
-                                static_cast<T>(count_combined);
-
-      shared_mean[threadIdx.x] = mean_combined;
-      shared_m2[threadIdx.x] = m2_combined;
+    if (threadIdx.x < s) {
+      shared_m2[threadIdx.x] += shared_m2[threadIdx.x + s];
     }
     __syncthreads();
   }
 
   if (threadIdx.x == 0) {
-    mean_data[c] = shared_mean[0];
     var_data[c] = shared_m2[0] / static_cast<T>(total_elements_per_channel);
   }
 }
@@ -542,8 +553,8 @@ void compute_batchnorm_backward_fused(const T *gradient_data, const T *normalize
   // Allocate temporary buffers for sums
   T *sum_grad_normalized_data;
   T *sum_grad_norm_times_norm_data;
-  cudaMalloc(&sum_grad_normalized_data, channels * sizeof(T));
-  cudaMalloc(&sum_grad_norm_times_norm_data, channels * sizeof(T));
+  cudaMallocAsync(&sum_grad_normalized_data, channels * sizeof(T), stream);
+  cudaMallocAsync(&sum_grad_norm_times_norm_data, channels * sizeof(T), stream);
 
   // First pass: compute sums and affine gradients
   int threads_per_block = THREADS_PER_BLOCK;
@@ -565,8 +576,8 @@ void compute_batchnorm_backward_fused(const T *gradient_data, const T *normalize
       sum_grad_norm_times_norm_data, grad_input_data, batch_size, channels, spatial_size,
       total_elements, affine);
 
-  cudaFree(sum_grad_normalized_data);
-  cudaFree(sum_grad_norm_times_norm_data);
+  cudaFreeAsync(sum_grad_normalized_data, stream);
+  cudaFreeAsync(sum_grad_norm_times_norm_data, stream);
 }
 
 template <typename T>

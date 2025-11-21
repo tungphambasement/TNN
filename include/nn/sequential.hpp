@@ -396,9 +396,6 @@ public:
         if (enable_profiling_) {
           auto start_time = std::chrono::high_resolution_clock::now();
           layers_[i]->forward_inplace(input, micro_batch_id);
-#ifdef USE_CUDA
-          cudaDeviceSynchronize();
-#endif
           auto end_time = std::chrono::high_resolution_clock::now();
           auto duration =
               std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
@@ -421,6 +418,10 @@ public:
         throw std::runtime_error("Error while forward in layer " + std::to_string(i) + " (" +
                                  layers_[i]->name() + "): " + e.what());
       }
+    }
+
+    if (input.is_on_gpu()) {
+      input = input.to_cpu();
     }
   }
 
