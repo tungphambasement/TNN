@@ -41,7 +41,7 @@ private:
                             size_t output_h, size_t output_w, const std::string &flow_id) const;
 
 public:
-  AvgPool2DLayer(size_t pool_h, size_t pool_w, size_t stride_h = 0, size_t stride_w = 0,
+  AvgPool2DLayer(size_t pool_h, size_t pool_w, size_t stride_h = 1, size_t stride_w = 1,
                  size_t pad_h = 0, size_t pad_w = 0, const std::string &name = "avgpool2d");
 
   Tensor<T> forward(const Tensor<T> &input, size_t micro_batch_id = 0) override;

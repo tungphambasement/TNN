@@ -6,7 +6,6 @@
 #include "utils/env.hpp"
 
 #include <cmath>
-#include <fstream>
 #include <iostream>
 #include <vector>
 
