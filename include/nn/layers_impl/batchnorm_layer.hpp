@@ -34,9 +34,14 @@ private:
   Tensor<T> running_mean_gradients_; // dummy gradient
   Tensor<T> running_var_gradients_;  // dummy gradient
 
+  // Workspace tensors to avoid reallocation (optimization)
+  Tensor<T> batch_mean_fixed_;
+  Tensor<T> batch_inv_std_fixed_; // Store 1/std instead of var for faster mult
+
   std::unordered_map<size_t, Tensor<T>> micro_batch_inputs_;
   std::unordered_map<size_t, Tensor<T>> micro_batch_normalized_;
   std::unordered_map<size_t, Tensor<T>> micro_batch_std_;
+  std::unordered_map<size_t, Tensor<T>> micro_batch_inv_std_; // For optimized backward
 
   std::unique_ptr<Task>
   normalize_and_scale(const device_ptr<T[]> &input_data, const device_ptr<T[]> &mean_data,

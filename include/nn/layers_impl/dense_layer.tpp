@@ -44,6 +44,7 @@ template <typename T> void DenseLayer<T>::initialize_params() {
 
 template <typename T>
 Tensor<T> DenseLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_id) {
+  auto forward_internal_start = std::chrono::high_resolution_clock::now();
   if (!this->initialized_) {
     throw std::runtime_error("Layer parameters not initialized. Call initialize() before forward.");
   }
@@ -57,30 +58,81 @@ Tensor<T> DenseLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_id) 
     throw std::invalid_argument("Input feature size mismatch in DenseLayer");
   }
 
+  auto to_device_start = std::chrono::high_resolution_clock::now();
   const Tensor<T> &current =
       input.device() == this->device_ ? input : input.to_device(this->device_);
+  auto to_device_end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> to_device_duration = to_device_end - to_device_start;
+  this->perf_timers_["to_device"] += to_device_duration.count();
 
+  auto input_clone_start = std::chrono::high_resolution_clock::now();
   micro_batch_inputs_[micro_batch_id] = current.clone();
+  auto input_clone_end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> input_clone_duration =
+      input_clone_end - input_clone_start;
+  this->perf_timers_["input_clone"] += input_clone_duration.count();
 
+  auto output_init_start = std::chrono::high_resolution_clock::now();
   Tensor<T> output({batch_size, output_features_, size_t(1), size_t(1)}, this->device_);
+  auto output_init_end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> output_init_duration =
+      output_init_end - output_init_start;
+  this->perf_timers_["output_init"] += output_init_duration.count();
 
+  auto forward_start = std::chrono::high_resolution_clock::now();
   forward_task_ = compute_dense_forward(current.data_ptr(), weights_.data_ptr(), output.data_ptr(),
                                         batch_size, input_features_, output_features_, "default");
+  auto forward_end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> forward_duration = forward_end - forward_start;
+  this->perf_timers_["forward_compute"] += forward_duration.count();
 
   if (use_bias_) {
+    auto add_bias_start = std::chrono::high_resolution_clock::now();
     add_bias_task_ = add_bias_vector(output.data_ptr(), bias_.data_ptr(), batch_size,
                                      output_features_, "default");
+    auto add_bias_end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> add_bias_duration = add_bias_end - add_bias_start;
+    this->perf_timers_["add_bias"] += add_bias_duration.count();
   }
 
+  auto output_clone_start = std::chrono::high_resolution_clock::now();
   micro_batch_pre_activations_[micro_batch_id] = output.clone();
+  auto output_clone_end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> output_clone_duration =
+      output_clone_end - output_clone_start;
+  this->perf_timers_["output_clone"] += output_clone_duration.count();
 
   if (activation_) {
+    auto activation_start = std::chrono::high_resolution_clock::now();
     activation_->apply(output);
+    auto activation_end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> activation_duration =
+        activation_end - activation_start;
+    this->perf_timers_["activation"] += activation_duration.count();
   }
 
+  auto sync_start = std::chrono::high_resolution_clock::now();
   task_sync_all({forward_task_.get(), add_bias_task_.get(), activation_task_.get()});
+  auto sync_end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> sync_duration = sync_end - sync_start;
+  this->perf_timers_["sync"] += sync_duration.count();
+
+  auto forward_internal_end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> forward_internal_duration =
+      forward_internal_end - forward_internal_start;
+  this->perf_timers_["forward_internal"] += forward_internal_duration.count();
 
   return output;
+}
+
+template <typename T> void DenseLayer<T>::forward_inplace(Tensor<T> &input, size_t micro_batch_id) {
+  auto total_forward_start = std::chrono::high_resolution_clock::now();
+  Tensor<T> output = forward(input, micro_batch_id);
+  auto total_forward_end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> total_forward_duration =
+      total_forward_end - total_forward_start;
+  this->perf_timers_["total_forward"] += total_forward_duration.count();
+  input = std::move(output);
 }
 
 template <typename T>

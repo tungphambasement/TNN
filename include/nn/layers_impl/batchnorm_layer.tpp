@@ -49,6 +49,10 @@ template <typename T> void BatchNormLayer<T>::initialize_params() {
   running_mean_gradients_.fill(T(0));
   running_var_gradients_.fill(T(0));
 
+  // Pre-allocate workspace tensors to avoid reallocation during forward/backward
+  batch_mean_fixed_ = Tensor<T>({num_features_, 1, 1, 1}, this->device_);
+  batch_inv_std_fixed_ = Tensor<T>({num_features_, 1, 1, 1}, this->device_);
+
   this->initialized_ = true;
 }
 
@@ -76,31 +80,52 @@ void BatchNormLayer<T>::forward_inplace(Tensor<T> &input, size_t micro_batch_id)
   output.fill(T(0));
 
   if (this->is_training_) {
-    Tensor<T> batch_mean({channels, 1, 1, 1}, this->device_);
-    Tensor<T> batch_var({channels, 1, 1, 1}, this->device_);
-    Tensor<T> batch_std({channels, 1, 1, 1}, this->device_);
     Tensor<T> normalized(input.shape(), this->device_);
 
-    compute_mean_variance_fused(input, batch_mean, batch_var, batch_size, channels, spatial_size,
-                                "default");
+#ifdef USE_CUDA
+    if (this->device_->getDeviceType() == DeviceType::GPU) {
+      // Optimized GPU path: Single fused call (2 kernels instead of 4-5)
+      auto fwd_task = create_gpu_task(
+          "default", cuda::batchnorm::run_forward_fused<T>, input.data_ptr().get(),
+          batch_mean_fixed_.data_ptr().get(), batch_inv_std_fixed_.data_ptr().get(),
+          running_mean_.data_ptr().get(), running_var_.data_ptr().get(),
+          affine_ ? gamma_.data_ptr().get() : nullptr, affine_ ? beta_.data_ptr().get() : nullptr,
+          output.data_ptr().get(), normalized.data_ptr().get(), batch_size, channels, spatial_size,
+          momentum_, epsilon_, affine_);
 
-    compute_batch_std(batch_var, batch_std, channels, "default");
+      // Cache inv_std for backward (more efficient than std)
+      micro_batch_inv_std_[micro_batch_id] = batch_inv_std_fixed_.clone();
+    } else
+#endif
+    {
+      // CPU path: Use existing implementation
+      Tensor<T> batch_mean({channels, 1, 1, 1}, this->device_);
+      Tensor<T> batch_var({channels, 1, 1, 1}, this->device_);
+      Tensor<T> batch_std({channels, 1, 1, 1}, this->device_);
 
-    std::unique_ptr<Task> norm_task = nullptr;
-    if (affine_) {
-      norm_task = normalize_and_scale(input.data_ptr(), batch_mean.data_ptr(), batch_std.data_ptr(),
-                                      gamma_.data_ptr(), beta_.data_ptr(), output.data_ptr(),
-                                      normalized.data_ptr(), batch_size, channels, spatial_size,
-                                      affine_, "default");
-    } else {
-      norm_task = normalize_and_scale(input.data_ptr(), batch_mean.data_ptr(), batch_std.data_ptr(),
-                                      nullptr, nullptr, output.data_ptr(), normalized.data_ptr(),
-                                      batch_size, channels, spatial_size, affine_, "default");
+      compute_mean_variance_fused(input, batch_mean, batch_var, batch_size, channels, spatial_size,
+                                  "default");
+
+      compute_batch_std(batch_var, batch_std, channels, "default");
+
+      std::unique_ptr<Task> norm_task = nullptr;
+      if (affine_) {
+        norm_task = normalize_and_scale(input.data_ptr(), batch_mean.data_ptr(),
+                                        batch_std.data_ptr(), gamma_.data_ptr(), beta_.data_ptr(),
+                                        output.data_ptr(), normalized.data_ptr(), batch_size,
+                                        channels, spatial_size, affine_, "default");
+      } else {
+        norm_task =
+            normalize_and_scale(input.data_ptr(), batch_mean.data_ptr(), batch_std.data_ptr(),
+                                nullptr, nullptr, output.data_ptr(), normalized.data_ptr(),
+                                batch_size, channels, spatial_size, affine_, "default");
+      }
+
+      update_running_stats(batch_mean, batch_var, channels, "default");
+
+      micro_batch_std_[micro_batch_id] = std::move(batch_std);
     }
 
-    update_running_stats(batch_mean, batch_var, channels, "default");
-
-    micro_batch_std_[micro_batch_id] = std::move(batch_std);
     micro_batch_normalized_[micro_batch_id] = std::move(normalized);
 
   } else {
@@ -115,10 +140,8 @@ template <typename T>
 Tensor<T> BatchNormLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch_id) {
   auto it_input = micro_batch_inputs_.find(micro_batch_id);
   auto it_normalized = micro_batch_normalized_.find(micro_batch_id);
-  auto it_std = micro_batch_std_.find(micro_batch_id);
 
-  if (it_input == micro_batch_inputs_.end() || it_normalized == micro_batch_normalized_.end() ||
-      it_std == micro_batch_std_.end()) {
+  if (it_input == micro_batch_inputs_.end() || it_normalized == micro_batch_normalized_.end()) {
     throw std::runtime_error("No cached data found for micro-batch ID in BatchNormLayer: " +
                              std::to_string(micro_batch_id));
   }
@@ -128,7 +151,6 @@ Tensor<T> BatchNormLayer<T>::backward(const Tensor<T> &gradient, size_t micro_ba
 
   const Tensor<T> &input = it_input->second;
   const Tensor<T> &normalized = it_normalized->second;
-  const Tensor<T> &std_val = it_std->second;
 
   const size_t batch_size = input.batch_size();
   const size_t channels = input.channels();
@@ -139,9 +161,38 @@ Tensor<T> BatchNormLayer<T>::backward(const Tensor<T> &gradient, size_t micro_ba
   Tensor<T> grad_input(input.shape(), this->device_);
   grad_input.fill(T(0));
 
-  Tensor<T> dummy_gamma(this->device_);
-  compute_batchnorm_backward_fused(current_gradient, normalized, std_val, dummy_gamma, grad_input,
-                                   batch_size, channels, spatial_size, "default");
+#ifdef USE_CUDA
+  if (this->device_->getDeviceType() == DeviceType::GPU) {
+    // Optimized GPU path: Fused backward (2 kernels, no allocations)
+    auto it_inv_std = micro_batch_inv_std_.find(micro_batch_id);
+    if (it_inv_std == micro_batch_inv_std_.end()) {
+      throw std::runtime_error("No cached inv_std found for micro-batch ID: " +
+                               std::to_string(micro_batch_id));
+    }
+    const Tensor<T> &inv_std_val = it_inv_std->second;
+
+    auto bwd_task =
+        create_gpu_task("default", cuda::batchnorm::run_backward_fused<T>,
+                        current_gradient.data_ptr().get(), normalized.data_ptr().get(),
+                        inv_std_val.data_ptr().get(), affine_ ? gamma_.data_ptr().get() : nullptr,
+                        affine_ ? gamma_gradients_.data_ptr().get() : nullptr,
+                        affine_ ? beta_gradients_.data_ptr().get() : nullptr,
+                        grad_input.data_ptr().get(), batch_size, channels, spatial_size, affine_);
+  } else
+#endif
+  {
+    // CPU path: Use existing implementation
+    auto it_std = micro_batch_std_.find(micro_batch_id);
+    if (it_std == micro_batch_std_.end()) {
+      throw std::runtime_error("No cached std found for micro-batch ID: " +
+                               std::to_string(micro_batch_id));
+    }
+    const Tensor<T> &std_val = it_std->second;
+
+    Tensor<T> dummy_gamma(this->device_);
+    compute_batchnorm_backward_fused(current_gradient, normalized, std_val, dummy_gamma, grad_input,
+                                     batch_size, channels, spatial_size, "default");
+  }
 
   return grad_input;
 }

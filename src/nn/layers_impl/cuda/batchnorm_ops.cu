@@ -12,10 +12,13 @@ namespace tnn {
 namespace cuda {
 namespace batchnorm {
 
+#define BLOCK_SIZE 256
 #define THREADS_PER_BLOCK 256
 #define WARP_SIZE 32
 
+// --------------------------------------------------------------------------
 // Warp-level reduction primitives for better performance
+// --------------------------------------------------------------------------
 template <typename T> __inline__ __device__ T warpReduceSum(T val) {
   for (int offset = WARP_SIZE / 2; offset > 0; offset /= 2) {
     val += __shfl_down_sync(0xffffffff, val, offset);
@@ -40,6 +43,215 @@ template <typename T> __inline__ __device__ T blockReduceSum(T val) {
 
   return val;
 }
+
+// --------------------------------------------------------------------------
+// FUSED KERNEL 1: Compute Mean, Variance, AND Update Running Stats
+// This kernel eliminates separate passes for mean, variance, std, and
+// running stats updates - reducing kernel launch overhead and memory I/O
+// --------------------------------------------------------------------------
+template <typename T>
+__global__ void fused_stats_kernel(const T *__restrict__ input, T *__restrict__ mean_out,
+                                   T *__restrict__ inv_std_out, // Store 1/std for faster reuse
+                                   T *__restrict__ running_mean, T *__restrict__ running_var,
+                                   size_t N, size_t C, size_t S, T momentum, T epsilon) {
+  // One block per channel
+  int c = blockIdx.x;
+  if (c >= C)
+    return;
+
+  size_t count = N * S;
+  T sum = T(0);
+  T sq_sum = T(0);
+
+  // Grid stride loop for reduction
+  // Input is NCHW: Index = n * (C*S) + c * S + s
+  size_t stride = C * S;
+  size_t offset = c * S;
+
+  for (size_t i = threadIdx.x; i < count; i += blockDim.x) {
+    size_t n = i / S;
+    size_t s = i % S;
+    size_t idx = n * stride + offset + s;
+    T val = input[idx];
+    sum += val;
+    sq_sum += val * val;
+  }
+
+  // Block reduction
+  sum = blockReduceSum(sum);
+  sq_sum = blockReduceSum(sq_sum);
+
+  if (threadIdx.x == 0) {
+    T inv_N = T(1) / T(count);
+    T mu = sum * inv_N;
+    T var = (sq_sum * inv_N) - (mu * mu);
+
+    // Save for backward pass
+    mean_out[c] = mu;
+    // Pre-calculate inverse standard deviation (optimization)
+    T inv_std = rsqrt(var + epsilon);
+    inv_std_out[c] = inv_std;
+
+    // Fused: Update running stats here to avoid a separate kernel launch
+    running_mean[c] = (T(1) - momentum) * running_mean[c] + momentum * mu;
+    running_var[c] = (T(1) - momentum) * running_var[c] + momentum * var;
+  }
+}
+
+// --------------------------------------------------------------------------
+// FUSED KERNEL 2: Normalize + Scale + Shift
+// Applies normalization and affine transformation in a single pass
+// --------------------------------------------------------------------------
+template <typename T>
+__global__ void fused_apply_kernel(const T *__restrict__ input, const T *__restrict__ mean,
+                                   const T *__restrict__ inv_std, const T *__restrict__ gamma,
+                                   const T *__restrict__ beta, T *__restrict__ output,
+                                   T *__restrict__ normalized_cache, // for backward
+                                   size_t N, size_t C, size_t S, bool affine) {
+  size_t total_elements = N * C * S;
+  size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+  size_t spatial_size = S;
+
+  if (idx < total_elements) {
+    int c = (idx / spatial_size) % C;
+
+    T mu = mean[c];
+    T istd = inv_std[c];
+    T x = input[idx];
+
+    T norm = (x - mu) * istd;
+
+    // Cache normalized value for backward pass
+    if (normalized_cache)
+      normalized_cache[idx] = norm;
+
+    T res = norm;
+    if (affine) {
+      res = res * gamma[c] + beta[c];
+    }
+    output[idx] = res;
+  }
+}
+
+// --------------------------------------------------------------------------
+// FUSED KERNEL 3: Backward Reduction
+// Computes gradient sums needed for both parameter gradients and input gradients
+// --------------------------------------------------------------------------
+template <typename T>
+__global__ void fused_backward_reduce_kernel(const T *__restrict__ grad_output,
+                                             const T *__restrict__ normalized_input,
+                                             T *__restrict__ d_gamma, T *__restrict__ d_beta,
+                                             size_t N, size_t C, size_t S) {
+  // One block per channel
+  int c = blockIdx.x;
+  if (c >= C)
+    return;
+
+  size_t count = N * S;
+  T sum_dy = T(0);
+  T sum_dy_x_norm = T(0);
+
+  size_t stride = C * S;
+  size_t offset = c * S;
+
+  for (size_t i = threadIdx.x; i < count; i += blockDim.x) {
+    size_t n = i / S;
+    size_t s = i % S;
+    size_t idx = n * stride + offset + s;
+
+    T dy = grad_output[idx];
+    T x_hat = normalized_input[idx];
+
+    sum_dy += dy;
+    sum_dy_x_norm += dy * x_hat;
+  }
+
+  sum_dy = blockReduceSum(sum_dy);
+  sum_dy_x_norm = blockReduceSum(sum_dy_x_norm);
+
+  if (threadIdx.x == 0) {
+    // These are dL/dGamma and dL/dBeta
+    d_gamma[c] = sum_dy_x_norm;
+    d_beta[c] = sum_dy;
+  }
+}
+
+// --------------------------------------------------------------------------
+// FUSED KERNEL 4: Backward Apply
+// Computes input gradients using pre-computed sums
+// --------------------------------------------------------------------------
+template <typename T>
+__global__ void
+fused_backward_apply_kernel(const T *__restrict__ grad_output,
+                            const T *__restrict__ normalized_input, const T *__restrict__ inv_std,
+                            const T *__restrict__ gamma, const T *__restrict__ d_gamma,
+                            const T *__restrict__ d_beta, T *__restrict__ grad_input, size_t N,
+                            size_t C, size_t S, bool affine) {
+  size_t total_elements = N * C * S;
+  size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (idx < total_elements) {
+    int c = (idx / S) % C;
+
+    T g = affine ? gamma[c] : T(1);
+    T istd = inv_std[c];
+    T sum_dy = d_beta[c];
+    T sum_dy_x_norm = d_gamma[c];
+    T M = T(N * S);
+
+    T dy = grad_output[idx];
+    T x_hat = normalized_input[idx];
+
+    // Standard BN Backward formula
+    // dx = (1/M) * (gamma / std) * (M * dy - sum_dy - x_hat * sum_dy_x_norm)
+    T term1 = (g * istd) / M;
+    T term2 = M * dy - sum_dy - (x_hat * sum_dy_x_norm);
+
+    grad_input[idx] = term1 * term2;
+  }
+}
+
+// --------------------------------------------------------------------------
+// Host Launcher: Optimized Forward Pass (2 kernels instead of 4-5)
+// --------------------------------------------------------------------------
+template <typename T>
+void run_forward_fused(const T *input, T *mean, T *inv_std, T *running_mean, T *running_var,
+                       const T *gamma, const T *beta, T *output, T *norm_cache, size_t N, size_t C,
+                       size_t S, T momentum, T epsilon, bool affine, cudaStream_t stream) {
+
+  // Pass 1: Compute statistics and update running stats
+  fused_stats_kernel<<<C, BLOCK_SIZE, 0, stream>>>(input, mean, inv_std, running_mean, running_var,
+                                                   N, C, S, momentum, epsilon);
+
+  // Pass 2: Apply normalization and affine transformation
+  size_t total_elements = N * C * S;
+  int num_blocks = (total_elements + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  fused_apply_kernel<<<num_blocks, BLOCK_SIZE, 0, stream>>>(input, mean, inv_std, gamma, beta,
+                                                            output, norm_cache, N, C, S, affine);
+}
+
+// --------------------------------------------------------------------------
+// Host Launcher: Optimized Backward Pass (2 kernels, no allocations)
+// --------------------------------------------------------------------------
+template <typename T>
+void run_backward_fused(const T *grad_output, const T *norm_input, const T *inv_std, const T *gamma,
+                        T *d_gamma, T *d_beta, T *grad_input, size_t N, size_t C, size_t S,
+                        bool affine, cudaStream_t stream) {
+
+  // Pass 1: Compute gradient sums (for both param grads and input grads)
+  fused_backward_reduce_kernel<<<C, BLOCK_SIZE, 0, stream>>>(grad_output, norm_input, d_gamma,
+                                                             d_beta, N, C, S);
+
+  // Pass 2: Compute element-wise input gradients
+  size_t total_elements = N * C * S;
+  int num_blocks = (total_elements + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  fused_backward_apply_kernel<<<num_blocks, BLOCK_SIZE, 0, stream>>>(
+      grad_output, norm_input, inv_std, gamma, d_gamma, d_beta, grad_input, N, C, S, affine);
+}
+
+// --------------------------------------------------------------------------
+// Keep legacy kernels for backward compatibility
+// --------------------------------------------------------------------------
 
 template <typename T>
 __global__ void compute_channel_mean_kernel(const T *input_data, T *mean_data, size_t batch_size,
@@ -702,6 +914,29 @@ template void compute_batchnorm_backward_fused<double>(
     const double *gradient_data, const double *normalized_data, const double *std_data,
     const double *gamma_data, double *grad_input_data, double *gamma_grad, double *beta_grad,
     size_t batch_size, size_t channels, size_t spatial_size, bool affine, cudaStream_t stream);
+
+// Explicit template instantiations for optimized fused functions
+template void run_forward_fused<float>(const float *input, float *mean, float *inv_std,
+                                       float *running_mean, float *running_var, const float *gamma,
+                                       const float *beta, float *output, float *norm_cache,
+                                       size_t N, size_t C, size_t S, float momentum, float epsilon,
+                                       bool affine, cudaStream_t stream);
+template void run_forward_fused<double>(const double *input, double *mean, double *inv_std,
+                                        double *running_mean, double *running_var,
+                                        const double *gamma, const double *beta, double *output,
+                                        double *norm_cache, size_t N, size_t C, size_t S,
+                                        double momentum, double epsilon, bool affine,
+                                        cudaStream_t stream);
+
+template void run_backward_fused<float>(const float *grad_output, const float *norm_input,
+                                        const float *inv_std, const float *gamma, float *d_gamma,
+                                        float *d_beta, float *grad_input, size_t N, size_t C,
+                                        size_t S, bool affine, cudaStream_t stream);
+template void run_backward_fused<double>(const double *grad_output, const double *norm_input,
+                                         const double *inv_std, const double *gamma,
+                                         double *d_gamma, double *d_beta, double *grad_input,
+                                         size_t N, size_t C, size_t S, bool affine,
+                                         cudaStream_t stream);
 
 } // namespace batchnorm
 } // namespace cuda
