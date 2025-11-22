@@ -41,6 +41,10 @@ private:
   std::unordered_map<size_t, device_ptr<T[]>> micro_batch_inv_std_;
   std::unordered_map<size_t, device_ptr<T[]>> batch_mean_fixed_;
 
+  // Workspace buffers for backward pass (GPU optimization)
+  std::unordered_map<size_t, device_ptr<T[]>> workspace_sum_grad_normalized_;
+  std::unordered_map<size_t, device_ptr<T[]>> workspace_sum_grad_norm_times_norm_;
+
   void extract_tensor_dimensions(const Tensor<T> &input, size_t &batch_size, size_t &channels,
                                  size_t &height, size_t &width, size_t &spatial_size);
 

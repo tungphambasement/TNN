@@ -23,7 +23,6 @@ __global__ void compute_avg_pool_forward_kernel(const T *input_data, T *output_d
   if (idx >= total_outputs)
     return;
 
-  // Decode indices
   int n = idx / (channels * output_h * output_w);
   int remaining = idx % (channels * output_h * output_w);
   int c = remaining / (output_h * output_w);
@@ -57,7 +56,6 @@ __global__ void compute_avg_pool_backward_kernel(const T *gradient_data, T *grad
   if (idx >= total_outputs)
     return;
 
-  // Decode indices
   int n = idx / (channels * output_h * output_w);
   int remaining = idx % (channels * output_h * output_w);
   int c = remaining / (output_h * output_w);
@@ -110,7 +108,6 @@ void compute_avg_pool_backward(const T *gradient_data, T *grad_input_data, size_
       pool_h, pool_w, stride_h, stride_w, pool_size_inv);
 }
 
-// Explicit template instantiations
 template void compute_avg_pool_forward<float>(const float *input_data, float *output_data,
                                               size_t batch_size, size_t channels, size_t input_h,
                                               size_t input_w, size_t output_h, size_t output_w,

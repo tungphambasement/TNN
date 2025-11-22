@@ -74,18 +74,16 @@ __global__ void add_bias_kernel(T *output_data, const T *bias_data, size_t batch
 template <typename T>
 __global__ void compute_bias_gradients_kernel(const T *current_grad_data, T *bias_gradient_data,
                                               size_t batch_size, size_t output_features) {
-  // Each block handles one output feature
+
   int out_f = blockIdx.x;
   if (out_f >= output_features)
     return;
 
-  // Parallel reduction within block
   extern __shared__ char shared_mem[];
   T *shared_data = reinterpret_cast<T *>(shared_mem);
 
   T sum = T(0);
 
-  // Each thread processes multiple elements with grid-stride loop
   int tid = threadIdx.x;
   for (int n = tid; n < batch_size; n += blockDim.x) {
     sum += current_grad_data[n * output_features + out_f];
@@ -94,7 +92,6 @@ __global__ void compute_bias_gradients_kernel(const T *current_grad_data, T *bia
   shared_data[tid] = sum;
   __syncthreads();
 
-  // Reduction in shared memory
   for (int s = blockDim.x / 2; s > 0; s >>= 1) {
     if (tid < s) {
       shared_data[tid] += shared_data[tid + s];
@@ -102,7 +99,6 @@ __global__ void compute_bias_gradients_kernel(const T *current_grad_data, T *bia
     __syncthreads();
   }
 
-  // Write result
   if (tid == 0) {
     bias_gradient_data[out_f] = shared_data[0];
   }
@@ -148,7 +144,7 @@ void compute_bias_gradients(const T *current_grad_data, const T *bias_gradient_d
                             const size_t batch_size, const size_t output_features,
                             cudaStream_t stream) {
   int threads_per_block = 256;
-  int num_blocks = output_features; // One block per output feature
+  int num_blocks = output_features;
   size_t shared_mem_size = threads_per_block * sizeof(T);
 
   compute_bias_gradients_kernel<<<num_blocks, threads_per_block, shared_mem_size, stream>>>(

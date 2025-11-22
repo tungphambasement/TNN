@@ -106,7 +106,6 @@ private:
     if (event_pool_.empty()) {
       cudaEvent_t e;
       cudaEventCreateWithFlags(&e, cudaEventDisableTiming);
-      std::cout << "number of events in pool: " << event_pool_.size() << std::endl;
       return e;
     }
     cudaEvent_t e = event_pool_.back();
@@ -122,7 +121,7 @@ private:
 public:
   template <typename Func, typename... Args>
   explicit CUDATask(CUDAFlow *flow, Func &&func, Args &&...args) : flow_(flow) {
-    event_ = get_event();
+    // event_ = get_event();
 
     cudaStream_t stream = flow_->get_stream();
 
@@ -139,7 +138,7 @@ public:
 
   void execute() override {
     launch_function_();
-    cudaEventRecord(event_, flow_->get_stream());
+    // cudaEventRecord(event_, flow_->get_stream());
   }
 
   ErrorStatus sync() override {
@@ -147,12 +146,10 @@ public:
       return status_;
     }
 
-    cudaError_t err = cudaEventSynchronize(event_);
+    // cudaError_t err = cudaStreamWaitEvent(flow_->get_stream(), event_, 0);
+    cudaError_t err = cudaStreamSynchronize(flow_->get_stream());
     ErrorStatus status = cuda_error_to_status(err);
     set_ready_state(status);
-
-    if (event_)
-      release_event(event_);
 
     return status;
   }
@@ -164,8 +161,11 @@ public:
       std::cerr << "You might want to capture task and call sync() explicitly to handle errors."
                 << std::endl;
     }
-    if (event_)
+
+    if (event_) {
       release_event(event_);
+      event_ = nullptr;
+    }
   }
 
   CUDATask(const CUDATask &) = delete;

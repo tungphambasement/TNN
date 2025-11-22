@@ -397,10 +397,10 @@ TEST_F(CUDABatchNormOpsTest, BackwardFusedAffine) {
   std::vector<float> cpu_gamma_grad(channels);
   std::vector<float> cpu_beta_grad(channels);
 
-  cpu::batchnorm::compute_batchnorm_backward_fused(
-      gradient_data.data(), normalized_data.data(), std_data.data(), gamma_data.data(),
-      cpu_grad_input.data(), cpu_gamma_grad.data(), cpu_beta_grad.data(), batch_size, channels,
-      spatial_size, affine);
+  cpu::batchnorm::run_backward_fused(gradient_data.data(), normalized_data.data(), std_data.data(),
+                                     gamma_data.data(), cpu_gamma_grad.data(), cpu_beta_grad.data(),
+                                     cpu_grad_input.data(), batch_size, channels, spatial_size,
+                                     affine);
 
   // GPU version
   device_ptr<float[]> gpu_gradient = make_array_ptr<float[]>(gpu_device_, total_size);
@@ -424,11 +424,10 @@ TEST_F(CUDABatchNormOpsTest, BackwardFusedAffine) {
   gpu_device_->copyToDevice(gpu_gamma_grad.get(), zeros_channels.data(), channels * sizeof(float));
   gpu_device_->copyToDevice(gpu_beta_grad.get(), zeros_channels.data(), channels * sizeof(float));
 
-  auto gpu_task =
-      create_gpu_task("test_backward_gpu", cuda::batchnorm::compute_batchnorm_backward_fused<float>,
-                      gpu_gradient.get(), gpu_normalized.get(), gpu_std.get(), gpu_gamma.get(),
-                      gpu_grad_input.get(), gpu_gamma_grad.get(), gpu_beta_grad.get(), batch_size,
-                      channels, spatial_size, affine);
+  auto gpu_task = create_gpu_task("test_backward_gpu", cuda::batchnorm::run_backward_fused<float>,
+                                  gpu_gradient.get(), gpu_normalized.get(), gpu_std.get(),
+                                  gpu_gamma.get(), gpu_gamma_grad.get(), gpu_beta_grad.get(),
+                                  gpu_grad_input.get(), batch_size, channels, spatial_size, affine);
   ASSERT_FALSE(gpu_task->sync());
 
   std::vector<float> gpu_grad_input_cpu(total_size);
@@ -460,38 +459,53 @@ TEST_F(CUDABatchNormOpsTest, BackwardFusedNoAffine) {
     normalized_data[i] = static_cast<float>(i % 10) * 0.1f - 0.5f;
   }
 
-  std::vector<float> std_data(channels);
+  std::vector<float> inv_std_data(channels);
   for (size_t i = 0; i < channels; ++i) {
-    std_data[i] = 1.0f + static_cast<float>(i) * 0.1f;
+    inv_std_data[i] = 1.0f + static_cast<float>(i) * 0.1f;
   }
 
   // CPU version
   std::vector<float> cpu_grad_input(total_size);
+  std::vector<float> cpu_gamma_grad(channels, 0.0f);   // Not used
+  std::vector<float> cpu_d_gamma_grad(channels, 0.0f); // Not used
+  std::vector<float> cpu_d_beta_grad(channels, 0.0f);
 
-  cpu::batchnorm::compute_batchnorm_backward_fused(
-      gradient_data.data(), normalized_data.data(), std_data.data(),
-      static_cast<const float *>(nullptr), cpu_grad_input.data(), static_cast<float *>(nullptr),
-      static_cast<float *>(nullptr), batch_size, channels, spatial_size, affine);
+  cpu::batchnorm::run_backward_fused(
+      gradient_data.data(), normalized_data.data(), inv_std_data.data(), cpu_gamma_grad.data(),
+      cpu_d_gamma_grad.data(), cpu_d_beta_grad.data(), cpu_grad_input.data(), batch_size, channels,
+      spatial_size, affine);
 
   // GPU version
   device_ptr<float[]> gpu_gradient = make_array_ptr<float[]>(gpu_device_, total_size);
   device_ptr<float[]> gpu_normalized = make_array_ptr<float[]>(gpu_device_, total_size);
-  device_ptr<float[]> gpu_std = make_array_ptr<float[]>(gpu_device_, channels);
+  device_ptr<float[]> gpu_inv_std = make_array_ptr<float[]>(gpu_device_, channels);
   device_ptr<float[]> gpu_grad_input = make_array_ptr<float[]>(gpu_device_, total_size);
+
+  // Allocate dummy buffers for gamma, d_gamma and d_beta even though affine=false
+  // The CUDA kernels need these for intermediate computations
+  device_ptr<float[]> gpu_dummy_gamma = make_array_ptr<float[]>(gpu_device_, channels);
+  device_ptr<float[]> gpu_dummy_gamma_grad = make_array_ptr<float[]>(gpu_device_, channels);
+  device_ptr<float[]> gpu_dummy_beta_grad = make_array_ptr<float[]>(gpu_device_, channels);
 
   gpu_device_->copyToDevice(gpu_gradient.get(), gradient_data.data(), total_size * sizeof(float));
   gpu_device_->copyToDevice(gpu_normalized.get(), normalized_data.data(),
                             total_size * sizeof(float));
-  gpu_device_->copyToDevice(gpu_std.get(), std_data.data(), channels * sizeof(float));
+  gpu_device_->copyToDevice(gpu_inv_std.get(), inv_std_data.data(), channels * sizeof(float));
 
   std::vector<float> zeros_total(total_size, 0.0f);
+  std::vector<float> zeros_channels(channels, 0.0f);
+  std::vector<float> ones_channels(channels, 1.0f);
   gpu_device_->copyToDevice(gpu_grad_input.get(), zeros_total.data(), total_size * sizeof(float));
+  gpu_device_->copyToDevice(gpu_dummy_gamma.get(), ones_channels.data(), channels * sizeof(float));
+  gpu_device_->copyToDevice(gpu_dummy_gamma_grad.get(), zeros_channels.data(),
+                            channels * sizeof(float));
+  gpu_device_->copyToDevice(gpu_dummy_beta_grad.get(), zeros_channels.data(),
+                            channels * sizeof(float));
 
   auto gpu_task = create_gpu_task(
-      "test_backward_gpu", cuda::batchnorm::compute_batchnorm_backward_fused<float>,
-      gpu_gradient.get(), gpu_normalized.get(), gpu_std.get(), static_cast<const float *>(nullptr),
-      gpu_grad_input.get(), static_cast<float *>(nullptr), static_cast<float *>(nullptr),
-      batch_size, channels, spatial_size, affine);
+      "test_backward_gpu", cuda::batchnorm::run_backward_fused<float>, gpu_gradient.get(),
+      gpu_normalized.get(), gpu_inv_std.get(), gpu_dummy_gamma.get(), gpu_dummy_gamma_grad.get(),
+      gpu_dummy_beta_grad.get(), gpu_grad_input.get(), batch_size, channels, spatial_size, affine);
   ASSERT_FALSE(gpu_task->sync());
 
   std::vector<float> gpu_grad_input_cpu(total_size);

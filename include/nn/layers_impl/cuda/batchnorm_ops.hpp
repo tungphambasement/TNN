@@ -53,7 +53,9 @@ void compute_batchnorm_backward_fused(const T *gradient_data, const T *normalize
                                       const T *std_data, const T *gamma_data, T *grad_input_data,
                                       T *gamma_grad, T *beta_grad, size_t batch_size,
                                       size_t channels, size_t spatial_size, bool affine,
-                                      cudaStream_t stream);
+                                      cudaStream_t stream,
+                                      T *workspace_sum_grad_normalized = nullptr,
+                                      T *workspace_sum_grad_norm_times_norm = nullptr);
 
 } // namespace batchnorm
 } // namespace cuda

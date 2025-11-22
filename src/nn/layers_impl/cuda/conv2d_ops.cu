@@ -38,18 +38,15 @@ __global__ void compute_bias_gradients_kernel(const T *gradient_data, T *bias_gr
   const size_t channel_stride = spatial_size;
   const size_t batch_stride = out_channels * spatial_size;
 
-  // Each block handles one channel
   int c = blockIdx.x;
   if (c >= out_channels)
     return;
 
-  // Parallel reduction within block
   extern __shared__ char shared_mem[];
   T *shared_data = reinterpret_cast<T *>(shared_mem);
 
   T sum = T(0);
 
-  // Each thread processes multiple elements with grid-stride loop
   int tid = threadIdx.x;
   int total_elements = batch_size * spatial_size;
 
@@ -62,7 +59,6 @@ __global__ void compute_bias_gradients_kernel(const T *gradient_data, T *bias_gr
   shared_data[tid] = sum;
   __syncthreads();
 
-  // Reduction in shared memory
   for (int s = blockDim.x / 2; s > 0; s >>= 1) {
     if (tid < s) {
       shared_data[tid] += shared_data[tid + s];
@@ -70,7 +66,6 @@ __global__ void compute_bias_gradients_kernel(const T *gradient_data, T *bias_gr
     __syncthreads();
   }
 
-  // Write result
   if (tid == 0) {
     bias_grad_data[c] = shared_data[0];
   }
@@ -109,7 +104,7 @@ void compute_bias_gradients(const T *gradient_data, T *bias_grad_data, const siz
                             const size_t output_h, const size_t output_w, const size_t out_channels,
                             cudaStream_t stream) {
   int threads_per_block = 256;
-  int num_blocks = out_channels; // One block per channel
+  int num_blocks = out_channels;
   size_t shared_mem_size = threads_per_block * sizeof(T);
 
   compute_bias_gradients_kernel<<<num_blocks, threads_per_block, shared_mem_size, stream>>>(
@@ -132,7 +127,6 @@ void add_bias_to_output(T *output_data, const T *bias_data, const size_t batch_s
   cuda::checkCudaError(cudaGetLastError(), __func__, __FILE__, __LINE__);
 }
 
-// Explicit template instantiations
 template void compute_conv_forward<float>(const float *col_data, const float *weight_data,
                                           float *output_data, const size_t output_size,
                                           const size_t kernel_size, const size_t out_channels,
