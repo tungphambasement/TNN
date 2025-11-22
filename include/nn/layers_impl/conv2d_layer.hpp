@@ -39,7 +39,9 @@ private:
   mutable std::unordered_map<size_t, Tensor<T>> micro_batch_pre_activations_;
   mutable std::unordered_map<size_t, device_ptr<T[]>> micro_batch_col_buffers_;
 
+  std::unique_ptr<Task> im2col_task_;
   std::unique_ptr<Task> forward_task_;
+  std::unique_ptr<Task> cnhw_to_nchw_task_;
   std::unique_ptr<Task> add_bias_task_;
 
   std::unique_ptr<Task> nchw_to_cnhw_task_;

@@ -6,10 +6,12 @@
 #include <atomic>
 #include <functional>
 #include <iostream>
+#include <mutex>
 #include <system_error>
 #include <thread>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 #ifdef USE_CUDA
 #include <cuda_runtime.h>
@@ -96,10 +98,31 @@ private:
   cudaEvent_t event_ = nullptr;
   std::function<void()> launch_function_;
 
+  static inline std::vector<cudaEvent_t> event_pool_;
+  static inline std::mutex pool_mutex_;
+
+  static cudaEvent_t get_event() {
+    std::lock_guard<std::mutex> lock(pool_mutex_);
+    if (event_pool_.empty()) {
+      cudaEvent_t e;
+      cudaEventCreateWithFlags(&e, cudaEventDisableTiming);
+      std::cout << "number of events in pool: " << event_pool_.size() << std::endl;
+      return e;
+    }
+    cudaEvent_t e = event_pool_.back();
+    event_pool_.pop_back();
+    return e;
+  }
+
+  static void release_event(cudaEvent_t e) {
+    std::lock_guard<std::mutex> lock(pool_mutex_);
+    event_pool_.push_back(e);
+  }
+
 public:
   template <typename Func, typename... Args>
   explicit CUDATask(CUDAFlow *flow, Func &&func, Args &&...args) : flow_(flow) {
-    cudaEventCreate(&event_);
+    event_ = get_event();
 
     cudaStream_t stream = flow_->get_stream();
 
@@ -128,12 +151,21 @@ public:
     ErrorStatus status = cuda_error_to_status(err);
     set_ready_state(status);
 
+    if (event_)
+      release_event(event_);
+
     return status;
   }
 
   ~CUDATask() override {
+    auto err = sync();
+    if (err != ErrorStatus{}) {
+      std::cerr << "Error in CUDATask sync in destructor: " << err.message() << std::endl;
+      std::cerr << "You might want to capture task and call sync() explicitly to handle errors."
+                << std::endl;
+    }
     if (event_)
-      cudaEventDestroy(event_);
+      release_event(event_);
   }
 
   CUDATask(const CUDATask &) = delete;

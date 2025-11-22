@@ -83,6 +83,7 @@ struct TrainingConfig {
       profiler_type = ProfilerType::NONE;
     }
     num_threads = get_env<size_t>("NUM_THREADS", DEFAULT_NUM_THREADS);
+    print_layer_profiling = get_env<bool>("PRINT_LAYER_PROFILING", false);
   }
 };
 

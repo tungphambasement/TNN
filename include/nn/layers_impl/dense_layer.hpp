@@ -33,6 +33,14 @@ private:
   std::unordered_map<size_t, Tensor<T>> micro_batch_inputs_;
   std::unordered_map<size_t, Tensor<T>> micro_batch_pre_activations_;
 
+  std::unique_ptr<Task> forward_task_;
+  std::unique_ptr<Task> add_bias_task_;
+  std::unique_ptr<Task> activation_task_;
+
+  std::unique_ptr<Task> weight_grad_task_;
+  std::unique_ptr<Task> input_grad_task_;
+  std::unique_ptr<Task> bias_grad_task_;
+
   std::unique_ptr<Task> compute_dense_forward(const device_ptr<T[]> &input_data,
                                               const device_ptr<T[]> &weight_data,
                                               device_ptr<T[]> &output_data, const size_t batch_size,

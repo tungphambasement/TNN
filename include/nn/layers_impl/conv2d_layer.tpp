@@ -89,21 +89,25 @@ Tensor<T> Conv2DLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_id)
   size_t output_buffer_size = out_channels_ * output_size;
   temp_output_buffer_.ensure(output_buffer_size);
 
-  im2col(current, micro_batch_col_buffers_[micro_batch_id], kernel_h_, kernel_w_, stride_h_,
-         stride_w_, pad_h_, pad_w_, "default");
+  im2col_task_ = im2col(current, micro_batch_col_buffers_[micro_batch_id], kernel_h_, kernel_w_,
+                        stride_h_, stride_w_, pad_h_, pad_w_, "default");
 
   Tensor<T> output({batch_size, out_channels_, output_h, output_w}, this->device_);
 
-  compute_conv_forward(micro_batch_col_buffers_[micro_batch_id], weights_.data_ptr(),
-                       temp_output_buffer_, output_size, kernel_size, out_channels_, "default");
+  forward_task_ =
+      compute_conv_forward(micro_batch_col_buffers_[micro_batch_id], weights_.data_ptr(),
+                           temp_output_buffer_, output_size, kernel_size, out_channels_, "default");
 
-  ops::cnhw_to_nchw(temp_output_buffer_, output.data_ptr(), batch_size, out_channels_, output_h,
-                    output_w);
+  cnhw_to_nchw_task_ = ops::cnhw_to_nchw(temp_output_buffer_, output.data_ptr(), batch_size,
+                                         out_channels_, output_h, output_w);
 
   if (use_bias_) {
-    add_bias_to_output(output.data_ptr(), bias_.data_ptr(), batch_size, output_h, output_w,
-                       out_channels_, "default");
+    add_bias_task_ = add_bias_to_output(output.data_ptr(), bias_.data_ptr(), batch_size, output_h,
+                                        output_w, out_channels_, "default");
   }
+
+  task_sync_all(
+      {im2col_task_.get(), forward_task_.get(), cnhw_to_nchw_task_.get(), add_bias_task_.get()});
 
   return output;
 }
@@ -150,7 +154,6 @@ Tensor<T> Conv2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch
 
   nchw_to_cnhw_task_ = ops::nchw_to_cnhw(current_gradient.data_ptr(), temp_gradient_buffer_,
                                          batch_size, out_channels_, output_h, output_w, "default");
-
   auto err = nchw_to_cnhw_task_->sync();
   if (err != ErrorStatus{}) {
     throw std::runtime_error("Error in nchw_to_cnhw_task_ sync: " + err.message());
@@ -158,7 +161,7 @@ Tensor<T> Conv2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch
 
   weight_grad_task_ = compute_weight_gradients(it_col_buffer->second, temp_gradient_buffer_,
                                                weight_gradients_.data_ptr(), output_size,
-                                               kernel_size, out_channels_, "flow_0");
+                                               kernel_size, out_channels_, "default");
 
   input_grad_task_ = compute_input_gradients(temp_gradient_buffer_, weights_.data_ptr(),
                                              temp_col_grad_matrix_buffer_, output_size, kernel_size,
@@ -171,9 +174,8 @@ Tensor<T> Conv2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch
   if (use_bias_) {
     bias_grad_task_ =
         compute_bias_gradients(current_gradient.data_ptr(), bias_gradients_.data_ptr(), batch_size,
-                               output_h, output_w, out_channels_, "flow_1");
+                               output_h, output_w, out_channels_, "default");
   }
-
   task_sync_all(
       {weight_grad_task_.get(), input_grad_task_.get(), col2im_task_.get(), bias_grad_task_.get()});
 

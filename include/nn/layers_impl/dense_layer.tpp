@@ -64,11 +64,12 @@ Tensor<T> DenseLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_id) 
 
   Tensor<T> output({batch_size, output_features_, size_t(1), size_t(1)}, this->device_);
 
-  compute_dense_forward(current.data_ptr(), weights_.data_ptr(), output.data_ptr(), batch_size,
-                        input_features_, output_features_, "default");
+  forward_task_ = compute_dense_forward(current.data_ptr(), weights_.data_ptr(), output.data_ptr(),
+                                        batch_size, input_features_, output_features_, "default");
 
   if (use_bias_) {
-    add_bias_vector(output.data_ptr(), bias_.data_ptr(), batch_size, output_features_, "default");
+    add_bias_task_ = add_bias_vector(output.data_ptr(), bias_.data_ptr(), batch_size,
+                                     output_features_, "default");
   }
 
   micro_batch_pre_activations_[micro_batch_id] = output.clone();
@@ -76,6 +77,8 @@ Tensor<T> DenseLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_id) 
   if (activation_) {
     activation_->apply(output);
   }
+
+  task_sync_all({forward_task_.get(), add_bias_task_.get(), activation_task_.get()});
 
   return output;
 }
@@ -116,18 +119,20 @@ Tensor<T> DenseLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch_
     activation_->compute_gradient_inplace(it_pre_act->second, current_grad);
   }
 
-  compute_weight_gradients(last_input.data_ptr(), current_grad.data_ptr(),
-                           weight_gradients_.data_ptr(), batch_size, input_features_,
-                           output_features_, "default");
+  weight_grad_task_ = compute_weight_gradients(last_input.data_ptr(), current_grad.data_ptr(),
+                                               weight_gradients_.data_ptr(), batch_size,
+                                               input_features_, output_features_, "default");
 
   if (use_bias_) {
-    compute_bias_gradients(current_grad.data_ptr(), bias_gradients_.data_ptr(), batch_size,
-                           output_features_, "default");
+    bias_grad_task_ = compute_bias_gradients(current_grad.data_ptr(), bias_gradients_.data_ptr(),
+                                             batch_size, output_features_, "default");
   }
 
-  compute_input_gradients(current_grad.data_ptr(), weights_.data_ptr(), grad_input.data_ptr(),
-                          batch_size, input_features_, output_features_, "default");
+  input_grad_task_ =
+      compute_input_gradients(current_grad.data_ptr(), weights_.data_ptr(), grad_input.data_ptr(),
+                              batch_size, input_features_, output_features_, "default");
 
+  task_sync_all({weight_grad_task_.get(), input_grad_task_.get(), bias_grad_task_.get()});
   return grad_input;
 }
 
