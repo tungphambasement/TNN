@@ -66,16 +66,13 @@ void cuda_im2col(const T *input, T *col_data, size_t batch_size, size_t channels
   cuda_im2col_kernel<T><<<num_blocks, BLOCK_SIZE, 0, stream>>>(
       input, col_data, batch_size, channels, height, width, kernel_h, kernel_w, stride_h, stride_w,
       pad_h, pad_w, output_h, output_w);
-  // Removed synchronous error check for performance - errors will be caught at sync points
 }
 
-// Optimized col2im kernel: parallelizes over output pixels instead of col elements
 template <typename T>
-__global__ void cuda_col2im_kernel_optimized(const T *col_data, T *output, size_t batch_size,
-                                             size_t channels, size_t height, size_t width,
-                                             size_t kernel_h, size_t kernel_w, size_t stride_h,
-                                             size_t stride_w, size_t pad_h, size_t pad_w,
-                                             size_t output_h, size_t output_w) {
+__global__ void cuda_col2im_kernel(const T *col_data, T *output, size_t batch_size, size_t channels,
+                                   size_t height, size_t width, size_t kernel_h, size_t kernel_w,
+                                   size_t stride_h, size_t stride_w, size_t pad_h, size_t pad_w,
+                                   size_t output_h, size_t output_w) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   size_t total_elements = batch_size * channels * height * width;
 
@@ -126,47 +123,6 @@ __global__ void cuda_col2im_kernel_optimized(const T *col_data, T *output, size_
   }
 }
 
-// Fallback kernel for backward compatibility
-template <typename T>
-__global__ void cuda_col2im_kernel(const T *col_data, T *output, size_t batch_size, size_t channels,
-                                   size_t height, size_t width, size_t kernel_h, size_t kernel_w,
-                                   size_t stride_h, size_t stride_w, size_t pad_h, size_t pad_w,
-                                   size_t output_h, size_t output_w) {
-  int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-  size_t col_height = channels * kernel_h * kernel_w;
-  size_t total_elements = batch_size * col_height * output_h * output_w;
-
-  if (idx < total_elements) {
-    // Decode the linear index to col_data position (n, c_kh_kw, h_out, w_out)
-    size_t w_out = idx % output_w;
-    size_t temp = idx / output_w;
-    size_t h_out = temp % output_h;
-    temp = temp / output_h;
-    size_t c_kh_kw = temp % col_height;
-    size_t n = temp / col_height;
-
-    // Decode c_kh_kw to (c, kh, kw)
-    size_t kw = c_kh_kw % kernel_w;
-    size_t temp2 = c_kh_kw / kernel_w;
-    size_t kh = temp2 % kernel_h;
-    size_t c = temp2 / kernel_h;
-
-    // Calculate corresponding position in output
-    int h_in = (int)h_out * (int)stride_h - (int)pad_h + (int)kh;
-    int w_in = (int)w_out * (int)stride_w - (int)pad_w + (int)kw;
-
-    // Only write if within valid output bounds
-    if (h_in >= 0 && (size_t)h_in < height && w_in >= 0 && (size_t)w_in < width) {
-      size_t output_idx = ((n * channels + c) * height + (size_t)h_in) * width + (size_t)w_in;
-      size_t col_idx = c_kh_kw * (batch_size * output_h * output_w) + n * (output_h * output_w) +
-                       h_out * output_w + w_out;
-      const T value = col_data[col_idx];
-      atomicAdd(&output[output_idx], value);
-    }
-  }
-}
-
 template <typename T>
 void cuda_col2im(const T *col_data, T *output, size_t batch_size, size_t channels, size_t height,
                  size_t width, size_t kernel_h, size_t kernel_w, size_t stride_h, size_t stride_w,
@@ -176,7 +132,6 @@ void cuda_col2im(const T *col_data, T *output, size_t batch_size, size_t channel
   size_t output_size = batch_size * channels * height * width;
   cudaMemsetAsync(output, 0, output_size * sizeof(T), stream);
 
-  // Use non-optimized kernel which handles all stride configurations correctly
   size_t col_height = channels * kernel_h * kernel_w;
   size_t total_elements = batch_size * col_height * output_h * output_w;
   int num_blocks = get_num_blocks(total_elements);

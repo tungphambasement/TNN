@@ -203,7 +203,8 @@ void train_classification_model(Sequential<float> &model, ImageDataLoader<float>
   std::cout << "TBB max threads limited to: " << arena.max_concurrency() << std::endl;
   arena.execute([&] {
 #endif
-    auto [best_val_loss, best_val_accuracy] = validate_class_model(model, test_loader);
+    // auto [best_val_loss, best_val_accuracy] = validate_class_model(model, test_loader);
+    float best_val_accuracy = 0.0f, best_val_loss = std::numeric_limits<float>::max();
 
     std::cout << "Initial validation - Loss: " << std::fixed << std::setprecision(4)
               << best_val_loss << ", Accuracy: " << std::setprecision(2)
