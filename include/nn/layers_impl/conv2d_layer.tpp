@@ -52,8 +52,7 @@ template <typename T> void Conv2DLayer<T>::initialize_params() {
 }
 
 template <typename T>
-Tensor<T> Conv2DLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_id) {
-  auto forward_internal_start = std::chrono::high_resolution_clock::now();
+const Tensor<T> &Conv2DLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_id) {
   if (!this->initialized_) {
     throw std::runtime_error("Conv2DLayer must be initialized before forward pass.");
   }
@@ -63,12 +62,8 @@ Tensor<T> Conv2DLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_id)
     throw std::invalid_argument("Input channel size mismatch in Conv2DLayer");
   }
 
-  auto to_device_start = std::chrono::high_resolution_clock::now();
   const Tensor<T> &current =
       (input.device() == this->device_) ? input : input.to_device(this->device_);
-  auto to_device_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> to_device_duration = to_device_end - to_device_start;
-  this->perf_timers_["backward_to_device"] += to_device_duration.count();
 
   micro_batch_input_shapes_[micro_batch_id] = {input.batch_size(), input.channels(), input.height(),
                                                input.width()};
@@ -95,69 +90,32 @@ Tensor<T> Conv2DLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_id)
   size_t output_buffer_size = out_channels_ * output_size;
   temp_output_buffer_.ensure(output_buffer_size);
 
-  auto im2col_start = std::chrono::high_resolution_clock::now();
   im2col_task_ = im2col(current, micro_batch_col_buffers_[micro_batch_id], kernel_h_, kernel_w_,
                         stride_h_, stride_w_, pad_h_, pad_w_, "default");
-  auto im2col_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> im2col_duration = im2col_end - im2col_start;
-  this->perf_timers_["im2col"] += im2col_duration.count();
 
-  Tensor<T> output({batch_size, out_channels_, output_h, output_w}, this->device_);
+  Tensor<T> &output =
+      this->get_output_buffer(micro_batch_id, {batch_size, out_channels_, output_h, output_w});
 
-  auto forward_start = std::chrono::high_resolution_clock::now();
   forward_task_ =
       compute_conv_forward(micro_batch_col_buffers_[micro_batch_id], weights_.data_ptr(),
                            temp_output_buffer_, output_size, kernel_size, out_channels_, "default");
-  auto forward_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> forward_duration = forward_end - forward_start;
-  this->perf_timers_["forward_compute"] += forward_duration.count();
 
-  auto cnhw_to_nchw_start = std::chrono::high_resolution_clock::now();
   cnhw_to_nchw_task_ = ops::cnhw_to_nchw(temp_output_buffer_, output.data_ptr(), batch_size,
                                          out_channels_, output_h, output_w);
-  auto cnhw_to_nchw_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> cnhw_to_nchw_duration =
-      cnhw_to_nchw_end - cnhw_to_nchw_start;
-  this->perf_timers_["cnhw_to_nchw"] += cnhw_to_nchw_duration.count();
 
   if (use_bias_) {
-    auto add_bias_start = std::chrono::high_resolution_clock::now();
     add_bias_task_ = add_bias_to_output(output.data_ptr(), bias_.data_ptr(), batch_size, output_h,
                                         output_w, out_channels_, "default");
-    auto add_bias_end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> add_bias_duration = add_bias_end - add_bias_start;
-    this->perf_timers_["add_bias"] += add_bias_duration.count();
   }
 
-  auto sync_start = std::chrono::high_resolution_clock::now();
   task_sync_all(
       {im2col_task_.get(), forward_task_.get(), cnhw_to_nchw_task_.get(), add_bias_task_.get()});
-  auto sync_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> sync_duration = sync_end - sync_start;
-  this->perf_timers_["forward_sync"] += sync_duration.count();
-
-  auto forward_internal_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> forward_internal_duration =
-      forward_internal_end - forward_internal_start;
-  this->perf_timers_["forward_internal"] += forward_internal_duration.count();
 
   return output;
 }
 
 template <typename T>
-void Conv2DLayer<T>::forward_inplace(Tensor<T> &input, size_t micro_batch_id) {
-  auto total_forward_start = std::chrono::high_resolution_clock::now();
-  Tensor<T> output = forward(input, micro_batch_id);
-  auto total_forward_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> total_forward_duration =
-      total_forward_end - total_forward_start;
-  this->perf_timers_["total_forward"] += total_forward_duration.count();
-  input = std::move(output);
-}
-
-template <typename T>
-Tensor<T> Conv2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch_id) {
-  auto backward_internal_start = std::chrono::high_resolution_clock::now();
+const Tensor<T> &Conv2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch_id) {
   if (!this->initialized_) {
     throw std::runtime_error("Conv2DLayer must be initialized before backward pass.");
   }
@@ -174,16 +132,8 @@ Tensor<T> Conv2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch
                              std::to_string(micro_batch_id));
   }
 
-  auto to_device_start = std::chrono::high_resolution_clock::now();
-  std::cout << "gradient device ptr: " << gradient.device() << " " << "gradient device type: "
-            << (gradient.device_type() == DeviceType::CPU ? "CPU" : "GPU") << std::endl;
-  std::cout << "layer device ptr: " << this->device_ << std::endl;
-  // const Tensor<T> &current_gradient =
-  //     (gradient.device() == this->device_) ? gradient : gradient.to_device(this->device_);
-  const Tensor<T> &current_gradient = gradient;
-  auto to_device_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> to_device_duration = to_device_end - to_device_start;
-  this->perf_timers_["backward_to_device"] += to_device_duration.count();
+  const Tensor<T> &current_gradient =
+      (gradient.device() == this->device_) ? gradient : gradient.to_device(this->device_);
 
   const auto &input_shape = it_input_shape->second;
 
@@ -193,7 +143,8 @@ Tensor<T> Conv2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch
   const size_t output_h = gradient.height();
   const size_t output_w = gradient.width();
 
-  Tensor<T> grad_input({batch_size, in_channels_, input_h, input_w}, this->device_);
+  // Tensor<T> grad_input({batch_size, in_channels_, input_h, input_w}, this->device_);
+  Tensor<T> &grad_input = this->get_gradient_buffer(micro_batch_id, input_shape);
   grad_input.fill(T(0));
 
   size_t kernel_size = in_channels_ * kernel_h_ * kernel_w_;
@@ -204,78 +155,36 @@ Tensor<T> Conv2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch
   temp_gradient_buffer_.ensure(gradient_buffer_size);
   temp_col_grad_matrix_buffer_.ensure(col_grad_matrix_size);
 
-  auto nchw_to_cnhw_start = std::chrono::high_resolution_clock::now();
   nchw_to_cnhw_task_ = ops::nchw_to_cnhw(current_gradient.data_ptr(), temp_gradient_buffer_,
                                          batch_size, out_channels_, output_h, output_w, "default");
-  auto nchw_to_cnhw_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> nchw_to_cnhw_duration =
-      nchw_to_cnhw_end - nchw_to_cnhw_start;
-  this->perf_timers_["nchw_to_cnhw"] += nchw_to_cnhw_duration.count();
 
   auto err = nchw_to_cnhw_task_->sync();
   if (err != ErrorStatus{}) {
     throw std::runtime_error("Error in nchw_to_cnhw_task_ sync: " + err.message());
   }
 
-  auto weight_grad_start = std::chrono::high_resolution_clock::now();
   weight_grad_task_ = compute_weight_gradients(it_col_buffer->second, temp_gradient_buffer_,
                                                weight_gradients_.data_ptr(), output_size,
                                                kernel_size, out_channels_, "default");
-  auto weight_grad_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> weight_grad_duration =
-      weight_grad_end - weight_grad_start;
-  this->perf_timers_["weight_grad_compute"] += weight_grad_duration.count();
 
-  auto input_grad_start = std::chrono::high_resolution_clock::now();
   input_grad_task_ = compute_input_gradients(temp_gradient_buffer_, weights_.data_ptr(),
                                              temp_col_grad_matrix_buffer_, output_size, kernel_size,
                                              out_channels_, "default");
-  auto input_grad_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> input_grad_duration = input_grad_end - input_grad_start;
-  this->perf_timers_["input_grad_compute"] += input_grad_duration.count();
 
-  auto col2im_start = std::chrono::high_resolution_clock::now();
   col2im_task_ =
       col2im(temp_col_grad_matrix_buffer_, grad_input.data_ptr(), batch_size, in_channels_, input_h,
              input_w, kernel_h_, kernel_w_, stride_h_, stride_w_, pad_h_, pad_w_, "default");
-  auto col2im_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> col2im_duration = col2im_end - col2im_start;
-  this->perf_timers_["col2im"] += col2im_duration.count();
 
   if (use_bias_) {
-    auto bias_grad_start = std::chrono::high_resolution_clock::now();
     bias_grad_task_ =
         compute_bias_gradients(current_gradient.data_ptr(), bias_gradients_.data_ptr(), batch_size,
                                output_h, output_w, out_channels_, "default");
-    auto bias_grad_end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> bias_grad_duration = bias_grad_end - bias_grad_start;
-    this->perf_timers_["bias_grad_compute"] += bias_grad_duration.count();
   }
 
-  auto sync_start = std::chrono::high_resolution_clock::now();
   task_sync_all(
       {weight_grad_task_.get(), input_grad_task_.get(), col2im_task_.get(), bias_grad_task_.get()});
-  auto sync_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> sync_duration = sync_end - sync_start;
-  this->perf_timers_["backward_sync"] += sync_duration.count();
-
-  auto backward_internal_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> backward_internal_duration =
-      backward_internal_end - backward_internal_start;
-  this->perf_timers_["backward_internal"] += backward_internal_duration.count();
 
   return grad_input;
-}
-
-template <typename T>
-void Conv2DLayer<T>::backward_inplace(Tensor<T> &input, size_t micro_batch_id) {
-  auto total_backward_start = std::chrono::high_resolution_clock::now();
-  Tensor<T> grad_input = backward(input, micro_batch_id);
-  auto total_backward_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> total_backward_duration =
-      total_backward_end - total_backward_start;
-  this->perf_timers_["total_backward"] += total_backward_duration.count();
-  input = std::move(grad_input);
 }
 
 template <typename T>

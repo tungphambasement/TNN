@@ -6,9 +6,6 @@
  */
 #pragma once
 
-#include "nn/activations.hpp"
-#include "nn/optimizers.hpp"
-
 #include "device/task.hpp"
 #include "parameterized_layer.hpp"
 #include "tensor/tensor.hpp"
@@ -24,14 +21,12 @@ private:
   size_t input_features_;
   size_t output_features_;
   bool use_bias_;
-  std::unique_ptr<ActivationFunction<T>> activation_;
   Tensor<T> weights_;
   Tensor<T> bias_;
   Tensor<T> weight_gradients_;
   Tensor<T> bias_gradients_;
 
   std::unordered_map<size_t, Tensor<T>> micro_batch_inputs_;
-  std::unordered_map<size_t, Tensor<T>> micro_batch_pre_activations_;
 
   std::unique_ptr<Task> forward_task_;
   std::unique_ptr<Task> add_bias_task_;
@@ -72,13 +67,11 @@ private:
                                         const std::string &flow_id) const;
 
 public:
-  DenseLayer(size_t input_features, size_t output_features,
-             std::unique_ptr<ActivationFunction<T>> activation = nullptr, bool use_bias = true,
+  DenseLayer(size_t input_features, size_t output_features, bool use_bias = true,
              const std::string &name = "dense");
 
-  Tensor<T> forward(const Tensor<T> &input, size_t micro_batch_id = 0) override;
-  Tensor<T> backward(const Tensor<T> &gradient, size_t micro_batch_id = 0) override;
-  void forward_inplace(Tensor<T> &input, size_t micro_batch_id = 0) override;
+  const Tensor<T> &forward(const Tensor<T> &input, size_t micro_batch_id = 0) override;
+  const Tensor<T> &backward(const Tensor<T> &gradient, size_t micro_batch_id = 0) override;
 
   uint64_t forward_complexity(const std::vector<size_t> &input_shape) const override;
   uint64_t backward_complexity(const std::vector<size_t> &input_shape) const override;

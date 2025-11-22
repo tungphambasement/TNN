@@ -108,19 +108,21 @@ ClassResult train_class_epoch(Sequential<float> &model, ImageDataLoader<float> &
   while (train_loader.get_next_batch(batch_data, batch_labels)) {
     ++num_batches;
 
-    model.forward(batch_data);
+    Tensor<float> predictions = model.forward(batch_data);
 
-    const Device *pre_device = batch_data.device();
+    const Device *pre_device = predictions.device();
     const Tensor<float> device_batch_labels = batch_labels.to_device(pre_device);
 
-    float loss = model.loss_function()->compute_loss(batch_data, device_batch_labels);
-    float accuracy = compute_class_accuracy(batch_data, device_batch_labels);
+    float loss = model.loss_function()->compute_loss(predictions, device_batch_labels);
+    float accuracy = compute_class_accuracy(predictions, device_batch_labels);
 
     total_loss += loss;
     total_accuracy += accuracy;
 
+    model.clear_gradients();
+
     Tensor<float> loss_gradient =
-        model.loss_function()->compute_gradient(batch_data, device_batch_labels);
+        model.loss_function()->compute_gradient(predictions, device_batch_labels);
     model.backward(loss_gradient);
 
     model.update_parameters();
@@ -159,12 +161,12 @@ ClassResult validate_class_model(Sequential<float> &model, ImageDataLoader<float
   int val_batches = 0;
 
   while (test_loader.get_next_batch(batch_data, batch_labels)) {
-    model.forward(batch_data);
+    Tensor<float> predictions = model.forward(batch_data);
 
-    const Device *pre_device = batch_data.device();
+    const Device *pre_device = predictions.device();
     const Tensor<float> device_batch_labels = batch_labels.to_device(pre_device);
-    val_loss += model.loss_function()->compute_loss(batch_data, device_batch_labels);
-    val_accuracy += compute_class_accuracy(batch_data, device_batch_labels);
+    val_loss += model.loss_function()->compute_loss(predictions, device_batch_labels);
+    val_accuracy += compute_class_accuracy(predictions, device_batch_labels);
     ++val_batches;
   }
 
@@ -298,13 +300,14 @@ RegResult train_reg_epoch(Sequential<float> &model, RegressionDataLoader<float> 
   while (train_loader.get_next_batch(batch_data, batch_labels)) {
     ++num_batches;
 
-    model.forward(batch_data);
+    Tensor<float> predictions = model.forward(batch_data);
 
-    const float loss = model.loss_function()->compute_loss(batch_data, batch_labels);
+    const float loss = model.loss_function()->compute_loss(predictions, batch_labels);
 
     total_loss += loss;
 
-    Tensor<float> loss_gradient = model.loss_function()->compute_gradient(batch_data, batch_labels);
+    Tensor<float> loss_gradient =
+        model.loss_function()->compute_gradient(predictions, batch_labels);
     model.backward(loss_gradient);
 
     model.update_parameters();
@@ -340,9 +343,9 @@ RegResult validate_reg_model(Sequential<float> &model, RegressionDataLoader<floa
   int val_batches = 0;
 
   while (test_loader.get_next_batch(batch_data, batch_labels)) {
-    model.forward(batch_data);
+    Tensor<float> predictions = model.forward(batch_data);
 
-    val_loss += model.loss_function()->compute_loss(batch_data, batch_labels);
+    val_loss += model.loss_function()->compute_loss(predictions, batch_labels);
     ++val_batches;
   }
 

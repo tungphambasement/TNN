@@ -49,95 +49,79 @@ template <typename T> void BatchNormLayer<T>::initialize_params() {
   running_mean_gradients_.fill(T(0));
   running_var_gradients_.fill(T(0));
 
-  // Pre-allocate workspace tensors to avoid reallocation during forward/backward
-  batch_mean_fixed_ = Tensor<T>({num_features_, 1, 1, 1}, this->device_);
-  batch_inv_std_fixed_ = Tensor<T>({num_features_, 1, 1, 1}, this->device_);
-
   this->initialized_ = true;
 }
 
 template <typename T>
-Tensor<T> BatchNormLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_id) {
-  Tensor<T> input_copy = input.clone();
-  forward_inplace(input_copy, micro_batch_id);
-  return input_copy;
-}
-
-template <typename T>
-void BatchNormLayer<T>::forward_inplace(Tensor<T> &input, size_t micro_batch_id) {
+const Tensor<T> &BatchNormLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_id) {
   if (input.channels() != num_features_) {
     throw std::invalid_argument("Input channels must match num_features in BatchNormLayer");
   }
 
-  if (input.device() != this->device_) {
-    input = input.to_device(this->device_);
-  }
+  const Tensor<T> &current =
+      input.device() == this->device_ ? input : input.to_device(this->device_);
 
   size_t batch_size, channels, height, width, spatial_size;
-  extract_tensor_dimensions(input, batch_size, channels, height, width, spatial_size);
+  extract_tensor_dimensions(current, batch_size, channels, height, width, spatial_size);
 
-  Tensor<T> output(input.shape(), this->device_);
+  Tensor<T> &output = this->get_output_buffer(micro_batch_id, current.shape());
   output.fill(T(0));
 
+  auto it_normalized = micro_batch_normalized_.find(micro_batch_id);
+  if (it_normalized == micro_batch_normalized_.end()) {
+    micro_batch_normalized_[micro_batch_id] = make_array_ptr<T[]>(this->device_, current.size());
+  } else {
+    micro_batch_normalized_[micro_batch_id].ensure(current.size());
+  }
+
+  auto it_batch_mean_fixed = batch_mean_fixed_.find(micro_batch_id);
+  if (it_batch_mean_fixed == batch_mean_fixed_.end()) {
+    batch_mean_fixed_[micro_batch_id] = make_array_ptr<T[]>(this->device_, num_features_);
+  } else {
+    batch_mean_fixed_[micro_batch_id].ensure(num_features_);
+  }
+
+  auto it_batch_inv_std_fixed = micro_batch_inv_std_.find(micro_batch_id);
+  if (it_batch_inv_std_fixed == micro_batch_inv_std_.end()) {
+    micro_batch_inv_std_[micro_batch_id] = make_array_ptr<T[]>(this->device_, num_features_);
+  } else {
+    micro_batch_inv_std_[micro_batch_id].ensure(num_features_);
+  }
+
   if (this->is_training_) {
-    Tensor<T> normalized(input.shape(), this->device_);
 
 #ifdef USE_CUDA
     if (this->device_->getDeviceType() == DeviceType::GPU) {
       // Optimized GPU path: Single fused call (2 kernels instead of 4-5)
       auto fwd_task = create_gpu_task(
           "default", cuda::batchnorm::run_forward_fused<T>, input.data_ptr().get(),
-          batch_mean_fixed_.data_ptr().get(), batch_inv_std_fixed_.data_ptr().get(),
+          batch_mean_fixed_[micro_batch_id].get(), micro_batch_inv_std_[micro_batch_id].get(),
           running_mean_.data_ptr().get(), running_var_.data_ptr().get(),
           affine_ ? gamma_.data_ptr().get() : nullptr, affine_ ? beta_.data_ptr().get() : nullptr,
-          output.data_ptr().get(), normalized.data_ptr().get(), batch_size, channels, spatial_size,
-          momentum_, epsilon_, affine_);
-
-      // Cache inv_std for backward (more efficient than std)
-      micro_batch_inv_std_[micro_batch_id] = batch_inv_std_fixed_.clone();
+          output.data_ptr().get(), micro_batch_normalized_[micro_batch_id].get(), batch_size,
+          channels, spatial_size, momentum_, epsilon_, affine_);
     } else
 #endif
     {
-      // CPU path: Use existing implementation
-      Tensor<T> batch_mean({channels, 1, 1, 1}, this->device_);
-      Tensor<T> batch_var({channels, 1, 1, 1}, this->device_);
-      Tensor<T> batch_std({channels, 1, 1, 1}, this->device_);
-
-      compute_mean_variance_fused(input, batch_mean, batch_var, batch_size, channels, spatial_size,
-                                  "default");
-
-      compute_batch_std(batch_var, batch_std, channels, "default");
-
-      std::unique_ptr<Task> norm_task = nullptr;
-      if (affine_) {
-        norm_task = normalize_and_scale(input.data_ptr(), batch_mean.data_ptr(),
-                                        batch_std.data_ptr(), gamma_.data_ptr(), beta_.data_ptr(),
-                                        output.data_ptr(), normalized.data_ptr(), batch_size,
-                                        channels, spatial_size, affine_, "default");
-      } else {
-        norm_task =
-            normalize_and_scale(input.data_ptr(), batch_mean.data_ptr(), batch_std.data_ptr(),
-                                nullptr, nullptr, output.data_ptr(), normalized.data_ptr(),
-                                batch_size, channels, spatial_size, affine_, "default");
-      }
-
-      update_running_stats(batch_mean, batch_var, channels, "default");
-
-      micro_batch_std_[micro_batch_id] = std::move(batch_std);
+      // CPU path: Use fused forward matching GPU behavior (stores inv_std instead of std)
+      auto fwd_task = create_cpu_task(
+          "default", cpu::batchnorm::run_forward_fused<T>, input.data_ptr().get(),
+          batch_mean_fixed_[micro_batch_id].get(), micro_batch_inv_std_[micro_batch_id].get(),
+          running_mean_.data_ptr().get(), running_var_.data_ptr().get(),
+          affine_ ? gamma_.data_ptr().get() : nullptr, affine_ ? beta_.data_ptr().get() : nullptr,
+          output.data_ptr().get(), micro_batch_normalized_[micro_batch_id].get(), batch_size,
+          channels, spatial_size, momentum_, epsilon_, affine_);
     }
-
-    micro_batch_normalized_[micro_batch_id] = std::move(normalized);
-
   } else {
     compute_inference_output(input, output, batch_size, channels, spatial_size, "default");
   }
 
-  micro_batch_inputs_[micro_batch_id] = std::move(input);
-  input = std::move(output);
+  micro_batch_inputs_[micro_batch_id] = input.clone();
+  return output;
 }
 
 template <typename T>
-Tensor<T> BatchNormLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch_id) {
+const Tensor<T> &BatchNormLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch_id) {
   auto it_input = micro_batch_inputs_.find(micro_batch_id);
   auto it_normalized = micro_batch_normalized_.find(micro_batch_id);
 
@@ -150,7 +134,6 @@ Tensor<T> BatchNormLayer<T>::backward(const Tensor<T> &gradient, size_t micro_ba
       gradient.device() == this->device_ ? gradient : gradient.to_device(this->device_);
 
   const Tensor<T> &input = it_input->second;
-  const Tensor<T> &normalized = it_normalized->second;
 
   const size_t batch_size = input.batch_size();
   const size_t channels = input.channels();
@@ -158,7 +141,7 @@ Tensor<T> BatchNormLayer<T>::backward(const Tensor<T> &gradient, size_t micro_ba
   const size_t width = input.width();
   const size_t spatial_size = height * width;
 
-  Tensor<T> grad_input(input.shape(), this->device_);
+  Tensor<T> &grad_input = this->get_gradient_buffer(micro_batch_id, input.shape());
   grad_input.fill(T(0));
 
 #ifdef USE_CUDA
@@ -169,88 +152,35 @@ Tensor<T> BatchNormLayer<T>::backward(const Tensor<T> &gradient, size_t micro_ba
       throw std::runtime_error("No cached inv_std found for micro-batch ID: " +
                                std::to_string(micro_batch_id));
     }
-    const Tensor<T> &inv_std_val = it_inv_std->second;
 
-    auto bwd_task =
-        create_gpu_task("default", cuda::batchnorm::run_backward_fused<T>,
-                        current_gradient.data_ptr().get(), normalized.data_ptr().get(),
-                        inv_std_val.data_ptr().get(), affine_ ? gamma_.data_ptr().get() : nullptr,
-                        affine_ ? gamma_gradients_.data_ptr().get() : nullptr,
-                        affine_ ? beta_gradients_.data_ptr().get() : nullptr,
-                        grad_input.data_ptr().get(), batch_size, channels, spatial_size, affine_);
+    auto bwd_task = create_gpu_task(
+        "default", cuda::batchnorm::run_backward_fused<T>, current_gradient.data_ptr().get(),
+        micro_batch_normalized_[micro_batch_id].get(), it_inv_std->second.get(),
+        affine_ ? gamma_.data_ptr().get() : nullptr,
+        affine_ ? gamma_gradients_.data_ptr().get() : nullptr,
+        affine_ ? beta_gradients_.data_ptr().get() : nullptr, grad_input.data_ptr().get(),
+        batch_size, channels, spatial_size, affine_);
   } else
 #endif
   {
-    // CPU path: Use existing implementation
-    auto it_std = micro_batch_std_.find(micro_batch_id);
-    if (it_std == micro_batch_std_.end()) {
-      throw std::runtime_error("No cached std found for micro-batch ID: " +
+    // CPU path: Use fused backward matching GPU behavior (uses inv_std)
+    auto it_inv_std = micro_batch_inv_std_.find(micro_batch_id);
+    if (it_inv_std == micro_batch_inv_std_.end()) {
+      throw std::runtime_error("No cached inv_std found for micro-batch ID: " +
                                std::to_string(micro_batch_id));
     }
-    const Tensor<T> &std_val = it_std->second;
 
-    Tensor<T> dummy_gamma(this->device_);
-    compute_batchnorm_backward_fused(current_gradient, normalized, std_val, dummy_gamma, grad_input,
-                                     batch_size, channels, spatial_size, "default");
+    auto bwd_task = create_cpu_task(
+        "default", cpu::batchnorm::run_backward_fused<T>, current_gradient.data_ptr().get(),
+        micro_batch_normalized_[micro_batch_id].get(), it_inv_std->second.get(),
+        affine_ ? gamma_.data_ptr().get() : nullptr,
+        affine_ ? gamma_gradients_.data_ptr().get() : nullptr,
+        affine_ ? beta_gradients_.data_ptr().get() : nullptr, grad_input.data_ptr().get(),
+        batch_size, channels, spatial_size, affine_);
   }
 
+  micro_batch_gradients_[micro_batch_id] = grad_input.clone();
   return grad_input;
-}
-
-template <typename T>
-std::unique_ptr<Task> BatchNormLayer<T>::compute_batch_std(const Tensor<T> &batch_var,
-                                                           Tensor<T> &batch_std, size_t channels,
-                                                           const std::string &flow_id) {
-  if (batch_var.device_type() != batch_std.device_type()) {
-    throw std::runtime_error("Batch variance and std tensors must be on the same device");
-  }
-
-  if (batch_var.device_type() == DeviceType::CPU) {
-    return create_cpu_task(flow_id, cpu::batchnorm::compute_batch_std<T>,
-                           batch_var.data_ptr().get(), batch_std.data_ptr().get(), channels,
-                           epsilon_);
-  }
-#ifdef USE_CUDA
-  else if (batch_var.device_type() == DeviceType::GPU) {
-    return create_gpu_task(flow_id, cuda::batchnorm::compute_batch_std<T>,
-                           batch_var.data_ptr().get(), batch_std.data_ptr().get(), channels,
-                           epsilon_);
-  }
-#endif
-  else {
-    throw std::runtime_error("Unsupported device type for compute_batch_std");
-  }
-  return nullptr;
-}
-
-template <typename T>
-std::unique_ptr<Task>
-BatchNormLayer<T>::update_running_stats(const Tensor<T> &batch_mean, const Tensor<T> &batch_var,
-                                        size_t channels, const std::string &flow_id) {
-  if (running_mean_.device_type() != running_var_.device_type() ||
-      running_mean_.device_type() != batch_mean.device_type() ||
-      batch_mean.device_type() != batch_var.device_type()) {
-    throw std::runtime_error("All tensors must be on the same device for update_running_stats");
-  }
-
-  if (running_mean_.device_type() == DeviceType::CPU) {
-    return create_cpu_task(flow_id, cpu::batchnorm::update_running_stats<T>,
-                           running_mean_.data_ptr().get(), running_var_.data_ptr().get(),
-                           batch_mean.data_ptr().get(), batch_var.data_ptr().get(), channels,
-                           momentum_);
-  }
-#ifdef USE_CUDA
-  else if (running_mean_.device_type() == DeviceType::GPU) {
-    return create_gpu_task(flow_id, cuda::batchnorm::update_running_stats<T>,
-                           running_mean_.data_ptr().get(), running_var_.data_ptr().get(),
-                           batch_mean.data_ptr().get(), batch_var.data_ptr().get(), channels,
-                           momentum_);
-  }
-#endif
-  else {
-    throw std::runtime_error("Unsupported device type for update_running_stats");
-  }
-  return nullptr;
 }
 
 template <typename T>
@@ -300,190 +230,6 @@ void BatchNormLayer<T>::extract_tensor_dimensions(const Tensor<T> &input, size_t
   height = input.height();
   width = input.width();
   spatial_size = height * width;
-}
-
-template <typename T>
-std::unique_ptr<Task> BatchNormLayer<T>::compute_mean_variance_fused(
-    const Tensor<T> &input, Tensor<T> &batch_mean, Tensor<T> &batch_var, size_t batch_size,
-    size_t channels, size_t spatial_size, const std::string &flow_id) {
-  if (input.device_type() == DeviceType::CPU) {
-    return create_cpu_task(flow_id, cpu::batchnorm::compute_mean_variance_fused<T>,
-                           input.data_ptr().get(), batch_mean.data_ptr().get(),
-                           batch_var.data_ptr().get(), batch_size, channels, spatial_size);
-  }
-#ifdef USE_CUDA
-  else if (input.device_type() == DeviceType::GPU) {
-    return create_gpu_task(flow_id, cuda::batchnorm::compute_mean_variance_fused<T>,
-                           input.data_ptr().get(), batch_mean.data_ptr().get(),
-                           batch_var.data_ptr().get(), batch_size, channels, spatial_size);
-  }
-#endif
-  else {
-    throw std::runtime_error("Unsupported device type for compute_mean_variance_fused");
-  }
-  return nullptr;
-}
-
-template <typename T>
-std::unique_ptr<Task> BatchNormLayer<T>::compute_batchnorm_backward_fused(
-    const Tensor<T> &gradient, const Tensor<T> &normalized, const Tensor<T> &std_val,
-    Tensor<T> &dummy_gamma, Tensor<T> &grad_input, size_t batch_size, size_t channels,
-    size_t spatial_size, const std::string &flow_id) {
-  if (gradient.device_type() == DeviceType::CPU) {
-    return create_cpu_task(
-        flow_id, cpu::batchnorm::compute_batchnorm_backward_fused<T>, gradient.data_ptr().get(),
-        normalized.data_ptr().get(), std_val.data_ptr().get(),
-        affine_ ? gamma_.data_ptr().get() : dummy_gamma.data_ptr().get(),
-        grad_input.data_ptr().get(),
-        affine_ ? gamma_gradients_.data_ptr().get() : dummy_gamma.data_ptr().get(),
-        affine_ ? beta_gradients_.data_ptr().get() : dummy_gamma.data_ptr().get(), batch_size,
-        channels, spatial_size, affine_);
-  }
-#ifdef USE_CUDA
-  else if (gradient.device_type() == DeviceType::GPU) {
-    return create_gpu_task(
-        flow_id, cuda::batchnorm::compute_batchnorm_backward_fused<T>, gradient.data_ptr().get(),
-        normalized.data_ptr().get(), std_val.data_ptr().get(),
-        affine_ ? gamma_.data_ptr().get() : dummy_gamma.data_ptr().get(),
-        grad_input.data_ptr().get(),
-        affine_ ? gamma_gradients_.data_ptr().get() : dummy_gamma.data_ptr().get(),
-        affine_ ? beta_gradients_.data_ptr().get() : dummy_gamma.data_ptr().get(), batch_size,
-        channels, spatial_size, affine_);
-  }
-#endif
-  else {
-    throw std::runtime_error("Unsupported device type for compute_batchnorm_backward_fused");
-  }
-  return nullptr;
-}
-
-template <typename T>
-std::unique_ptr<Task> BatchNormLayer<T>::normalize_and_scale(
-    const device_ptr<T[]> &input_data, const device_ptr<T[]> &mean_data,
-    const device_ptr<T[]> &std_data, const device_ptr<T[]> &gamma_data,
-    const device_ptr<T[]> &beta_data, device_ptr<T[]> &output_data,
-    device_ptr<T[]> &normalized_data, size_t batch_size, size_t channels, size_t spatial_size,
-    bool affine, const std::string &flow_id) {
-  if (input_data.getDeviceType() != mean_data.getDeviceType() ||
-      mean_data.getDeviceType() != std_data.getDeviceType() ||
-      std_data.getDeviceType() != output_data.getDeviceType() ||
-      output_data.getDeviceType() != normalized_data.getDeviceType()) {
-    throw std::runtime_error("All tensors must be on the same device for normalize and scale");
-  }
-
-  if (affine && (gamma_data.getDeviceType() != input_data.getDeviceType() ||
-                 beta_data.getDeviceType() != input_data.getDeviceType())) {
-    throw std::runtime_error("Gamma and beta tensors must be on the same device as input");
-  }
-
-  if (input_data.getDeviceType() == DeviceType::CPU) {
-    return create_cpu_task(flow_id, cpu::batchnorm::normalize_and_scale<T>, input_data.get(),
-                           mean_data.get(), std_data.get(), affine ? gamma_data.get() : nullptr,
-                           affine ? beta_data.get() : nullptr, output_data.get(),
-                           normalized_data.get(), batch_size, channels, spatial_size, affine);
-  }
-#ifdef USE_CUDA
-  else if (input_data.getDeviceType() == DeviceType::GPU) {
-    return create_gpu_task(flow_id, cuda::batchnorm::normalize_and_scale<T>, input_data.get(),
-                           mean_data.get(), std_data.get(), affine ? gamma_data.get() : nullptr,
-                           affine ? beta_data.get() : nullptr, output_data.get(),
-                           normalized_data.get(), batch_size, channels, spatial_size, affine);
-  }
-#endif
-  else {
-    throw std::runtime_error("Unsupported device type for normalize_and_scale");
-  }
-}
-
-template <typename T>
-std::unique_ptr<Task>
-BatchNormLayer<T>::compute_batch_std_wrapper(const device_ptr<T[]> &batch_var_data,
-                                             device_ptr<T[]> &batch_std_data, size_t channels,
-                                             T epsilon, const std::string &flow_id) {
-  if (batch_var_data.getDeviceType() != batch_std_data.getDeviceType()) {
-    throw std::runtime_error("Batch variance and std tensors must be on the same device");
-  }
-
-  if (batch_var_data.getDeviceType() == DeviceType::CPU) {
-    return create_cpu_task(flow_id, cpu::batchnorm::compute_batch_std<T>, batch_var_data.get(),
-                           batch_std_data.get(), channels, epsilon);
-  }
-#ifdef USE_CUDA
-  else if (batch_var_data.getDeviceType() == DeviceType::GPU) {
-    return create_gpu_task(flow_id, cuda::batchnorm::compute_batch_std<T>, batch_var_data.get(),
-                           batch_std_data.get(), channels, epsilon);
-  }
-#endif
-  else {
-    throw std::runtime_error("Unsupported device type for compute_batch_std_wrapper");
-  }
-  return nullptr;
-}
-
-template <typename T>
-std::unique_ptr<Task> BatchNormLayer<T>::update_running_stats_wrapper(
-    device_ptr<T[]> &running_mean_data, device_ptr<T[]> &running_var_data,
-    const device_ptr<T[]> &batch_mean_data, const device_ptr<T[]> &batch_var_data, size_t channels,
-    T momentum, const std::string &flow_id) {
-  if (running_mean_data.getDeviceType() != running_var_data.getDeviceType() ||
-      running_mean_data.getDeviceType() != batch_mean_data.getDeviceType() ||
-      batch_mean_data.getDeviceType() != batch_var_data.getDeviceType()) {
-    throw std::runtime_error("All tensors must be on the same device for update_running_stats");
-  }
-
-  if (running_mean_data.getDeviceType() == DeviceType::CPU) {
-    return create_cpu_task(flow_id, cpu::batchnorm::update_running_stats<T>,
-                           running_mean_data.get(), running_var_data.get(), batch_mean_data.get(),
-                           batch_var_data.get(), channels, momentum);
-  }
-#ifdef USE_CUDA
-  else if (running_mean_data.getDeviceType() == DeviceType::GPU) {
-    return create_gpu_task(flow_id, cuda::batchnorm::update_running_stats<T>,
-                           running_mean_data.get(), running_var_data.get(), batch_mean_data.get(),
-                           batch_var_data.get(), channels, momentum);
-  }
-#endif
-  else {
-    throw std::runtime_error("Unsupported device type for update_running_stats_wrapper");
-  }
-  return nullptr;
-}
-
-template <typename T>
-std::unique_ptr<Task> BatchNormLayer<T>::compute_inference_output_wrapper(
-    const device_ptr<T[]> &input_data, const device_ptr<T[]> &running_mean_data,
-    const device_ptr<T[]> &running_var_data, const device_ptr<T[]> &gamma_data,
-    const device_ptr<T[]> &beta_data, device_ptr<T[]> &output_data, size_t batch_size,
-    size_t channels, size_t spatial_size, T epsilon, bool affine, const std::string &flow_id) {
-  if (input_data.getDeviceType() != output_data.getDeviceType() ||
-      input_data.getDeviceType() != running_mean_data.getDeviceType() ||
-      running_mean_data.getDeviceType() != running_var_data.getDeviceType()) {
-    throw std::runtime_error("All tensors must be on the same device for inference output");
-  }
-
-  if (affine && (input_data.getDeviceType() != gamma_data.getDeviceType() ||
-                 gamma_data.getDeviceType() != beta_data.getDeviceType())) {
-    throw std::runtime_error("Gamma and beta must be on the same device as input");
-  }
-
-  if (input_data.getDeviceType() == DeviceType::CPU) {
-    return create_cpu_task(flow_id, cpu::batchnorm::compute_inference_output<T>, input_data.get(),
-                           running_mean_data.get(), running_var_data.get(),
-                           affine ? gamma_data.get() : nullptr, affine ? beta_data.get() : nullptr,
-                           output_data.get(), batch_size, channels, spatial_size, epsilon, affine);
-  }
-#ifdef USE_CUDA
-  else if (input_data.getDeviceType() == DeviceType::GPU) {
-    return create_gpu_task(flow_id, cuda::batchnorm::compute_inference_output<T>, input_data.get(),
-                           running_mean_data.get(), running_var_data.get(),
-                           affine ? gamma_data.get() : nullptr, affine ? beta_data.get() : nullptr,
-                           output_data.get(), batch_size, channels, spatial_size, epsilon, affine);
-  }
-#endif
-  else {
-    throw std::runtime_error("Unsupported device type for compute_inference_output_wrapper");
-  }
-  return nullptr;
 }
 
 template <typename T> std::string BatchNormLayer<T>::type() const { return "batchnorm"; }

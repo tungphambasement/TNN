@@ -452,6 +452,22 @@ public:
     ops::fill_random_normal(data_, data_size_, mean, stddev, seed)->sync();
   }
 
+  void resize(const std::vector<size_t> &new_shape) {
+    assert(new_shape.size() == dims_ && "New shape size must match tensor dims size");
+    if (new_shape == std::vector<size_t>(shape_, shape_ + dims_)) {
+      return;
+    }
+    size_t new_size =
+        std::accumulate(new_shape.begin(), new_shape.end(), size_t(1), std::multiplies<size_t>());
+    if (new_size != data_size_) {
+      data_.reset();
+      allocate_data(new_size);
+      data_size_ = new_size;
+    }
+    std::copy(new_shape.begin(), new_shape.end(), shape_);
+    layout_trait_.compute_strides();
+  }
+
   Tensor<T, L> reshape(const std::vector<size_t> &new_shape) const {
     size_t new_size =
         std::accumulate(new_shape.begin(), new_shape.end(), size_t(1), std::multiplies<size_t>());
@@ -489,7 +505,15 @@ public:
     return sum_sq_diff / static_cast<T>(data_size_);
   }
 
-  void print_data() const { throw new std::runtime_error("print_data not implemented yet"); }
+  void print_data() const {
+    Tensor<T, L> cpu_tensor = to_cpu();
+    size_t total_elements = cpu_tensor.size();
+    std::cout << "Tensor data (shape " << cpu_tensor.shape_str() << "):\n";
+    for (size_t i = 0; i < total_elements; ++i) {
+      std::cout << cpu_tensor.data_.get()[i] << " ";
+    }
+    std::cout << std::endl;
+  }
 
   void save(std::ofstream &out) const {
     if (!out.is_open()) {

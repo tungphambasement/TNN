@@ -267,8 +267,8 @@ TEST_F(LayerIntegrationTest, DenseLayerForwardBasic) {
   const size_t output_features = 64;
 
   // Create layers on CPU and GPU
-  DenseLayer<float> cpu_layer(input_features, output_features, nullptr, true, "cpu_dense");
-  DenseLayer<float> gpu_layer(input_features, output_features, nullptr, true, "gpu_dense");
+  DenseLayer<float> cpu_layer(input_features, output_features, true, "cpu_dense");
+  DenseLayer<float> gpu_layer(input_features, output_features, true, "gpu_dense");
 
   cpu_layer.set_device(cpu_device_);
   gpu_layer.set_device(gpu_device_);
@@ -299,8 +299,8 @@ TEST_F(LayerIntegrationTest, DenseLayerBackwardBasic) {
   const size_t output_features = 64;
 
   // Create layers
-  DenseLayer<float> cpu_layer(input_features, output_features, nullptr, true, "cpu_dense");
-  DenseLayer<float> gpu_layer(input_features, output_features, nullptr, true, "gpu_dense");
+  DenseLayer<float> cpu_layer(input_features, output_features, true, "cpu_dense");
+  DenseLayer<float> gpu_layer(input_features, output_features, true, "gpu_dense");
 
   cpu_layer.set_device(cpu_device_);
   gpu_layer.set_device(gpu_device_);
@@ -345,8 +345,8 @@ TEST_F(LayerIntegrationTest, DenseLayerLargeMatrix) {
   const size_t output_features = 256;
 
   // Create layers without bias
-  DenseLayer<float> cpu_layer(input_features, output_features, nullptr, false, "cpu_dense_large");
-  DenseLayer<float> gpu_layer(input_features, output_features, nullptr, false, "gpu_dense_large");
+  DenseLayer<float> cpu_layer(input_features, output_features, false, "cpu_dense_large");
+  DenseLayer<float> gpu_layer(input_features, output_features, false, "gpu_dense_large");
 
   cpu_layer.set_device(cpu_device_);
   gpu_layer.set_device(gpu_device_);
@@ -612,7 +612,7 @@ TEST_F(LayerIntegrationTest, Conv2DDensePipeline) {
 
   // CPU pipeline
   Conv2DLayer<float> cpu_conv(in_channels, out_channels, 3, 3, 1, 1, 1, 1, false, "cpu_conv");
-  DenseLayer<float> cpu_dense(flattened_size, dense_output, nullptr, true, "cpu_dense");
+  DenseLayer<float> cpu_dense(flattened_size, dense_output, true, "cpu_dense");
 
   cpu_conv.set_device(cpu_device_);
   cpu_dense.set_device(cpu_device_);
@@ -621,7 +621,7 @@ TEST_F(LayerIntegrationTest, Conv2DDensePipeline) {
 
   // GPU pipeline
   Conv2DLayer<float> gpu_conv(in_channels, out_channels, 3, 3, 1, 1, 1, 1, false, "gpu_conv");
-  DenseLayer<float> gpu_dense(flattened_size, dense_output, nullptr, true, "gpu_dense");
+  DenseLayer<float> gpu_dense(flattened_size, dense_output, true, "gpu_dense");
 
   gpu_conv.set_device(gpu_device_);
   gpu_dense.set_device(gpu_device_);

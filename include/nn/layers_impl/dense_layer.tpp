@@ -19,11 +19,10 @@
 namespace tnn {
 
 template <typename T>
-DenseLayer<T>::DenseLayer(size_t input_features, size_t output_features,
-                          std::unique_ptr<ActivationFunction<T>> activation, bool use_bias,
+DenseLayer<T>::DenseLayer(size_t input_features, size_t output_features, bool use_bias,
                           const std::string &name)
     : ParameterizedLayer<T>(name), input_features_(input_features),
-      output_features_(output_features), use_bias_(use_bias), activation_(std::move(activation)) {}
+      output_features_(output_features), use_bias_(use_bias) {}
 
 template <typename T> void DenseLayer<T>::initialize_params() {
   weights_ = Tensor<T>({output_features_, input_features_, 1, 1}, this->device_);
@@ -43,8 +42,7 @@ template <typename T> void DenseLayer<T>::initialize_params() {
 }
 
 template <typename T>
-Tensor<T> DenseLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_id) {
-  auto forward_internal_start = std::chrono::high_resolution_clock::now();
+const Tensor<T> &DenseLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_id) {
   if (!this->initialized_) {
     throw std::runtime_error("Layer parameters not initialized. Call initialize() before forward.");
   }
@@ -58,91 +56,34 @@ Tensor<T> DenseLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_id) 
     throw std::invalid_argument("Input feature size mismatch in DenseLayer");
   }
 
-  auto to_device_start = std::chrono::high_resolution_clock::now();
   const Tensor<T> &current =
       input.device() == this->device_ ? input : input.to_device(this->device_);
-  auto to_device_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> to_device_duration = to_device_end - to_device_start;
-  this->perf_timers_["to_device"] += to_device_duration.count();
 
-  auto input_clone_start = std::chrono::high_resolution_clock::now();
   micro_batch_inputs_[micro_batch_id] = current.clone();
-  auto input_clone_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> input_clone_duration =
-      input_clone_end - input_clone_start;
-  this->perf_timers_["input_clone"] += input_clone_duration.count();
 
-  auto output_init_start = std::chrono::high_resolution_clock::now();
-  Tensor<T> output({batch_size, output_features_, size_t(1), size_t(1)}, this->device_);
-  auto output_init_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> output_init_duration =
-      output_init_end - output_init_start;
-  this->perf_timers_["output_init"] += output_init_duration.count();
+  Tensor<T> &output =
+      this->get_output_buffer(micro_batch_id, {batch_size, output_features_, size_t(1), size_t(1)});
 
-  auto forward_start = std::chrono::high_resolution_clock::now();
   forward_task_ = compute_dense_forward(current.data_ptr(), weights_.data_ptr(), output.data_ptr(),
                                         batch_size, input_features_, output_features_, "default");
-  auto forward_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> forward_duration = forward_end - forward_start;
-  this->perf_timers_["forward_compute"] += forward_duration.count();
 
   if (use_bias_) {
-    auto add_bias_start = std::chrono::high_resolution_clock::now();
     add_bias_task_ = add_bias_vector(output.data_ptr(), bias_.data_ptr(), batch_size,
                                      output_features_, "default");
-    auto add_bias_end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> add_bias_duration = add_bias_end - add_bias_start;
-    this->perf_timers_["add_bias"] += add_bias_duration.count();
   }
 
-  auto output_clone_start = std::chrono::high_resolution_clock::now();
-  micro_batch_pre_activations_[micro_batch_id] = output.clone();
-  auto output_clone_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> output_clone_duration =
-      output_clone_end - output_clone_start;
-  this->perf_timers_["output_clone"] += output_clone_duration.count();
-
-  if (activation_) {
-    auto activation_start = std::chrono::high_resolution_clock::now();
-    activation_->apply(output);
-    auto activation_end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> activation_duration =
-        activation_end - activation_start;
-    this->perf_timers_["activation"] += activation_duration.count();
-  }
-
-  auto sync_start = std::chrono::high_resolution_clock::now();
-  task_sync_all({forward_task_.get(), add_bias_task_.get(), activation_task_.get()});
-  auto sync_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> sync_duration = sync_end - sync_start;
-  this->perf_timers_["sync"] += sync_duration.count();
-
-  auto forward_internal_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> forward_internal_duration =
-      forward_internal_end - forward_internal_start;
-  this->perf_timers_["forward_internal"] += forward_internal_duration.count();
+  task_sync_all({forward_task_.get(), add_bias_task_.get()});
 
   return output;
 }
 
-template <typename T> void DenseLayer<T>::forward_inplace(Tensor<T> &input, size_t micro_batch_id) {
-  auto total_forward_start = std::chrono::high_resolution_clock::now();
-  Tensor<T> output = forward(input, micro_batch_id);
-  auto total_forward_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> total_forward_duration =
-      total_forward_end - total_forward_start;
-  this->perf_timers_["total_forward"] += total_forward_duration.count();
-  input = std::move(output);
-}
-
 template <typename T>
-Tensor<T> DenseLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch_id) {
+const Tensor<T> &DenseLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch_id) {
   if (!this->initialized_) {
     throw std::runtime_error(
         "Layer parameters not initialized. Call initialize() before backward.");
   }
   auto it_input = micro_batch_inputs_.find(micro_batch_id);
-  auto it_pre_act = micro_batch_pre_activations_.find(micro_batch_id);
 
   if (it_input == micro_batch_inputs_.end()) {
     for (const auto &pair : micro_batch_inputs_) {
@@ -151,25 +92,14 @@ Tensor<T> DenseLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch_
     throw std::runtime_error("No cached input found for micro-batch ID: " +
                              std::to_string(micro_batch_id));
   }
-  if (it_pre_act == micro_batch_pre_activations_.end()) {
-    throw std::runtime_error("No cached pre-activation output found for micro-batch ID: " +
-                             std::to_string(micro_batch_id));
-  }
-
-  if (gradient.shape() != it_pre_act->second.shape()) {
-    throw std::invalid_argument("Gradient output shape does not match cached pre-activation shape");
-  }
 
   const Tensor<T> &last_input = it_input->second;
   size_t batch_size = last_input.batch_size();
-  Tensor<T> grad_input(last_input.shape(), this->device_);
+
+  Tensor<T> &grad_input = this->get_gradient_buffer(micro_batch_id, last_input.shape());
 
   Tensor<T> current_grad =
       gradient.device() == this->device_ ? gradient.clone() : gradient.to_device(this->device_);
-
-  if (activation_) {
-    activation_->compute_gradient_inplace(it_pre_act->second, current_grad);
-  }
 
   weight_grad_task_ = compute_weight_gradients(last_input.data_ptr(), current_grad.data_ptr(),
                                                weight_gradients_.data_ptr(), batch_size,
@@ -185,6 +115,7 @@ Tensor<T> DenseLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch_
                               batch_size, input_features_, output_features_, "default");
 
   task_sync_all({weight_grad_task_.get(), input_grad_task_.get(), bias_grad_task_.get()});
+
   return grad_input;
 }
 
@@ -330,15 +261,12 @@ template <typename T> LayerConfig DenseLayer<T>::get_config() const {
   config.parameters["input_features"] = input_features_;
   config.parameters["output_features"] = output_features_;
   config.parameters["use_bias"] = use_bias_;
-  config.parameters["activation"] = activation_ ? activation_->name() : std::string("none");
   config.parameters["optimized"] = std::string("native");
   return config;
 }
 
 template <typename T> std::unique_ptr<Layer<T>> DenseLayer<T>::clone() const {
-  auto activation_clone = activation_ ? activation_->clone() : nullptr;
-  return std::make_unique<DenseLayer<T>>(input_features_, output_features_,
-                                         std::move(activation_clone), use_bias_, this->name_);
+  return std::make_unique<DenseLayer<T>>(input_features_, output_features_, use_bias_, this->name_);
 }
 
 template <typename T>
@@ -376,17 +304,8 @@ std::unique_ptr<Layer<T>> DenseLayer<T>::create_from_config(const LayerConfig &c
   size_t input_features = config.get<size_t>("input_features");
   size_t output_features = config.get<size_t>("output_features");
   bool use_bias = config.get<bool>("use_bias");
-  std::string activation_name = config.get<std::string>("activation");
 
-  std::unique_ptr<ActivationFunction<T>> activation;
-  if (activation_name != "none") {
-
-    ActivationFactory<T>::register_defaults();
-    activation = ActivationFactory<T>::create(activation_name);
-  }
-
-  return std::make_unique<DenseLayer<T>>(input_features, output_features, std::move(activation),
-                                         use_bias, config.name);
+  return std::make_unique<DenseLayer<T>>(input_features, output_features, use_bias, config.name);
 }
 
 template <typename T>
@@ -397,16 +316,12 @@ uint64_t DenseLayer<T>::forward_flops(const std::vector<size_t> &input_shape) co
 
   uint64_t bias_flops = use_bias_ ? (batch_size * output_features_) : 0;
 
-  uint64_t activation_flops = activation_ ? (batch_size * output_features_) : 0;
-
-  return gemm_flops + bias_flops + activation_flops;
+  return gemm_flops + bias_flops;
 }
 
 template <typename T>
 uint64_t DenseLayer<T>::backward_flops(const std::vector<size_t> &input_shape) const {
   size_t batch_size = input_shape[0];
-
-  uint64_t activation_grad_flops = activation_ ? (batch_size * output_features_) : 0;
 
   uint64_t weight_grad_flops = 2ULL * input_features_ * batch_size * output_features_;
 
@@ -414,7 +329,7 @@ uint64_t DenseLayer<T>::backward_flops(const std::vector<size_t> &input_shape) c
 
   uint64_t input_grad_flops = 2ULL * batch_size * output_features_ * input_features_;
 
-  return activation_grad_flops + weight_grad_flops + bias_grad_flops + input_grad_flops;
+  return weight_grad_flops + bias_grad_flops + input_grad_flops;
 }
 
 template <typename T>

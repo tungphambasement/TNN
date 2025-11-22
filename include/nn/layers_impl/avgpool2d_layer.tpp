@@ -5,6 +5,7 @@
  * project root for the full license text.
  */
 #pragma once
+#include "device/device_ptr.hpp"
 #include "device/task.hpp"
 #include "nn/layers_impl/avgpool2d_layer.hpp"
 #include "tensor/tensor_ops.hpp"
@@ -31,47 +32,43 @@ AvgPool2DLayer<T>::AvgPool2DLayer(size_t pool_h, size_t pool_w, size_t stride_h,
 }
 
 template <typename T>
-Tensor<T> AvgPool2DLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_id) {
+const Tensor<T> &AvgPool2DLayer<T>::forward(const Tensor<T> &input, size_t micro_batch_id) {
 
   const Tensor<T> &current =
       input.device() == this->device_ ? input : input.to_device(this->device_);
 
   const size_t batch_size = current.batch_size();
   const size_t channels = current.channels();
+  const size_t input_h = current.height();
+  const size_t input_w = current.width();
 
-  const Tensor<T> *padded_input = nullptr;
-  Tensor<T> temp;
-  if (pad_h_ > 0 || pad_w_ > 0) {
-    temp = Tensor<T, NCHW>(
-        {batch_size, channels, current.height() + 2 * pad_h_, current.width() + 2 * pad_w_},
-        this->device_);
-    pad(current, temp, pad_h_, pad_w_, T(0));
-    padded_input = &temp;
-  } else {
-    padded_input = &current;
-  }
-
-  const size_t padded_h = padded_input->height();
-  const size_t padded_w = padded_input->width();
-
+  const size_t padded_h = input_h + 2 * pad_h_;
+  const size_t padded_w = input_w + 2 * pad_w_;
   const size_t output_h = (padded_h - pool_h_) / stride_h_ + 1;
   const size_t output_w = (padded_w - pool_w_) / stride_w_ + 1;
 
-  Tensor<T> output({batch_size, channels, output_h, output_w}, this->device_);
+  auto it_padded = micro_batch_padded_inputs_.find(micro_batch_id);
+  if (it_padded == micro_batch_padded_inputs_.end()) {
+    micro_batch_padded_inputs_[micro_batch_id] =
+        Tensor<T>({batch_size, channels, padded_h, padded_w}, this->device_);
+  } else {
+    micro_batch_padded_inputs_[micro_batch_id].resize({batch_size, channels, padded_h, padded_w});
+  }
 
-  compute_avg_pool_forward(padded_input->data_ptr(), output.data_ptr(), batch_size, channels,
-                           padded_h, padded_w, output_h, output_w, "default");
+  Tensor<T> &output =
+      this->get_output_buffer(micro_batch_id, {batch_size, channels, output_h, output_w});
 
-  micro_batch_inputs_[micro_batch_id] = padded_input->clone();
+  compute_avg_pool_forward(micro_batch_padded_inputs_[micro_batch_id].data_ptr(), output.data_ptr(),
+                           batch_size, channels, padded_h, padded_w, output_h, output_w, "default");
 
   return output;
 }
 
 template <typename T>
-Tensor<T> AvgPool2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch_id) {
-  auto it_input = micro_batch_inputs_.find(micro_batch_id);
+const Tensor<T> &AvgPool2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch_id) {
+  auto it_input = micro_batch_padded_inputs_.find(micro_batch_id);
 
-  if (it_input == micro_batch_inputs_.end()) {
+  if (it_input == micro_batch_padded_inputs_.end()) {
     throw std::runtime_error("No cached input found for micro-batch ID in AvgPool2DLayer: " +
                              std::to_string(micro_batch_id));
   }
@@ -88,19 +85,26 @@ Tensor<T> AvgPool2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_ba
   const size_t output_h = gradient.height();
   const size_t output_w = gradient.width();
 
-  Tensor<T> grad_padded_input(cached_padded_input.shape(), this->device_);
+  auto it_grad_padded = micro_batch_grad_padded_inputs_.find(micro_batch_id);
+  if (it_grad_padded == micro_batch_grad_padded_inputs_.end()) {
+    micro_batch_grad_padded_inputs_[micro_batch_id] =
+        Tensor<T>({batch_size, channels, padded_h, padded_w}, this->device_);
+  } else {
+    micro_batch_grad_padded_inputs_[micro_batch_id].resize(
+        {batch_size, channels, padded_h, padded_w});
+  }
 
-  compute_avg_pool_backward(current_gradient.data_ptr(), grad_padded_input.data_ptr(), batch_size,
+  compute_avg_pool_backward(current_gradient.data_ptr(),
+                            micro_batch_grad_padded_inputs_[micro_batch_id].data_ptr(), batch_size,
                             channels, padded_h, padded_w, output_h, output_w, "default");
 
   if (pad_h_ > 0 || pad_w_ > 0) {
-    Tensor<T, NCHW> grad_input({batch_size, channels, cached_padded_input.height() - 2 * pad_h_,
-                                cached_padded_input.width() - 2 * pad_w_},
-                               this->device_);
-    unpad(grad_padded_input, grad_input, pad_h_, pad_w_);
+    Tensor<T> &grad_input = this->get_gradient_buffer(
+        micro_batch_id, {batch_size, channels, padded_h - 2 * pad_h_, padded_w - 2 * pad_w_});
+    unpad(micro_batch_grad_padded_inputs_[micro_batch_id], grad_input, pad_h_, pad_w_);
     return grad_input;
   } else {
-    return grad_padded_input;
+    return micro_batch_grad_padded_inputs_[micro_batch_id];
   }
 }
 

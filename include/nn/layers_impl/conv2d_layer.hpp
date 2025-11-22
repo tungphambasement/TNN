@@ -92,10 +92,8 @@ public:
               size_t stride_h = 1, size_t stride_w = 1, size_t pad_h = 0, size_t pad_w = 0,
               bool use_bias = true, const std::string &name = "conv2d");
 
-  Tensor<T> forward(const Tensor<T> &input, size_t micro_batch_id = 0) override;
-  Tensor<T> backward(const Tensor<T> &gradient, size_t micro_batch_id = 0) override;
-  void forward_inplace(Tensor<T> &input, size_t micro_batch_id = 0) override;
-  void backward_inplace(Tensor<T> &gradient, size_t micro_batch_id = 0) override;
+  const Tensor<T> &forward(const Tensor<T> &input, size_t micro_batch_id = 0) override;
+  const Tensor<T> &backward(const Tensor<T> &gradient, size_t micro_batch_id = 0) override;
 
   uint64_t forward_complexity(const std::vector<size_t> &input_shape) const override;
   uint64_t backward_complexity(const std::vector<size_t> &input_shape) const override;

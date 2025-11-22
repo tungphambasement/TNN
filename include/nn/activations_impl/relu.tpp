@@ -6,7 +6,6 @@
  */
 #pragma once
 #include "nn/activations_impl/relu.hpp"
-#include "ops/ops.hpp"
 #include "tensor/tensor.hpp"
 #include <cassert>
 

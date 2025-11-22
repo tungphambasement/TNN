@@ -31,6 +31,7 @@ set(TEST_FILES
     cuda_loss_funcs_test.cpp
     cuda_batchnorm_ops_test.cpp
     layer_integration_test.cpp
+    layer_buffer_reuse_test.cpp
 )
 
 foreach(test_file IN LISTS TEST_FILES)
