@@ -10,10 +10,10 @@ void compute_mean_variance_fused(const T *input_data, T *mean_data, T *var_data,
                                  size_t channels, size_t spatial_size);
 
 template <typename T>
-void normalize_and_scale_optimized(const T *input_data, const T *mean_data, const T *std_data,
-                                   const T *gamma_data, const T *beta_data, T *output_data,
-                                   T *normalized_data, size_t batch_size, size_t channels,
-                                   size_t spatial_size, bool affine);
+void normalize_and_scale(const T *input_data, const T *mean_data, const T *std_data,
+                         const T *gamma_data, const T *beta_data, T *output_data,
+                         T *normalized_data, size_t batch_size, size_t channels,
+                         size_t spatial_size, bool affine);
 
 template <typename T>
 void compute_batch_std(const T *batch_var_data, T *batch_std_data, size_t channels, T epsilon);

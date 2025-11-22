@@ -56,10 +56,10 @@ void compute_channel_variance(const T *input_data, const T *mean_data, T *var_da
 }
 
 template <typename T>
-void normalize_and_scale_optimized(const T *input_data, const T *mean_data, const T *std_data,
-                                   const T *gamma_data, const T *beta_data, T *output_data,
-                                   T *normalized_data, size_t batch_size, size_t channels,
-                                   size_t spatial_size, bool affine) {
+void normalize_and_scale(const T *input_data, const T *mean_data, const T *std_data,
+                         const T *gamma_data, const T *beta_data, T *output_data,
+                         T *normalized_data, size_t batch_size, size_t channels,
+                         size_t spatial_size, bool affine) {
   const size_t channel_stride = channels * spatial_size;
 
   parallel_for_2d(batch_size, channels, [&](size_t n, size_t c) {
@@ -168,16 +168,16 @@ template void compute_mean_variance_fused<double>(const double *input_data, doub
                                                   double *var_data, size_t batch_size,
                                                   size_t channels, size_t spatial_size);
 
-template void normalize_and_scale_optimized<float>(const float *input_data, const float *mean_data,
-                                                   const float *std_data, const float *gamma_data,
-                                                   const float *beta_data, float *output_data,
-                                                   float *normalized_data, size_t batch_size,
-                                                   size_t channels, size_t spatial_size,
-                                                   bool affine);
-template void normalize_and_scale_optimized<double>(
-    const double *input_data, const double *mean_data, const double *std_data,
-    const double *gamma_data, const double *beta_data, double *output_data, double *normalized_data,
-    size_t batch_size, size_t channels, size_t spatial_size, bool affine);
+template void normalize_and_scale<float>(const float *input_data, const float *mean_data,
+                                         const float *std_data, const float *gamma_data,
+                                         const float *beta_data, float *output_data,
+                                         float *normalized_data, size_t batch_size, size_t channels,
+                                         size_t spatial_size, bool affine);
+template void normalize_and_scale<double>(const double *input_data, const double *mean_data,
+                                          const double *std_data, const double *gamma_data,
+                                          const double *beta_data, double *output_data,
+                                          double *normalized_data, size_t batch_size,
+                                          size_t channels, size_t spatial_size, bool affine);
 
 template void compute_affine_gradients_optimized<float>(const float *gradient_data,
                                                         const float *normalized_data,

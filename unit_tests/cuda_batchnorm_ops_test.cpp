@@ -140,7 +140,7 @@ TEST_F(CUDABatchNormOpsTest, BatchStdBasic) {
   compareArrays(cpu_std, gpu_std_cpu);
 }
 
-// ==================== normalize_and_scale_optimized Tests ====================
+// ==================== normalize_and_scale Tests ====================
 
 TEST_F(CUDABatchNormOpsTest, NormalizeAndScaleAffine) {
   const size_t batch_size = 2;
@@ -172,7 +172,7 @@ TEST_F(CUDABatchNormOpsTest, NormalizeAndScaleAffine) {
   // CPU version
   std::vector<float> cpu_output(total_size);
   std::vector<float> cpu_normalized(total_size);
-  cpu::batchnorm::normalize_and_scale_optimized(
+  cpu::batchnorm::normalize_and_scale(
       input_data.data(), mean_data.data(), std_data.data(), gamma_data.data(), beta_data.data(),
       cpu_output.data(), cpu_normalized.data(), batch_size, channels, spatial_size, affine);
 
@@ -192,7 +192,7 @@ TEST_F(CUDABatchNormOpsTest, NormalizeAndScaleAffine) {
   gpu_device_->copyToDevice(gpu_beta.get(), beta_data.data(), channels * sizeof(float));
 
   auto gpu_task = create_gpu_task(
-      "test_norm_scale_gpu", cuda::batchnorm::normalize_and_scale_optimized<float>, gpu_input.get(),
+      "test_norm_scale_gpu", cuda::batchnorm::normalize_and_scale<float>, gpu_input.get(),
       gpu_mean.get(), gpu_std.get(), gpu_gamma.get(), gpu_beta.get(), gpu_output.get(),
       gpu_normalized.get(), batch_size, channels, spatial_size, affine);
   ASSERT_FALSE(gpu_task->sync());
@@ -229,7 +229,7 @@ TEST_F(CUDABatchNormOpsTest, NormalizeAndScaleNoAffine) {
   // CPU version
   std::vector<float> cpu_output(total_size);
   std::vector<float> cpu_normalized(total_size);
-  cpu::batchnorm::normalize_and_scale_optimized(
+  cpu::batchnorm::normalize_and_scale(
       input_data.data(), mean_data.data(), std_data.data(), static_cast<const float *>(nullptr),
       static_cast<const float *>(nullptr), cpu_output.data(), cpu_normalized.data(), batch_size,
       channels, spatial_size, affine);
@@ -246,7 +246,7 @@ TEST_F(CUDABatchNormOpsTest, NormalizeAndScaleNoAffine) {
   gpu_device_->copyToDevice(gpu_std.get(), std_data.data(), channels * sizeof(float));
 
   auto gpu_task = create_gpu_task(
-      "test_norm_scale_gpu", cuda::batchnorm::normalize_and_scale_optimized<float>, gpu_input.get(),
+      "test_norm_scale_gpu", cuda::batchnorm::normalize_and_scale<float>, gpu_input.get(),
       gpu_mean.get(), gpu_std.get(), static_cast<const float *>(nullptr),
       static_cast<const float *>(nullptr), gpu_output.get(), gpu_normalized.get(), batch_size,
       channels, spatial_size, affine);

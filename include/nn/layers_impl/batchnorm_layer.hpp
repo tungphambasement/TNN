@@ -39,12 +39,11 @@ private:
   std::unordered_map<size_t, Tensor<T>> micro_batch_std_;
 
   std::unique_ptr<Task>
-  normalize_and_scale_optimized(const device_ptr<T[]> &input_data, const device_ptr<T[]> &mean_data,
-                                const device_ptr<T[]> &std_data, const device_ptr<T[]> &gamma_data,
-                                const device_ptr<T[]> &beta_data, device_ptr<T[]> &output_data,
-                                device_ptr<T[]> &normalized_data, size_t batch_size,
-                                size_t channels, size_t spatial_size, bool affine,
-                                const std::string &flow_id);
+  normalize_and_scale(const device_ptr<T[]> &input_data, const device_ptr<T[]> &mean_data,
+                      const device_ptr<T[]> &std_data, const device_ptr<T[]> &gamma_data,
+                      const device_ptr<T[]> &beta_data, device_ptr<T[]> &output_data,
+                      device_ptr<T[]> &normalized_data, size_t batch_size, size_t channels,
+                      size_t spatial_size, bool affine, const std::string &flow_id);
 
   std::unique_ptr<Task> compute_batch_std(const Tensor<T> &batch_var, Tensor<T> &batch_std,
                                           size_t channels,

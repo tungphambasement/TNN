@@ -13,22 +13,42 @@ namespace cuda {
 namespace batchnorm {
 
 #define THREADS_PER_BLOCK 256
+#define WARP_SIZE 32
+
+// Warp-level reduction primitives for better performance
+template <typename T> __inline__ __device__ T warpReduceSum(T val) {
+  for (int offset = WARP_SIZE / 2; offset > 0; offset /= 2) {
+    val += __shfl_down_sync(0xffffffff, val, offset);
+  }
+  return val;
+}
+
+template <typename T> __inline__ __device__ T blockReduceSum(T val) {
+  static __shared__ T shared[WARP_SIZE];
+  int lane = threadIdx.x % WARP_SIZE;
+  int wid = threadIdx.x / WARP_SIZE;
+
+  val = warpReduceSum(val);
+
+  if (lane == 0)
+    shared[wid] = val;
+  __syncthreads();
+
+  val = (threadIdx.x < blockDim.x / WARP_SIZE) ? shared[lane] : T(0);
+  if (wid == 0)
+    val = warpReduceSum(val);
+
+  return val;
+}
 
 template <typename T>
 __global__ void compute_channel_mean_kernel(const T *input_data, T *mean_data, size_t batch_size,
                                             size_t channels, size_t spatial_size) {
 
-  union SharedData {
-    T sdata[THREADS_PER_BLOCK];
-  };
-  __shared__ SharedData shared_union;
-  T *sdata = shared_union.sdata;
-
   const int c = blockIdx.x;
   if (c >= channels)
     return;
 
-  const size_t block_size = blockDim.x;
   const size_t total_elements_per_channel = batch_size * spatial_size;
   const T inv_total = T(1) / static_cast<T>(total_elements_per_channel);
   const size_t channel_stride = channels * spatial_size;
@@ -36,25 +56,17 @@ __global__ void compute_channel_mean_kernel(const T *input_data, T *mean_data, s
 
   T thread_sum = T(0);
 
-  for (size_t i = threadIdx.x; i < total_elements_per_channel; i += block_size) {
+  for (size_t i = threadIdx.x; i < total_elements_per_channel; i += blockDim.x) {
     const size_t n = i / spatial_size;
     const size_t i_local = i % spatial_size;
     const size_t global_idx = n * channel_stride + c_offset + i_local;
     thread_sum += input_data[global_idx];
   }
 
-  sdata[threadIdx.x] = thread_sum;
-  __syncthreads();
-
-  for (unsigned int s = block_size / 2; s > 0; s /= 2) {
-    if (threadIdx.x < s) {
-      sdata[threadIdx.x] += sdata[threadIdx.x + s];
-    }
-    __syncthreads();
-  }
+  thread_sum = blockReduceSum(thread_sum);
 
   if (threadIdx.x == 0) {
-    mean_data[c] = sdata[0] * inv_total;
+    mean_data[c] = thread_sum * inv_total;
   }
 }
 
@@ -63,17 +75,10 @@ __global__ void compute_channel_variance_kernel(const T *input_data, const T *me
                                                 T *var_data, size_t batch_size, size_t channels,
                                                 size_t spatial_size) {
 
-  union SharedData {
-    T sdata[THREADS_PER_BLOCK];
-  };
-  __shared__ SharedData shared_union;
-  T *sdata = shared_union.sdata;
-
   const int c = blockIdx.x;
   if (c >= channels)
     return;
 
-  const size_t block_size = blockDim.x;
   const size_t total_elements_per_channel = batch_size * spatial_size;
   const T inv_total = T(1) / static_cast<T>(total_elements_per_channel);
   const T mean_val = mean_data[c];
@@ -82,7 +87,7 @@ __global__ void compute_channel_variance_kernel(const T *input_data, const T *me
 
   T thread_sum_sq = T(0);
 
-  for (size_t i = threadIdx.x; i < total_elements_per_channel; i += block_size) {
+  for (size_t i = threadIdx.x; i < total_elements_per_channel; i += blockDim.x) {
     const size_t n = i / spatial_size;
     const size_t i_local = i % spatial_size;
     const size_t global_idx = n * channel_stride + c_offset + i_local;
@@ -91,18 +96,10 @@ __global__ void compute_channel_variance_kernel(const T *input_data, const T *me
     thread_sum_sq += diff * diff;
   }
 
-  sdata[threadIdx.x] = thread_sum_sq;
-  __syncthreads();
-
-  for (unsigned int s = block_size / 2; s > 0; s /= 2) {
-    if (threadIdx.x < s) {
-      sdata[threadIdx.x] += sdata[threadIdx.x + s];
-    }
-    __syncthreads();
-  }
+  thread_sum_sq = blockReduceSum(thread_sum_sq);
 
   if (threadIdx.x == 0) {
-    var_data[c] = sdata[0] * inv_total;
+    var_data[c] = thread_sum_sq * inv_total;
   }
 }
 
@@ -111,28 +108,18 @@ __global__ void compute_affine_gradients_kernel(const T *gradient_data, const T 
                                                 T *gamma_grad, T *beta_grad, size_t batch_size,
                                                 size_t channels, size_t spatial_size) {
 
-  union SharedData {
-    T sdata_gamma_beta[2 * THREADS_PER_BLOCK];
-  };
-  __shared__ SharedData shared_union;
-  T *sdata_gamma_beta = shared_union.sdata_gamma_beta;
-
   int c = blockIdx.x;
   if (c >= channels)
     return;
 
-  const size_t block_size = blockDim.x;
   const size_t total_elements_per_channel = batch_size * spatial_size;
   const size_t channel_stride = channels * spatial_size;
   const size_t c_offset = c * spatial_size;
 
-  T *sdata_gamma = sdata_gamma_beta;
-  T *sdata_beta = sdata_gamma_beta + block_size;
-
   T thread_gamma_sum = T(0);
   T thread_beta_sum = T(0);
 
-  for (size_t i = threadIdx.x; i < total_elements_per_channel; i += block_size) {
+  for (size_t i = threadIdx.x; i < total_elements_per_channel; i += blockDim.x) {
     const size_t n = i / spatial_size;
     const size_t i_local = i % spatial_size;
     const size_t idx = n * channel_stride + c_offset + i_local;
@@ -141,30 +128,21 @@ __global__ void compute_affine_gradients_kernel(const T *gradient_data, const T 
     thread_beta_sum += gradient_data[idx];
   }
 
-  sdata_gamma[threadIdx.x] = thread_gamma_sum;
-  sdata_beta[threadIdx.x] = thread_beta_sum;
-  __syncthreads();
-
-  for (unsigned int s = block_size / 2; s > 0; s /= 2) {
-    if (threadIdx.x < s) {
-      sdata_gamma[threadIdx.x] += sdata_gamma[threadIdx.x + s];
-      sdata_beta[threadIdx.x] += sdata_beta[threadIdx.x + s];
-    }
-    __syncthreads();
-  }
+  thread_gamma_sum = blockReduceSum(thread_gamma_sum);
+  thread_beta_sum = blockReduceSum(thread_beta_sum);
 
   if (threadIdx.x == 0) {
-    atomicAdd(&gamma_grad[c], sdata_gamma[0]);
-    atomicAdd(&beta_grad[c], sdata_beta[0]);
+    atomicAdd(&gamma_grad[c], thread_gamma_sum);
+    atomicAdd(&beta_grad[c], thread_beta_sum);
   }
 }
 
 template <typename T>
-__global__ void normalize_and_scale_kernel(const T *input_data, const T *mean_data,
-                                           const T *std_data, const T *gamma_data,
-                                           const T *beta_data, T *output_data, T *normalized_data,
-                                           size_t batch_size, size_t channels, size_t spatial_size,
-                                           bool affine) {
+__global__ void normalize_and_scalekernel(const T *input_data, const T *mean_data,
+                                          const T *std_data, const T *gamma_data,
+                                          const T *beta_data, T *output_data, T *normalized_data,
+                                          size_t batch_size, size_t channels, size_t spatial_size,
+                                          bool affine) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   int total_elements = batch_size * channels * spatial_size;
 
@@ -199,88 +177,43 @@ __global__ void compute_batch_std_kernel(const T *batch_var_data, T *batch_std_d
   }
 }
 
-// Fused mean and variance computation using Welford's online algorithm
+// Fused mean and variance computation -  with warp primitives
 template <typename T>
 __global__ void compute_mean_variance_fused_kernel(const T *input_data, T *mean_data, T *var_data,
                                                    size_t batch_size, size_t channels,
                                                    size_t spatial_size) {
-  union SharedData {
-    T sdata_mean[THREADS_PER_BLOCK];
-    T sdata_var[THREADS_PER_BLOCK];
-  };
-  __shared__ T shared_mean[THREADS_PER_BLOCK];
-  __shared__ T shared_m2[THREADS_PER_BLOCK];
-
   const int c = blockIdx.x;
   if (c >= channels)
     return;
 
-  const size_t block_size = blockDim.x;
   const size_t total_elements_per_channel = batch_size * spatial_size;
   const size_t channel_stride = channels * spatial_size;
   const size_t c_offset = c * spatial_size;
 
-  // First pass: compute sum for mean
+  // Single pass: compute sum and sum of squares simultaneously
   T thread_sum = T(0);
-
-  for (size_t i = threadIdx.x; i < total_elements_per_channel; i += block_size) {
-    const size_t n = i / spatial_size;
-    const size_t i_local = i % spatial_size;
-    const size_t global_idx = n * channel_stride + c_offset + i_local;
-    thread_sum += input_data[global_idx];
-  }
-
-  shared_mean[threadIdx.x] = thread_sum;
-  __syncthreads();
-
-  // Reduce to get total sum
-  for (unsigned int s = block_size / 2; s > 0; s /= 2) {
-    if (threadIdx.x < s) {
-      shared_mean[threadIdx.x] += shared_mean[threadIdx.x + s];
-    }
-    __syncthreads();
-  }
-
-  // Compute mean
-  T mean_val;
-  if (threadIdx.x == 0) {
-    mean_val = shared_mean[0] / static_cast<T>(total_elements_per_channel);
-    mean_data[c] = mean_val;
-  }
-  __syncthreads();
-
-  // Broadcast mean to all threads
-  if (threadIdx.x == 0) {
-    shared_mean[0] = mean_val;
-  }
-  __syncthreads();
-  mean_val = shared_mean[0];
-
-  // Second pass: compute variance
   T thread_sum_sq = T(0);
 
-  for (size_t i = threadIdx.x; i < total_elements_per_channel; i += block_size) {
+  //  memory access - stride by block size
+  for (size_t i = threadIdx.x; i < total_elements_per_channel; i += blockDim.x) {
     const size_t n = i / spatial_size;
     const size_t i_local = i % spatial_size;
     const size_t global_idx = n * channel_stride + c_offset + i_local;
-
-    const T diff = input_data[global_idx] - mean_val;
-    thread_sum_sq += diff * diff;
+    const T val = input_data[global_idx];
+    thread_sum += val;
+    thread_sum_sq += val * val;
   }
 
-  shared_m2[threadIdx.x] = thread_sum_sq;
-  __syncthreads();
-
-  // Reduce to get total sum of squares
-  for (unsigned int s = block_size / 2; s > 0; s /= 2) {
-    if (threadIdx.x < s) {
-      shared_m2[threadIdx.x] += shared_m2[threadIdx.x + s];
-    }
-    __syncthreads();
-  }
+  // Use warp-level reduction instead of shared memory
+  thread_sum = blockReduceSum(thread_sum);
+  thread_sum_sq = blockReduceSum(thread_sum_sq);
 
   if (threadIdx.x == 0) {
-    var_data[c] = shared_m2[0] / static_cast<T>(total_elements_per_channel);
+    const T inv_n = T(1) / static_cast<T>(total_elements_per_channel);
+    const T mean_val = thread_sum * inv_n;
+    const T mean_sq = thread_sum_sq * inv_n;
+    mean_data[c] = mean_val;
+    var_data[c] = mean_sq - mean_val * mean_val;
   }
 }
 
@@ -361,28 +294,18 @@ __global__ void compute_backward_sums_kernel(const T *grad_normalized_data,
                                              T *sum_grad_norm_times_norm_data, size_t batch_size,
                                              size_t channels, size_t spatial_size) {
 
-  union SharedData {
-    T sdata_sums[2 * THREADS_PER_BLOCK];
-  };
-  __shared__ SharedData shared_union;
-  T *sdata_sums = shared_union.sdata_sums;
-
   const int c = blockIdx.x;
   if (c >= channels)
     return;
 
-  const size_t block_size = blockDim.x;
   const size_t total_elements_per_channel = batch_size * spatial_size;
   const size_t channel_stride = channels * spatial_size;
   const size_t c_offset = c * spatial_size;
 
-  T *sdata_grad_norm = sdata_sums;
-  T *sdata_grad_norm_x_norm = sdata_sums + block_size;
-
   T thread_sum_grad_norm = T(0);
   T thread_sum_grad_norm_x_norm = T(0);
 
-  for (size_t i = threadIdx.x; i < total_elements_per_channel; i += block_size) {
+  for (size_t i = threadIdx.x; i < total_elements_per_channel; i += blockDim.x) {
     const size_t n = i / spatial_size;
     const size_t i_local = i % spatial_size;
     const size_t global_idx = n * channel_stride + c_offset + i_local;
@@ -391,21 +314,12 @@ __global__ void compute_backward_sums_kernel(const T *grad_normalized_data,
     thread_sum_grad_norm_x_norm += grad_normalized_data[global_idx] * normalized_data[global_idx];
   }
 
-  sdata_grad_norm[threadIdx.x] = thread_sum_grad_norm;
-  sdata_grad_norm_x_norm[threadIdx.x] = thread_sum_grad_norm_x_norm;
-  __syncthreads();
-
-  for (unsigned int s = block_size / 2; s > 0; s /= 2) {
-    if (threadIdx.x < s) {
-      sdata_grad_norm[threadIdx.x] += sdata_grad_norm[threadIdx.x + s];
-      sdata_grad_norm_x_norm[threadIdx.x] += sdata_grad_norm_x_norm[threadIdx.x + s];
-    }
-    __syncthreads();
-  }
+  thread_sum_grad_norm = blockReduceSum(thread_sum_grad_norm);
+  thread_sum_grad_norm_x_norm = blockReduceSum(thread_sum_grad_norm_x_norm);
 
   if (threadIdx.x == 0) {
-    sum_grad_normalized_data[c] = sdata_grad_norm[0];
-    sum_grad_norm_times_norm_data[c] = sdata_grad_norm_x_norm[0];
+    sum_grad_normalized_data[c] = thread_sum_grad_norm;
+    sum_grad_norm_times_norm_data[c] = thread_sum_grad_norm_x_norm;
   }
 }
 
@@ -433,32 +347,20 @@ __global__ void compute_input_gradients_batchnorm_kernel(
                           sum_grad_norm - normalized_data[idx] * sum_grad_norm_x_norm);
 }
 
-// Fused backward kernel: combines affine gradients + backward sums computation
+// Fused backward kernel: combines affine gradients + backward sums computation -
 template <typename T>
 __global__ void compute_batchnorm_backward_sums_fused_kernel(
     const T *gradient_data, const T *normalized_data, const T *gamma_data,
     T *sum_grad_normalized_data, T *sum_grad_norm_times_norm_data, T *gamma_grad, T *beta_grad,
     size_t batch_size, size_t channels, size_t spatial_size, bool affine) {
 
-  union SharedData {
-    T sdata[4 * THREADS_PER_BLOCK]; // sum_grad, sum_grad*norm, gamma_grad, beta_grad
-  };
-  __shared__ SharedData shared_union;
-  T *sdata = shared_union.sdata;
-
   const int c = blockIdx.x;
   if (c >= channels)
     return;
 
-  const size_t block_size = blockDim.x;
   const size_t total_elements_per_channel = batch_size * spatial_size;
   const size_t channel_stride = channels * spatial_size;
   const size_t c_offset = c * spatial_size;
-
-  T *sdata_grad_norm = sdata;
-  T *sdata_grad_norm_x_norm = sdata + block_size;
-  T *sdata_gamma = sdata + 2 * block_size;
-  T *sdata_beta = sdata + 3 * block_size;
 
   T thread_sum_grad_norm = T(0);
   T thread_sum_grad_norm_x_norm = T(0);
@@ -467,7 +369,8 @@ __global__ void compute_batchnorm_backward_sums_fused_kernel(
 
   const T gamma_val = affine ? gamma_data[c] : T(1);
 
-  for (size_t i = threadIdx.x; i < total_elements_per_channel; i += block_size) {
+  //  loop with better memory access
+  for (size_t i = threadIdx.x; i < total_elements_per_channel; i += blockDim.x) {
     const size_t n = i / spatial_size;
     const size_t i_local = i % spatial_size;
     const size_t global_idx = n * channel_stride + c_offset + i_local;
@@ -485,31 +388,21 @@ __global__ void compute_batchnorm_backward_sums_fused_kernel(
     }
   }
 
-  sdata_grad_norm[threadIdx.x] = thread_sum_grad_norm;
-  sdata_grad_norm_x_norm[threadIdx.x] = thread_sum_grad_norm_x_norm;
-  sdata_gamma[threadIdx.x] = thread_gamma_sum;
-  sdata_beta[threadIdx.x] = thread_beta_sum;
-  __syncthreads();
+  // Use warp-level reductions instead of shared memory
+  thread_sum_grad_norm = blockReduceSum(thread_sum_grad_norm);
+  thread_sum_grad_norm_x_norm = blockReduceSum(thread_sum_grad_norm_x_norm);
 
-  // Reduction
-  for (unsigned int s = block_size / 2; s > 0; s /= 2) {
-    if (threadIdx.x < s) {
-      sdata_grad_norm[threadIdx.x] += sdata_grad_norm[threadIdx.x + s];
-      sdata_grad_norm_x_norm[threadIdx.x] += sdata_grad_norm_x_norm[threadIdx.x + s];
-      if (affine) {
-        sdata_gamma[threadIdx.x] += sdata_gamma[threadIdx.x + s];
-        sdata_beta[threadIdx.x] += sdata_beta[threadIdx.x + s];
-      }
-    }
-    __syncthreads();
+  if (affine) {
+    thread_gamma_sum = blockReduceSum(thread_gamma_sum);
+    thread_beta_sum = blockReduceSum(thread_beta_sum);
   }
 
   if (threadIdx.x == 0) {
-    sum_grad_normalized_data[c] = sdata_grad_norm[0];
-    sum_grad_norm_times_norm_data[c] = sdata_grad_norm_x_norm[0];
+    sum_grad_normalized_data[c] = thread_sum_grad_norm;
+    sum_grad_norm_times_norm_data[c] = thread_sum_grad_norm_x_norm;
     if (affine) {
-      atomicAdd(&gamma_grad[c], sdata_gamma[0]);
-      atomicAdd(&beta_grad[c], sdata_beta[0]);
+      atomicAdd(&gamma_grad[c], thread_gamma_sum);
+      atomicAdd(&beta_grad[c], thread_beta_sum);
     }
   }
 }
@@ -550,19 +443,17 @@ void compute_batchnorm_backward_fused(const T *gradient_data, const T *normalize
                                       cudaStream_t stream) {
   const size_t total_elements = batch_size * spatial_size;
 
-  // Allocate temporary buffers for sums
+  // Allocate temporary buffers - use cudaMallocAsync for stream ordering
   T *sum_grad_normalized_data;
   T *sum_grad_norm_times_norm_data;
   cudaMallocAsync(&sum_grad_normalized_data, channels * sizeof(T), stream);
   cudaMallocAsync(&sum_grad_norm_times_norm_data, channels * sizeof(T), stream);
 
-  // First pass: compute sums and affine gradients
+  // First pass: compute sums and affine gradients with  kernel (no large shared mem)
   int threads_per_block = THREADS_PER_BLOCK;
   int num_blocks = channels;
-  size_t shared_mem_size = 4 * threads_per_block * sizeof(T);
 
-  compute_batchnorm_backward_sums_fused_kernel<<<num_blocks, threads_per_block, shared_mem_size,
-                                                 stream>>>(
+  compute_batchnorm_backward_sums_fused_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
       gradient_data, normalized_data, gamma_data, sum_grad_normalized_data,
       sum_grad_norm_times_norm_data, gamma_grad, beta_grad, batch_size, channels, spatial_size,
       affine);
@@ -586,9 +477,7 @@ void compute_channel_mean(const T *input_data, T *mean_data, size_t batch_size, 
   int threads_per_block = THREADS_PER_BLOCK;
   int num_blocks = channels;
 
-  size_t shared_mem_size = threads_per_block * sizeof(T);
-
-  compute_channel_mean_kernel<<<num_blocks, threads_per_block, shared_mem_size, stream>>>(
+  compute_channel_mean_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
       input_data, mean_data, batch_size, channels, spatial_size);
 }
 
@@ -599,36 +488,32 @@ void compute_channel_variance(const T *input_data, const T *mean_data, T *var_da
   int threads_per_block = THREADS_PER_BLOCK;
   int num_blocks = channels;
 
-  size_t shared_mem_size = threads_per_block * sizeof(T);
-
-  compute_channel_variance_kernel<<<num_blocks, threads_per_block, shared_mem_size, stream>>>(
+  compute_channel_variance_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
       input_data, mean_data, var_data, batch_size, channels, spatial_size);
 }
 
 template <typename T>
-void normalize_and_scale_optimized(const T *input_data, const T *mean_data, const T *std_data,
-                                   const T *gamma_data, const T *beta_data, T *output_data,
-                                   T *normalized_data, size_t batch_size, size_t channels,
-                                   size_t spatial_size, bool affine, cudaStream_t stream) {
+void normalize_and_scale(const T *input_data, const T *mean_data, const T *std_data,
+                         const T *gamma_data, const T *beta_data, T *output_data,
+                         T *normalized_data, size_t batch_size, size_t channels,
+                         size_t spatial_size, bool affine, cudaStream_t stream) {
   size_t total_elements = batch_size * channels * spatial_size;
   int threads_per_block = THREADS_PER_BLOCK;
   int num_blocks = (total_elements + threads_per_block - 1) / threads_per_block;
 
-  normalize_and_scale_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
+  normalize_and_scalekernel<<<num_blocks, threads_per_block, 0, stream>>>(
       input_data, mean_data, std_data, gamma_data, beta_data, output_data, normalized_data,
       batch_size, channels, spatial_size, affine);
 }
 
 template <typename T>
-void compute_affine_gradients_optimized(const T *gradient_data, const T *normalized_data,
-                                        T *gamma_grad, T *beta_grad, size_t batch_size,
-                                        size_t channels, size_t spatial_size, cudaStream_t stream) {
+void compute_affine_gradients_(const T *gradient_data, const T *normalized_data, T *gamma_grad,
+                               T *beta_grad, size_t batch_size, size_t channels,
+                               size_t spatial_size, cudaStream_t stream) {
   int threads_per_block = THREADS_PER_BLOCK;
   int num_blocks = channels;
 
-  size_t shared_mem_size = 2 * threads_per_block * sizeof(T);
-
-  compute_affine_gradients_kernel<<<num_blocks, threads_per_block, shared_mem_size, stream>>>(
+  compute_affine_gradients_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
       gradient_data, normalized_data, gamma_grad, beta_grad, batch_size, channels, spatial_size);
 }
 
@@ -688,9 +573,7 @@ void compute_backward_sums(const T *grad_normalized_data, const T *normalized_da
   int threads_per_block = THREADS_PER_BLOCK;
   int num_blocks = channels;
 
-  size_t shared_mem_size = 2 * threads_per_block * sizeof(T);
-
-  compute_backward_sums_kernel<<<num_blocks, threads_per_block, shared_mem_size, stream>>>(
+  compute_backward_sums_kernel<<<num_blocks, threads_per_block, 0, stream>>>(
       grad_normalized_data, normalized_data, sum_grad_normalized_data,
       sum_grad_norm_times_norm_data, batch_size, channels, spatial_size);
 }
@@ -734,16 +617,17 @@ template void compute_mean_variance_fused<double>(const double *input_data, doub
                                                   size_t channels, size_t spatial_size,
                                                   cudaStream_t stream);
 
-template void normalize_and_scale_optimized<float>(const float *input_data, const float *mean_data,
-                                                   const float *std_data, const float *gamma_data,
-                                                   const float *beta_data, float *output_data,
-                                                   float *normalized_data, size_t batch_size,
-                                                   size_t channels, size_t spatial_size,
-                                                   bool affine, cudaStream_t stream);
-template void normalize_and_scale_optimized<double>(
-    const double *input_data, const double *mean_data, const double *std_data,
-    const double *gamma_data, const double *beta_data, double *output_data, double *normalized_data,
-    size_t batch_size, size_t channels, size_t spatial_size, bool affine, cudaStream_t stream);
+template void normalize_and_scale<float>(const float *input_data, const float *mean_data,
+                                         const float *std_data, const float *gamma_data,
+                                         const float *beta_data, float *output_data,
+                                         float *normalized_data, size_t batch_size, size_t channels,
+                                         size_t spatial_size, bool affine, cudaStream_t stream);
+template void normalize_and_scale<double>(const double *input_data, const double *mean_data,
+                                          const double *std_data, const double *gamma_data,
+                                          const double *beta_data, double *output_data,
+                                          double *normalized_data, size_t batch_size,
+                                          size_t channels, size_t spatial_size, bool affine,
+                                          cudaStream_t stream);
 
 template void compute_batch_std<float>(const float *batch_var_data, float *batch_std_data,
                                        size_t channels, float epsilon, cudaStream_t stream);
@@ -767,16 +651,15 @@ template void compute_inference_output<double>(
     const double *gamma_data, const double *beta_data, double *output_data, size_t batch_size,
     size_t channels, size_t spatial_size, double epsilon, bool affine, cudaStream_t stream);
 
-template void compute_affine_gradients_optimized<float>(const float *gradient_data,
-                                                        const float *normalized_data,
-                                                        float *gamma_grad, float *beta_grad,
-                                                        size_t batch_size, size_t channels,
-                                                        size_t spatial_size, cudaStream_t stream);
-template void compute_affine_gradients_optimized<double>(const double *gradient_data,
-                                                         const double *normalized_data,
-                                                         double *gamma_grad, double *beta_grad,
-                                                         size_t batch_size, size_t channels,
-                                                         size_t spatial_size, cudaStream_t stream);
+template void compute_affine_gradients_<float>(const float *gradient_data,
+                                               const float *normalized_data, float *gamma_grad,
+                                               float *beta_grad, size_t batch_size, size_t channels,
+                                               size_t spatial_size, cudaStream_t stream);
+template void compute_affine_gradients_<double>(const double *gradient_data,
+                                                const double *normalized_data, double *gamma_grad,
+                                                double *beta_grad, size_t batch_size,
+                                                size_t channels, size_t spatial_size,
+                                                cudaStream_t stream);
 
 template void compute_grad_normalized<float>(const float *gradient_data, const float *gamma_data,
                                              float *grad_normalized_data, size_t batch_size,

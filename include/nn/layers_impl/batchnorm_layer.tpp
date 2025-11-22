@@ -89,15 +89,14 @@ void BatchNormLayer<T>::forward_inplace(Tensor<T> &input, size_t micro_batch_id)
 
     std::unique_ptr<Task> norm_task = nullptr;
     if (affine_) {
-      norm_task = normalize_and_scale_optimized(
-          input.data_ptr(), batch_mean.data_ptr(), batch_std.data_ptr(), gamma_.data_ptr(),
-          beta_.data_ptr(), output.data_ptr(), normalized.data_ptr(), batch_size, channels,
-          spatial_size, affine_, "default");
+      norm_task = normalize_and_scale(input.data_ptr(), batch_mean.data_ptr(), batch_std.data_ptr(),
+                                      gamma_.data_ptr(), beta_.data_ptr(), output.data_ptr(),
+                                      normalized.data_ptr(), batch_size, channels, spatial_size,
+                                      affine_, "default");
     } else {
-      norm_task = normalize_and_scale_optimized(
-          input.data_ptr(), batch_mean.data_ptr(), batch_std.data_ptr(), nullptr, nullptr,
-          output.data_ptr(), normalized.data_ptr(), batch_size, channels, spatial_size, affine_,
-          "default");
+      norm_task = normalize_and_scale(input.data_ptr(), batch_mean.data_ptr(), batch_std.data_ptr(),
+                                      nullptr, nullptr, output.data_ptr(), normalized.data_ptr(),
+                                      batch_size, channels, spatial_size, affine_, "default");
     }
 
     update_running_stats(batch_mean, batch_var, channels, "default");
@@ -309,7 +308,7 @@ std::unique_ptr<Task> BatchNormLayer<T>::compute_batchnorm_backward_fused(
 }
 
 template <typename T>
-std::unique_ptr<Task> BatchNormLayer<T>::normalize_and_scale_optimized(
+std::unique_ptr<Task> BatchNormLayer<T>::normalize_and_scale(
     const device_ptr<T[]> &input_data, const device_ptr<T[]> &mean_data,
     const device_ptr<T[]> &std_data, const device_ptr<T[]> &gamma_data,
     const device_ptr<T[]> &beta_data, device_ptr<T[]> &output_data,
@@ -328,23 +327,21 @@ std::unique_ptr<Task> BatchNormLayer<T>::normalize_and_scale_optimized(
   }
 
   if (input_data.getDeviceType() == DeviceType::CPU) {
-    return create_cpu_task(flow_id, cpu::batchnorm::normalize_and_scale_optimized<T>,
-                           input_data.get(), mean_data.get(), std_data.get(),
-                           affine ? gamma_data.get() : nullptr, affine ? beta_data.get() : nullptr,
-                           output_data.get(), normalized_data.get(), batch_size, channels,
-                           spatial_size, affine);
+    return create_cpu_task(flow_id, cpu::batchnorm::normalize_and_scale<T>, input_data.get(),
+                           mean_data.get(), std_data.get(), affine ? gamma_data.get() : nullptr,
+                           affine ? beta_data.get() : nullptr, output_data.get(),
+                           normalized_data.get(), batch_size, channels, spatial_size, affine);
   }
 #ifdef USE_CUDA
   else if (input_data.getDeviceType() == DeviceType::GPU) {
-    return create_gpu_task(flow_id, cuda::batchnorm::normalize_and_scale_optimized<T>,
-                           input_data.get(), mean_data.get(), std_data.get(),
-                           affine ? gamma_data.get() : nullptr, affine ? beta_data.get() : nullptr,
-                           output_data.get(), normalized_data.get(), batch_size, channels,
-                           spatial_size, affine);
+    return create_gpu_task(flow_id, cuda::batchnorm::normalize_and_scale<T>, input_data.get(),
+                           mean_data.get(), std_data.get(), affine ? gamma_data.get() : nullptr,
+                           affine ? beta_data.get() : nullptr, output_data.get(),
+                           normalized_data.get(), batch_size, channels, spatial_size, affine);
   }
 #endif
   else {
-    throw std::runtime_error("Unsupported device type for normalize_and_scale_optimized");
+    throw std::runtime_error("Unsupported device type for normalize_and_scale");
   }
 }
 
