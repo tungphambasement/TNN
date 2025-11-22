@@ -7,12 +7,10 @@
 #pragma once
 #include "nn/layers_impl/conv2d_layer.hpp"
 
-#include "device/device_manager.hpp"
 #include "device/task.hpp"
 #include "nn/layers_impl/cpu/conv2d_ops.hpp"
 #include "nn/layers_impl/cuda/conv2d_ops.hpp"
 #include "tensor/tensor_ops.hpp"
-#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <iostream>
@@ -160,7 +158,7 @@ Tensor<T> Conv2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch
 
   weight_grad_task_ = compute_weight_gradients(it_col_buffer->second, temp_gradient_buffer_,
                                                weight_gradients_.data_ptr(), output_size,
-                                               kernel_size, out_channels_, "default");
+                                               kernel_size, out_channels_, "flow_0");
 
   input_grad_task_ = compute_input_gradients(temp_gradient_buffer_, weights_.data_ptr(),
                                              temp_col_grad_matrix_buffer_, output_size, kernel_size,
@@ -173,7 +171,7 @@ Tensor<T> Conv2DLayer<T>::backward(const Tensor<T> &gradient, size_t micro_batch
   if (use_bias_) {
     bias_grad_task_ =
         compute_bias_gradients(current_gradient.data_ptr(), bias_gradients_.data_ptr(), batch_size,
-                               output_h, output_w, out_channels_, "default");
+                               output_h, output_w, out_channels_, "flow_1");
   }
 
   task_sync_all(

@@ -42,8 +42,8 @@ template <typename T> void BatchNormLayer<T>::initialize_params() {
 
   running_mean_ = Tensor<T>({num_features_, 1, 1, 1}, this->device_);
   running_var_ = Tensor<T>({num_features_, 1, 1, 1}, this->device_);
-  running_mean_gradients_ = Tensor<T>({num_features_, 1, 1, 1}, this->device_); // Dummy gradients
-  running_var_gradients_ = Tensor<T>({num_features_, 1, 1, 1}, this->device_);  // Dummy gradients
+  running_mean_gradients_ = Tensor<T>({num_features_, 1, 1, 1}, this->device_);
+  running_var_gradients_ = Tensor<T>({num_features_, 1, 1, 1}, this->device_);
   running_mean_.fill(T(0));
   running_var_.fill(T(1));
   running_mean_gradients_.fill(T(0));
@@ -81,7 +81,6 @@ void BatchNormLayer<T>::forward_inplace(Tensor<T> &input, size_t micro_batch_id)
     Tensor<T> batch_std({channels, 1, 1, 1}, this->device_);
     Tensor<T> normalized(input.shape(), this->device_);
 
-    // Use fused mean+variance computation
     compute_mean_variance_fused(input, batch_mean, batch_var, batch_size, channels, spatial_size,
                                 "default");
 
@@ -501,16 +500,12 @@ uint64_t BatchNormLayer<T>::forward_flops(const std::vector<size_t> &input_shape
   size_t batch_size = input_shape[0];
   size_t spatial_size = num_elements / (batch_size * num_features_);
 
-  // mean computation: sum reduction across batch and spatial dimensions
   uint64_t mean_flops = batch_size * spatial_size * num_features_;
 
-  // variance computation: (x - mean)^2 for each element + sum reduction
   uint64_t var_flops = 2 * num_elements + mean_flops;
 
-  // normalization: (x - mean) / sqrt(var + epsilon) for each element
-  uint64_t norm_flops = 3 * num_elements; // subtract, sqrt+add, divide
+  uint64_t norm_flops = 3 * num_elements;
 
-  // scale and shift (if affine): gamma * normalized + beta
   uint64_t affine_flops = affine_ ? (2 * num_elements) : 0;
 
   return mean_flops + var_flops + norm_flops + affine_flops;
@@ -523,13 +518,8 @@ uint64_t BatchNormLayer<T>::backward_flops(const std::vector<size_t> &input_shap
   size_t batch_size = input_shape[0];
   size_t spatial_size = num_elements / (batch_size * num_features_);
 
-  // Gradient w.r.t. gamma and beta (if affine)
   uint64_t param_grad_flops = affine_ ? (2 * batch_size * spatial_size * num_features_) : 0;
 
-  // Gradient w.r.t. input involves multiple terms:
-  // 1. Direct gradient scaling: 2 * num_elements
-  // 2. Mean gradient compensation: 3 * num_elements
-  // 3. Variance gradient compensation: 4 * num_elements
   uint64_t input_grad_flops = 9 * num_elements;
 
   return param_grad_flops + input_grad_flops;
@@ -547,7 +537,6 @@ uint64_t BatchNormLayer<T>::backward_complexity(const std::vector<size_t> &input
       std::min(backward_flops(input_shape), static_cast<uint64_t>(UINT32_MAX)));
 }
 
-// Explicit template instantiations
 template class BatchNormLayer<float>;
 template class BatchNormLayer<double>;
 
