@@ -11,7 +11,9 @@
 #include <stdexcept>
 
 #include "nn/layers_impl/cpu/maxpool_ops.hpp"
+#ifdef USE_CUDA
 #include "nn/layers_impl/cuda/maxpool_ops.hpp"
+#endif
 
 namespace tnn {
 

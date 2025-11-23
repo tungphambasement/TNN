@@ -10,7 +10,9 @@
  * This file provides a wrapper header for gemm functions
  */
 #include "cpu/gemm.hpp"
+#ifdef USE_CUDA
 #include "cuda/gemm.hpp"
+#endif
 #include "device/device_ptr.hpp"
 
 namespace tnn {

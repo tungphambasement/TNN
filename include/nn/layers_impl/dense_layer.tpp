@@ -12,7 +12,9 @@
 #include <stdexcept>
 
 #include "cpu/dense_ops.hpp"
+#ifdef USE_CUDA
 #include "cuda/dense_ops.hpp"
+#endif
 #include "device/task.hpp"
 #include "nn/layers_impl/parameterized_layer.hpp"
 

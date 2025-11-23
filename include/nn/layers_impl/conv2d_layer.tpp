@@ -10,7 +10,9 @@
 
 #include "device/task.hpp"
 #include "nn/layers_impl/cpu/conv2d_ops.hpp"
+#ifdef USE_CUDA
 #include "nn/layers_impl/cuda/conv2d_ops.hpp"
+#endif
 #include "tensor/tensor_ops.hpp"
 #include <cmath>
 #include <cstring>

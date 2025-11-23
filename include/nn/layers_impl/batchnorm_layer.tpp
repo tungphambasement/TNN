@@ -13,7 +13,9 @@
 #include <stdexcept>
 
 #include "nn/layers_impl/cpu/batchnorm_ops.hpp"
+#ifdef USE_CUDA
 #include "nn/layers_impl/cuda/batchnorm_ops.hpp"
+#endif
 
 namespace tnn {
 
