@@ -12,7 +12,9 @@
 #include <stdexcept>
 
 #include "nn/layers_impl/cpu/avgpool_ops.hpp"
+#ifdef USE_CUDA
 #include "nn/layers_impl/cuda/avgpool_ops.hpp"
+#endif
 
 namespace tnn {
 

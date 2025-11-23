@@ -22,17 +22,23 @@ endfunction()
 set(TEST_FILES 
     tensor_test.cpp
     device_manager_test.cpp
-    cuda_kernels_test.cpp
-    gpu_tensor_test.cpp
-    gpu_tensor_ops_test.cpp
-    cuda_conv2d_ops_test.cpp
-    cuda_dense_ops_test.cpp
-    cuda_maxpool_ops_test.cpp
-    cuda_loss_funcs_test.cpp
-    cuda_batchnorm_ops_test.cpp
     layer_integration_test.cpp
     layer_buffer_reuse_test.cpp
 )
+
+# Add CUDA tests only if CUDA is enabled
+if(ENABLE_CUDA)
+    list(APPEND TEST_FILES
+        cuda_kernels_test.cpp
+        gpu_tensor_test.cpp
+        gpu_tensor_ops_test.cpp
+        cuda_conv2d_ops_test.cpp
+        cuda_dense_ops_test.cpp
+        cuda_maxpool_ops_test.cpp
+        cuda_loss_funcs_test.cpp
+        cuda_batchnorm_ops_test.cpp
+    )
+endif()
 
 foreach(test_file IN LISTS TEST_FILES)
     get_filename_component(test_name ${test_file} NAME_WE)
@@ -69,18 +75,28 @@ else()
 endif()
 
 # Optional: Create a target to run all tests
+set(ALL_TEST_TARGETS
+    tensor_test 
+    device_manager_test
+    layer_integration_test
+    layer_buffer_reuse_test
+)
+
+if(ENABLE_CUDA)
+    list(APPEND ALL_TEST_TARGETS
+        cuda_kernels_test
+        gpu_tensor_test
+        gpu_tensor_ops_test
+        cuda_conv2d_ops_test
+        cuda_dense_ops_test
+        cuda_maxpool_ops_test
+        cuda_loss_funcs_test
+        cuda_batchnorm_ops_test
+    )
+endif()
+
 add_custom_target(run_tests
     COMMAND ${CMAKE_CTEST_COMMAND} --verbose
-    DEPENDS tensor_test 
-    device_manager_test
-    gpu_tensor_test
-    gpu_tensor_ops_test
-    cuda_conv2d_ops_test
-    cuda_dense_ops_test
-    cuda_maxpool_ops_test
-    cuda_loss_funcs_test
-    cuda_batchnorm_ops_test
-    layer_integration_test
-    ${CUDA_TEST_TARGET}
+    DEPENDS ${ALL_TEST_TARGETS}
     COMMENT "Running all unit tests"
 )

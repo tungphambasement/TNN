@@ -32,9 +32,14 @@ endif()
 
 # Operations library
 file(GLOB_RECURSE TNN_OPS_SOURCES 
-    "ops/*.cpp"
-    "ops/*.cu"
+    "ops/cpu/*.cpp"
 )
+if(ENABLE_CUDA)
+    file(GLOB TNN_OPS_CUDA_SOURCES 
+        "ops/cuda/*.cu"
+    )
+    list(APPEND TNN_OPS_SOURCES ${TNN_OPS_CUDA_SOURCES})
+endif()
 add_library(tnn_ops STATIC ${TNN_OPS_SOURCES})
 target_include_directories(tnn_ops PUBLIC 
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
@@ -60,10 +65,16 @@ if(NOT MSVC)
 endif()
 
 # Tensor library
-file(GLOB_RECURSE TNN_TENSOR_SOURCES 
+file(GLOB TNN_TENSOR_SOURCES 
     "tensor/*.cpp"
-    "tensor/*.cu"
 )
+if(ENABLE_CUDA)
+    file(GLOB TNN_TENSOR_CUDA_SOURCES 
+        "tensor/cuda/*.cpp"
+        "tensor/cuda/*.cu"
+    )
+    list(APPEND TNN_TENSOR_SOURCES ${TNN_TENSOR_CUDA_SOURCES})
+endif()
 add_library(tnn_tensor STATIC ${TNN_TENSOR_SOURCES})
 target_include_directories(tnn_tensor PUBLIC 
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
@@ -80,8 +91,13 @@ endif()
 # Utilities library
 file(GLOB_RECURSE TNN_UTILS_SOURCES 
     "utils/*.cpp"
-    "utils/*.cu"
 )
+if(ENABLE_CUDA)
+    file(GLOB TNN_UTILS_CUDA_SOURCES 
+        "utils/accuracy_impl/cuda/*.cu"
+    )
+    list(APPEND TNN_UTILS_SOURCES ${TNN_UTILS_CUDA_SOURCES})
+endif()
 add_library(tnn_utils STATIC ${TNN_UTILS_SOURCES})
 target_include_directories(tnn_utils PUBLIC 
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
@@ -178,10 +194,13 @@ endif()
 file(GLOB_RECURSE TNN_NN_SOURCES 
     "nn/*.cpp"
 )
-file(GLOB_RECURSE TNN_NN_CUDA_SOURCES 
-    "nn/*.cu"
-)
-add_library(tnn_nn STATIC ${TNN_NN_SOURCES} ${TNN_NN_CUDA_SOURCES})
+if(ENABLE_CUDA)
+    file(GLOB_RECURSE TNN_NN_CUDA_SOURCES 
+        "nn/*.cu"
+    )
+    list(APPEND TNN_NN_SOURCES ${TNN_NN_CUDA_SOURCES})
+endif()
+add_library(tnn_nn STATIC ${TNN_NN_SOURCES})
 target_include_directories(tnn_nn PUBLIC 
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
