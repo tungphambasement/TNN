@@ -97,4 +97,4 @@ __pycache__/
 
 # profiling artifacts
 /profile.json
-*.nsys-rep
+*.nsys-rep_codeql_build_dir/
