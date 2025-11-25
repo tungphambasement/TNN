@@ -44,6 +44,7 @@ private:
   std::unique_ptr<Task> cnhw_to_nchw_task_;
   std::unique_ptr<Task> add_bias_task_;
 
+  std::unique_ptr<Task> gradinput_init_task_;
   std::unique_ptr<Task> nchw_to_cnhw_task_;
   std::unique_ptr<Task> weight_grad_task_;
   std::unique_ptr<Task> input_grad_task_;

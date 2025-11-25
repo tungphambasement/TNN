@@ -57,7 +57,7 @@ const Tensor<T> &MaxPool2DLayer<T>::forward(const Tensor<T> &input, size_t micro
     micro_batch_padded_inputs_[micro_batch_id].resize({batch_size, channels, padded_h, padded_w});
   }
 
-  pad(*current, micro_batch_padded_inputs_[micro_batch_id], pad_h_, pad_w_, T(0))->sync();
+  pad_task_ = pad(*current, micro_batch_padded_inputs_[micro_batch_id], pad_h_, pad_w_, T(0));
 
   Tensor<T> &output =
       this->get_output_buffer(micro_batch_id, {batch_size, channels, output_h, output_w});
@@ -70,14 +70,10 @@ const Tensor<T> &MaxPool2DLayer<T>::forward(const Tensor<T> &input, size_t micro
         make_array_ptr<size_t[]>(this->device_, total_outputs);
   }
 
-  auto forward_task = compute_max_pool_forward(
-      micro_batch_padded_inputs_[micro_batch_id].data_ptr(), output.data_ptr(), batch_size,
-      channels, padded_h, padded_w, output_h, output_w, micro_batch_mask_indices_[micro_batch_id],
-      "default");
-
-  if (forward_task) {
-    forward_task->sync();
-  }
+  forward_task_ = compute_max_pool_forward(micro_batch_padded_inputs_[micro_batch_id].data_ptr(),
+                                           output.data_ptr(), batch_size, channels, padded_h,
+                                           padded_w, output_h, output_w,
+                                           micro_batch_mask_indices_[micro_batch_id], "default");
 
   return output;
 }
@@ -124,22 +120,15 @@ const Tensor<T> &MaxPool2DLayer<T>::backward(const Tensor<T> &gradient, size_t m
 
   micro_batch_grad_padded_inputs_[micro_batch_id].fill(T(0));
 
-  auto backward_task = compute_max_pool_backward(
+  backward_task_ = compute_max_pool_backward(
       current_gradient->data_ptr(), micro_batch_grad_padded_inputs_[micro_batch_id].data_ptr(),
       batch_size, channels, output_h, output_w, mask_indices, "default");
-
-  if (backward_task) {
-    backward_task->sync();
-  }
 
   if (pad_h_ > 0 || pad_w_ > 0) {
     Tensor<T> &grad_input = this->get_gradient_buffer(
         micro_batch_id, {batch_size, channels, padded_h - 2 * pad_h_, padded_w - 2 * pad_w_});
-    auto unpad_task =
+    unpad_task_ =
         unpad(micro_batch_grad_padded_inputs_[micro_batch_id], grad_input, pad_h_, pad_w_);
-    if (unpad_task) {
-      unpad_task->sync();
-    }
     return grad_input;
   } else {
     return micro_batch_grad_padded_inputs_[micro_batch_id];

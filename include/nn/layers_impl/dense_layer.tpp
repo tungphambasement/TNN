@@ -87,8 +87,6 @@ const Tensor<T> &DenseLayer<T>::forward(const Tensor<T> &input, size_t micro_bat
                                      output_features_, "default");
   }
 
-  task_sync_all({forward_task_.get(), add_bias_task_.get()});
-
   return output;
 }
 
@@ -132,8 +130,6 @@ const Tensor<T> &DenseLayer<T>::backward(const Tensor<T> &gradient, size_t micro
   input_grad_task_ =
       compute_input_gradients(current_grad->data_ptr(), weights_.data_ptr(), grad_input.data_ptr(),
                               batch_size, input_features_, output_features_, "default");
-
-  task_sync_all({weight_grad_task_.get(), input_grad_task_.get(), bias_grad_task_.get()});
 
   return grad_input;
 }

@@ -117,9 +117,6 @@ const Tensor<T> &Conv2DLayer<T>::forward(const Tensor<T> &input, size_t micro_ba
                                         output_w, out_channels_, "default");
   }
 
-  task_sync_all(
-      {im2col_task_.get(), forward_task_.get(), cnhw_to_nchw_task_.get(), add_bias_task_.get()});
-
   return output;
 }
 
@@ -188,9 +185,6 @@ const Tensor<T> &Conv2DLayer<T>::backward(const Tensor<T> &gradient, size_t micr
         compute_bias_gradients(current_gradient->data_ptr(), bias_gradients_.data_ptr(), batch_size,
                                output_h, output_w, out_channels_, "default");
   }
-
-  task_sync_all(
-      {weight_grad_task_.get(), input_grad_task_.get(), col2im_task_.get(), bias_grad_task_.get()});
 
   auto backward_internal_end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> backward_internal_duration =
