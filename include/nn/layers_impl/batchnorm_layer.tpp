@@ -163,7 +163,7 @@ std::unique_ptr<Task> BatchNormLayer<T>::run_forward_fused(
     const device_ptr<T[]> &beta, device_ptr<T[]> &output, device_ptr<T[]> &norm_cache,
     size_t batch_size, size_t channels, size_t spatial_size, const std::string &flow_id) {
 #ifdef USE_CUDA
-  if (this->device_->getDeviceType() == DeviceType::GPU) {
+  if (this->device_->device_type() == DeviceType::GPU) {
     return create_gpu_task("default", cuda::batchnorm::run_forward_fused<T>, input.get(),
                            batch_mean_fixed.get(), batch_inv_std.get(), running_mean.get(),
                            running_var.get(), affine_ ? gamma.get() : nullptr,
@@ -187,7 +187,7 @@ std::unique_ptr<Task> BatchNormLayer<T>::run_backward_fused(
     device_ptr<T[]> &d_beta, device_ptr<T[]> &grad_input, size_t batch_size, size_t channels,
     size_t spatial_size, const std::string &flow_id) {
 #ifdef USE_CUDA
-  if (this->device_->getDeviceType() == DeviceType::GPU) {
+  if (this->device_->device_type() == DeviceType::GPU) {
     return create_gpu_task("default", cuda::batchnorm::run_backward_fused<T>, grad_output.get(),
                            norm_input.get(), inv_std.get(), gamma.get(), d_gamma.get(),
                            d_beta.get(), grad_input.get(), batch_size, channels, spatial_size,

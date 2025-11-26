@@ -140,17 +140,17 @@ std::unique_ptr<Task> MaxPool2DLayer<T>::compute_max_pool_forward(
     const device_ptr<T[]> &input_data, device_ptr<T[]> &output_data, size_t batch_size,
     size_t channels, size_t input_h, size_t input_w, size_t output_h, size_t output_w,
     device_ptr<size_t[]> &mask_indices, const std::string &flow_id) const {
-  if (input_data.getDeviceType() != output_data.getDeviceType()) {
+  if (input_data.device_type() != output_data.device_type()) {
     throw std::runtime_error("Input and output tensors must be on the same device");
   }
 
-  if (input_data.getDeviceType() == DeviceType::CPU) {
+  if (input_data.device_type() == DeviceType::CPU) {
     return create_cpu_task(flow_id, cpu::maxpool::compute_max_pool_forward<T>, input_data.get(),
                            output_data.get(), batch_size, channels, input_h, input_w, output_h,
                            output_w, pool_h_, pool_w_, stride_h_, stride_w_, mask_indices);
   }
 #ifdef USE_CUDA
-  else if (input_data.getDeviceType() == DeviceType::GPU) {
+  else if (input_data.device_type() == DeviceType::GPU) {
     return create_gpu_task(flow_id, cuda::maxpool::compute_max_pool_forward<T>, input_data.get(),
                            output_data.get(), batch_size, channels, input_h, input_w, output_h,
                            output_w, pool_h_, pool_w_, stride_h_, stride_w_, mask_indices);
@@ -167,17 +167,17 @@ std::unique_ptr<Task> MaxPool2DLayer<T>::compute_max_pool_backward(
     const device_ptr<T[]> &gradient_data, device_ptr<T[]> &grad_input_data, size_t batch_size,
     size_t channels, size_t output_h, size_t output_w, const device_ptr<size_t[]> &mask_indices,
     const std::string &flow_id) const {
-  if (gradient_data.getDeviceType() != grad_input_data.getDeviceType()) {
+  if (gradient_data.device_type() != grad_input_data.device_type()) {
     throw std::runtime_error("Gradient and input gradient tensors must be on the same device");
   }
 
-  if (gradient_data.getDeviceType() == DeviceType::CPU) {
+  if (gradient_data.device_type() == DeviceType::CPU) {
     return create_cpu_task(flow_id, cpu::maxpool::compute_max_pool_backward<T>, gradient_data.get(),
                            grad_input_data.get(), batch_size, channels, output_h, output_w,
                            mask_indices);
   }
 #ifdef USE_CUDA
-  else if (gradient_data.getDeviceType() == DeviceType::GPU) {
+  else if (gradient_data.device_type() == DeviceType::GPU) {
     return create_gpu_task(flow_id, cuda::maxpool::compute_max_pool_backward<T>,
                            gradient_data.get(), grad_input_data.get(), batch_size, channels,
                            output_h, output_w, mask_indices);
