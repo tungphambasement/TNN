@@ -34,15 +34,6 @@ ResidualBlock::ResidualBlock(std::vector<std::unique_ptr<Layer>> main_path,
   }
 }
 
-void ResidualBlock::on_set_context(GraphContext &graph_ctx) {
-  for (auto &layer : main_path_) {
-    layer->set_context(graph_ctx);
-  }
-  for (auto &layer : shortcut_path_) {
-    layer->set_context(graph_ctx);
-  }
-}
-
 void ResidualBlock::init_impl() {
   for (auto &layer : main_path_) {
     layer->init();
@@ -52,57 +43,12 @@ void ResidualBlock::init_impl() {
   }
 }
 
-void ResidualBlock::on_set_flow_handle(flowHandle_t handle) {
-  for (auto &layer : main_path_) {
-    layer->set_flow_handle(handle);
-  }
-  for (auto &layer : shortcut_path_) {
-    layer->set_flow_handle(handle);
-  }
-}
-
-void ResidualBlock::on_set_seed(unsigned long long seed) {
-  for (auto &layer : main_path_) {
-    layer->set_seed(seed);
-  }
-  for (auto &layer : shortcut_path_) {
-    layer->set_seed(seed);
-  }
-}
-
-void ResidualBlock::on_set_io_dtype(DType_t dtype) {
-  for (auto &layer : main_path_) {
-    layer->set_io_dtype(dtype);
-  }
-  for (auto &layer : shortcut_path_) {
-    layer->set_io_dtype(dtype);
-  }
-}
-
-void ResidualBlock::on_set_param_dtype(DType_t dtype) {
-  for (auto &layer : main_path_) {
-    layer->set_param_dtype(dtype);
-  }
-  for (auto &layer : shortcut_path_) {
-    layer->set_param_dtype(dtype);
-  }
-}
-
-void ResidualBlock::on_set_compute_dtype(DType_t dtype) {
-  for (auto &layer : main_path_) {
-    layer->set_compute_dtype(dtype);
-  }
-  for (auto &layer : shortcut_path_) {
-    layer->set_compute_dtype(dtype);
-  }
-}
-
 static size_t compute_path_max_size(const std::vector<std::unique_ptr<Layer>> &path,
                                     const std::vector<size_t> &input_shape, DType_t dtype) {
   size_t max_size = 0;
   std::vector<size_t> current_shape = input_shape;
   for (const auto &layer : path) {
-    current_shape = layer->compute_output_shape(current_shape);
+    current_shape = layer->output_shape({current_shape})[0];
     size_t layer_size =
         std::accumulate(current_shape.begin(), current_shape.end(), 1, std::multiplies<size_t>());
     max_size = std::max(max_size, layer_size);
@@ -115,15 +61,15 @@ void ResidualBlock::forward_impl(const ConstTensor &input, const Tensor &output,
 
   ConstTensor main_output = input;  // main output = f exist ? input : f(input)
   for (auto &layer : main_path_) {
-    Tensor temp_output = this->get_buffer(layer->compute_output_shape(main_output->shape()),
-                                          main_output->data_type());
+    Tensor temp_output =
+        this->get_buffer(layer->output_shape({main_output->shape()})[0], main_output->data_type());
     layer->forward({main_output}, {temp_output}, mb_id);
     main_output = temp_output;
   }
 
   ConstTensor shortcut_output = input;  // shortcut output = g exist ? input : g(input)
   for (auto &layer : shortcut_path_) {
-    Tensor temp_output = this->get_buffer(layer->compute_output_shape(shortcut_output->shape()),
+    Tensor temp_output = this->get_buffer(layer->output_shape({shortcut_output->shape()})[0],
                                           shortcut_output->data_type());
     layer->forward({shortcut_output}, {temp_output}, mb_id);
     shortcut_output = temp_output;
@@ -196,21 +142,11 @@ void ResidualBlock::backward_impl(const ConstTensor &gradient, const Tensor &gra
                     grad_input->data_ptr(), grad_input->size());
 }
 
-void ResidualBlock::on_set_training(bool training) {
-  this->is_training_ = training;
-  for (auto &layer : main_path_) {
-    layer->set_training(training);
-  }
-  for (auto &layer : shortcut_path_) {
-    layer->set_training(training);
-  }
-}
-
 std::vector<size_t> ResidualBlock::compute_output_shape(
     const std::vector<size_t> &input_shape) const {
   std::vector<size_t> shape = input_shape;
   for (const auto &layer : main_path_) {
-    shape = layer->compute_output_shape(shape);
+    shape = layer->output_shape({shape})[0];
   }
   return shape;
 }
@@ -241,14 +177,6 @@ LayerConfig ResidualBlock::get_config() const {
   return config;
 }
 
-const std::vector<std::unique_ptr<Layer>> &ResidualBlock::get_main_path() const {
-  return main_path_;
-}
-
-const std::vector<std::unique_ptr<Layer>> &ResidualBlock::get_shortcut_path() const {
-  return shortcut_path_;
-}
-
 std::unique_ptr<ResidualBlock> ResidualBlock::create_from_config(const LayerConfig &config) {
   std::vector<std::unique_ptr<Layer>> main_path;
   std::vector<std::unique_ptr<Layer>> shortcut_path;
@@ -270,32 +198,6 @@ std::unique_ptr<ResidualBlock> ResidualBlock::create_from_config(const LayerConf
   std::string activation = config.get<std::string>("activation", "relu");
   return std::make_unique<ResidualBlock>(std::move(main_path), std::move(shortcut_path), activation,
                                          config.name);
-}
-
-std::vector<Tensor> ResidualBlock::parameters() {
-  std::vector<Tensor> params;
-  for (const auto &layer : main_path_) {
-    auto layer_params = layer->parameters();
-    params.insert(params.end(), layer_params.begin(), layer_params.end());
-  }
-  for (const auto &layer : shortcut_path_) {
-    auto layer_params = layer->parameters();
-    params.insert(params.end(), layer_params.begin(), layer_params.end());
-  }
-  return params;
-}
-
-std::vector<Tensor> ResidualBlock::gradients() {
-  std::vector<Tensor> grads;
-  for (const auto &layer : main_path_) {
-    auto layer_grads = layer->gradients();
-    grads.insert(grads.end(), layer_grads.begin(), layer_grads.end());
-  }
-  for (const auto &layer : shortcut_path_) {
-    auto layer_grads = layer->gradients();
-    grads.insert(grads.end(), layer_grads.begin(), layer_grads.end());
-  }
-  return grads;
 }
 
 }  // namespace tnn

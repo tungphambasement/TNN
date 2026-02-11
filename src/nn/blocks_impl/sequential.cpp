@@ -26,7 +26,7 @@ void Sequential::compute_max_size(const std::vector<size_t> &input_shape, DType_
   size_t current_max =
       std::accumulate(current_shape.begin(), current_shape.end(), 1, std::multiplies<size_t>());
   for (const auto &layer : layers_) {
-    current_shape = layer->compute_output_shape(current_shape);
+    current_shape = layer->output_shape({current_shape})[0];
     size_t activation_size =
         std::accumulate(current_shape.begin(), current_shape.end(), 1, std::multiplies<size_t>());
     current_max = std::max(current_max, activation_size);
@@ -40,36 +40,6 @@ void Sequential::init_impl() {
   }
 }
 
-void Sequential::on_set_seed(unsigned long long seed) {
-  for (auto &layer : layers_) {
-    layer->set_seed(seed);
-  }
-}
-
-void Sequential::on_set_io_dtype(DType_t dtype) {
-  for (auto &layer : layers_) {
-    layer->set_io_dtype(dtype);
-  }
-}
-
-void Sequential::on_set_param_dtype(DType_t dtype) {
-  for (auto &layer : layers_) {
-    layer->set_param_dtype(dtype);
-  }
-}
-
-void Sequential::on_set_compute_dtype(DType_t dtype) {
-  for (auto &layer : layers_) {
-    layer->set_compute_dtype(dtype);
-  }
-}
-
-void Sequential::on_set_training(bool training) {
-  for (auto &layer : layers_) {
-    layer->set_training(training);
-  }
-}
-
 void Sequential::forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id) {
   if (layers_.empty()) {
     throw std::runtime_error("Cannot forward through empty sequential model");
@@ -80,7 +50,7 @@ void Sequential::forward_impl(const ConstTensor &input, const Tensor &output, si
   for (size_t i = 0; i < layers_.size(); ++i) {
     try {
       if (i < layers_.size() - 1) {
-        current_output = this->get_buffer(layers_[i]->compute_output_shape(current_input->shape()),
+        current_output = this->get_buffer(layers_[i]->output_shape({current_input->shape()})[0],
                                           input->data_type());
       } else {
         current_output = output;
@@ -125,12 +95,6 @@ Sequential::Sequential(const std::string &name, std::vector<std::unique_ptr<Laye
   layers_ = std::move(layers);
 }
 
-void Sequential::on_set_context(GraphContext &graph_ctx) {
-  for (auto &layer : layers_) {
-    layer->set_context(graph_ctx);
-  }
-}
-
 std::vector<size_t> Sequential::compute_output_shape(const std::vector<size_t> &input_shape) const {
   if (layers_.empty()) {
     return input_shape;
@@ -138,7 +102,7 @@ std::vector<size_t> Sequential::compute_output_shape(const std::vector<size_t> &
 
   std::vector<size_t> current_shape = input_shape;
   for (const auto &layer : layers_) {
-    current_shape = layer->compute_output_shape(current_shape);
+    current_shape = layer->output_shape({current_shape})[0];
   }
 
   return current_shape;
@@ -174,9 +138,9 @@ void Sequential::print_summary(const std::vector<size_t> &input_shape) const {
 
     std::cout << std::setw(20) << format_shape(current_shape);
 
-    auto output_shape = layer->compute_output_shape(current_shape);
-    std::cout << std::setw(20) << format_shape(output_shape);
-    current_shape = layer->compute_output_shape(current_shape);
+    auto output_shape = layer->output_shape({current_shape})[0];
+    std::cout << std::setw(20) << format_shape(output_shape) << "\n";
+    current_shape = layer->output_shape({current_shape})[0];
   }
   std::cout << std::string(100, '-') << "\n";
 }
@@ -216,24 +180,6 @@ std::unique_ptr<Sequential> Sequential::create_from_config(const LayerConfig &co
     layers.push_back(std::move(layer));
   }
   return std::make_unique<Sequential>(config.name, std::move(layers));
-}
-
-std::vector<Tensor> Sequential::parameters() {
-  std::vector<Tensor> params;
-  for (const auto &layer : layers_) {
-    auto layer_params = layer->parameters();
-    params.insert(params.end(), layer_params.begin(), layer_params.end());
-  }
-  return params;
-}
-
-std::vector<Tensor> Sequential::gradients() {
-  std::vector<Tensor> grads;
-  for (const auto &layer : layers_) {
-    auto layer_grads = layer->gradients();
-    grads.insert(grads.end(), layer_grads.begin(), layer_grads.end());
-  }
-  return grads;
 }
 
 }  // namespace tnn

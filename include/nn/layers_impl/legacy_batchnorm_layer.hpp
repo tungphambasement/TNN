@@ -71,12 +71,14 @@ private:
     std::vector<ParamDescriptor> descriptors;
     if (affine_) {
       auto gamma_desc = ParamDescriptor{
+          param_dtype_,
           {num_features_},
           &gamma_,
           &gamma_gradients_,
       };
       descriptors.push_back(gamma_desc);
       auto beta_desc = ParamDescriptor{
+          param_dtype_,
           {num_features_},
           &beta_,
           &beta_gradients_,
@@ -84,12 +86,14 @@ private:
       descriptors.push_back(beta_desc);
     }
     auto running_mean_desc = ParamDescriptor{
+        param_dtype_,
         {num_features_},
         &running_mean_,
         &dummy_mean_gradients_,
     };
     descriptors.push_back(running_mean_desc);
     auto running_var_desc = ParamDescriptor{
+        param_dtype_,
         {num_features_},
         &running_var_,
         &dummy_var_gradients_,

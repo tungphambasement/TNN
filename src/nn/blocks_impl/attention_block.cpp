@@ -39,61 +39,11 @@ AttentionBlock::AttentionBlock(size_t embed_dim, size_t num_heads, bool is_causa
   out_proj_ = std::make_unique<DenseLayer>(embed_dim, embed_dim, true, name + "_out");
 }
 
-void AttentionBlock::on_set_context(GraphContext &graph_ctx) {
-  q_proj_->set_context(graph_ctx);
-  k_proj_->set_context(graph_ctx);
-  v_proj_->set_context(graph_ctx);
-  out_proj_->set_context(graph_ctx);
-}
-
 void AttentionBlock::init_impl() {
   q_proj_->init();
   k_proj_->init();
   v_proj_->init();
   out_proj_->init();
-}
-
-void AttentionBlock::on_set_io_dtype(DType_t dtype) {
-  q_proj_->set_io_dtype(dtype);
-  k_proj_->set_io_dtype(dtype);
-  v_proj_->set_io_dtype(dtype);
-  out_proj_->set_io_dtype(dtype);
-}
-
-void AttentionBlock::on_set_param_dtype(DType_t dtype) {
-  q_proj_->set_param_dtype(dtype);
-  k_proj_->set_param_dtype(dtype);
-  v_proj_->set_param_dtype(dtype);
-  out_proj_->set_param_dtype(dtype);
-}
-
-void AttentionBlock::on_set_compute_dtype(DType_t dtype) {
-  q_proj_->set_compute_dtype(dtype);
-  k_proj_->set_compute_dtype(dtype);
-  v_proj_->set_compute_dtype(dtype);
-  out_proj_->set_compute_dtype(dtype);
-}
-
-void AttentionBlock::on_set_training(bool training) {
-  this->is_training_ = training;
-  q_proj_->set_training(training);
-  k_proj_->set_training(training);
-  v_proj_->set_training(training);
-  out_proj_->set_training(training);
-}
-
-void AttentionBlock::on_set_flow_handle(flowHandle_t handle) {
-  q_proj_->set_flow_handle(handle);
-  k_proj_->set_flow_handle(handle);
-  v_proj_->set_flow_handle(handle);
-  out_proj_->set_flow_handle(handle);
-}
-
-void AttentionBlock::on_set_seed(unsigned long long seed) {
-  q_proj_->set_seed(seed);
-  k_proj_->set_seed(seed);
-  v_proj_->set_seed(seed);
-  out_proj_->set_seed(seed);
 }
 
 void AttentionBlock::forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id) {
@@ -373,32 +323,6 @@ std::unique_ptr<Task> AttentionBlock::compute_attention_backward(
     throw std::runtime_error("Unsupported device type for compute_attention_backward.");
   }
   return nullptr;
-}
-
-std::vector<Tensor> AttentionBlock::parameters() {
-  std::vector<Tensor> params;
-  auto q_params = q_proj_->parameters();
-  params.insert(params.end(), q_params.begin(), q_params.end());
-  auto k_params = k_proj_->parameters();
-  params.insert(params.end(), k_params.begin(), k_params.end());
-  auto v_params = v_proj_->parameters();
-  params.insert(params.end(), v_params.begin(), v_params.end());
-  auto out_params = out_proj_->parameters();
-  params.insert(params.end(), out_params.begin(), out_params.end());
-  return params;
-}
-
-std::vector<Tensor> AttentionBlock::gradients() {
-  std::vector<Tensor> grads;
-  auto q_grads = q_proj_->gradients();
-  grads.insert(grads.end(), q_grads.begin(), q_grads.end());
-  auto k_grads = k_proj_->gradients();
-  grads.insert(grads.end(), k_grads.begin(), k_grads.end());
-  auto v_grads = v_proj_->gradients();
-  grads.insert(grads.end(), v_grads.begin(), v_grads.end());
-  auto out_grads = out_proj_->gradients();
-  grads.insert(grads.end(), out_grads.begin(), out_grads.end());
-  return grads;
 }
 
 LayerConfig AttentionBlock::get_config() const {

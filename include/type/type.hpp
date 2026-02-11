@@ -8,8 +8,13 @@
 #else
 #include "type/fp16.hpp"
 #endif
+#include <vector>
 
 namespace tnn {
+template <typename T>
+using Vec = std::vector<T>;
+using std::string;
+
 #if defined(USE_CUDA)
 typedef __half fp16;
 typedef __nv_bfloat16 bf16;

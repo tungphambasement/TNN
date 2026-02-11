@@ -18,6 +18,7 @@
 #include "device/pool_allocator.hpp"
 #include "nn/accuracy.hpp"
 #include "nn/blocks_impl/sequential.hpp"
+#include "nn/graph_context.hpp"
 #include "threading/thread_wrapper.hpp"
 #include "utils/env.hpp"
 #include "utils/memory.hpp"
@@ -286,11 +287,11 @@ static void train_step(unique_ptr<Sequential> &model, unique_ptr<BaseDataLoader>
   });
 }
 
-void train_model(unique_ptr<Sequential> &model, unique_ptr<BaseDataLoader> &train_loader,
-                 unique_ptr<BaseDataLoader> &val_loader, unique_ptr<Optimizer> &optimizer,
-                 const unique_ptr<Loss> &criterion, unique_ptr<Scheduler> &scheduler,
-                 const TrainingConfig &config) {
-  optimizer->attach(model->context());
+void train_model(unique_ptr<Sequential> &model, GraphContext &graph_context,
+                 unique_ptr<BaseDataLoader> &train_loader, unique_ptr<BaseDataLoader> &val_loader,
+                 unique_ptr<Optimizer> &optimizer, const unique_ptr<Loss> &criterion,
+                 unique_ptr<Scheduler> &scheduler, const TrainingConfig &config) {
+  optimizer->attach(graph_context);
   Tensor batch_data, batch_labels;
 
   cout << "Training batches: " << train_loader->size() / config.batch_size << endl;

@@ -1,28 +1,17 @@
 #pragma once
 
+#include "nn/graph_context.hpp"
 #include "nn/node.hpp"
 
 namespace tnn {
 class IONode : public INode {
 public:
-  IONode() = default;
+  IONode(GraphContext& ctx)
+      : INode(ctx) {}
 
-  const Tensor &tensor() const {
-    if (!tensor_) {
-      throw std::runtime_error("Dangling tensor in IO Node");
-    }
-    return *tensor_;
-  }
-
-  Tensor &tensor() {
-    if (!tensor_) {
-      throw std::runtime_error("Dangling tensor in IO Node");
-    }
-    return *tensor_;
-  }
-
-private:
-  Tensor *tensor_;
+  std::string type() const override { return "io_node"; }
+  void save_state(std::ofstream& file) override {}
+  NodeConfig get_config() const override { return NodeConfig(); }
 };
 
 }  // namespace tnn

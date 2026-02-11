@@ -88,7 +88,8 @@ signed main() {
   }
 
   try {
-    train_model(model, train_loader, val_loader, optimizer, criterion, scheduler, train_config);
+    train_model(model, graph.context(), train_loader, val_loader, optimizer, criterion, scheduler,
+                train_config);
   } catch (const std::exception &e) {
     cerr << "Training failed: " << e.what() << endl;
     return 1;

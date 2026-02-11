@@ -33,14 +33,17 @@ private:
   std::unordered_map<size_t, std::vector<size_t>> input_shape_cache_;
   std::string activation_type_;
 
+  std::vector<Layer *> layers() override {
+    std::vector<Layer *> layers;
+    for (auto &layer : main_path_) {
+      layers.push_back(layer.get());
+    }
+    for (auto &layer : shortcut_path_) {
+      layers.push_back(layer.get());
+    }
+    return layers;
+  }
   void init_impl() override;
-  void on_set_context(GraphContext &graph_ctx) override;
-  void on_set_flow_handle(flowHandle_t handle) override;
-  void on_set_seed(unsigned long long seed) override;
-  void on_set_io_dtype(DType_t dtype) override;
-  void on_set_param_dtype(DType_t dtype) override;
-  void on_set_compute_dtype(DType_t dtype) override;
-  void on_set_training(bool training) override;
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
   void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
                      size_t mb_id = 0) override;
@@ -63,16 +66,8 @@ public:
   static constexpr const char *TYPE_NAME = "residual_block";
 
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
-
   std::string type() const override { return TYPE_NAME; }
-
   LayerConfig get_config() const override;
   static std::unique_ptr<ResidualBlock> create_from_config(const LayerConfig &config);
-
-  const std::vector<std::unique_ptr<Layer>> &get_main_path() const;
-  const std::vector<std::unique_ptr<Layer>> &get_shortcut_path() const;
-
-  std::vector<Tensor> parameters() override;
-  std::vector<Tensor> gradients() override;
 };
 }  // namespace tnn

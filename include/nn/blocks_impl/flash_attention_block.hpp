@@ -58,14 +58,10 @@ private:
   std::unordered_map<size_t, AttentionStats> stats_cache;
   size_t get_shape_hash(size_t b, size_t h, size_t s, size_t d) const;
 
+  std::vector<Layer *> layers() override {
+    return {q_proj_.get(), k_proj_.get(), v_proj_.get(), out_proj_.get()};
+  }
   void init_impl() override;
-  void on_set_context(GraphContext &graph_ctx) override;
-  void on_set_flow_handle(flowHandle_t handle) override;
-  void on_set_seed(unsigned long long seed) override;
-  void on_set_io_dtype(DType_t dtype) override;
-  void on_set_param_dtype(DType_t dtype) override;
-  void on_set_compute_dtype(DType_t dtype) override;
-  void on_set_training(bool training) override;
   // Expects input: [batch_size, seq_len, embed_dim], output: [batch_size, seq_len, embed_dim]
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
   void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
@@ -83,8 +79,6 @@ public:
   LayerConfig get_config() const override;
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
   static std::unique_ptr<FlashAttentionBlock> create_from_config(const LayerConfig &config);
-  std::vector<Tensor> parameters() override;
-  std::vector<Tensor> gradients() override;
 };
 
 }  // namespace tnn

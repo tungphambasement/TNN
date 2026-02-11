@@ -12,8 +12,7 @@
 #include <cstring>
 
 #include "common/config.hpp"
-#include "nn/graph_context.hpp"
-#include "nn/node.hpp"
+#include "device/iallocator.hpp"
 #include "tensor/tensor.hpp"
 #include "type/type.hpp"
 
@@ -21,15 +20,18 @@ namespace tnn {
 using LayerConfig = TConfig;
 
 struct ParamDescriptor {
+  DType_t dtype;  // data type of the parameter
   std::vector<size_t> shape;
   Tensor *data_ptr;  // pointer to the actual param
   Tensor *grad_ptr;  // pointer to the actual gradient
 };
 
 // Single input/output layer interface. For multi-input/output, use a Block to wrap multiple Layers.
-class Layer : public INode {
+class Layer {
 public:
   Layer() = default;
+
+  virtual ~Layer() = default;
 
   void init();
   void forward(const std::vector<ConstTensor> &inputs, const std::vector<Tensor> &outputs,
@@ -38,6 +40,8 @@ public:
                 size_t mb_id = 0);
 
   // Note: have to call init again after changing param dtype
+  Layer &set_allocator(IAllocator &allocator);
+  IAllocator *get_allocator() const;
   Layer &set_flow_handle(flowHandle_t handle);
   flowHandle_t get_flow_handle() const;
   Layer &set_seed(unsigned long long seed);
@@ -50,31 +54,41 @@ public:
   Layer &set_training(bool training);
   bool is_training() const;
 
-  virtual std::vector<size_t> compute_output_shape(
-      const std::vector<size_t> &input_shape) const = 0;
-
-  virtual std::vector<Tensor> parameters() { return params_; }
-  virtual std::vector<Tensor> gradients() { return grads_; }
-
+  Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shape) const;
   std::string name() const { return name_; }
-  void save_state(std::ofstream &file) override;
+  void save_state(std::ofstream &file);
+  virtual std::vector<ParamDescriptor> param_descriptors() { return {}; }
+  virtual std::string type() const = 0;
+  virtual LayerConfig get_config() const = 0;
+  const Device &device() const {
+    if (!allocator_) {
+      throw std::runtime_error("Allocator is not set");
+    }
+    return allocator_->device();
+  }
+
+  std::vector<Tensor> parameters();
+  std::vector<Tensor> gradients();
 
 protected:
-  virtual std::vector<ParamDescriptor> param_descriptors() { return {}; }
-  void on_set_context(GraphContext &context) override;
   virtual void init_impl() {}
+  virtual void on_set_allocator(IAllocator &allocator) {}
   virtual void on_set_flow_handle(flowHandle_t handle) {}
   virtual void on_set_seed(unsigned long long seed) {}
   virtual void on_set_training(bool training) {}
   virtual void on_set_io_dtype(DType_t dtype) {}
   virtual void on_set_param_dtype(DType_t dtype) {}
   virtual void on_set_compute_dtype(DType_t dtype) {}
+
+  // all assuming single input, single output. Can easily be modified later.
   virtual void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) = 0;
   virtual void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
                              size_t mb_id = 0) = 0;
+  virtual Vec<size_t> compute_output_shape(const Vec<size_t> &input_shape) const = 0;
 
 protected:
   bool initialized_ = false;
+  IAllocator *allocator_ = nullptr;
   bool is_training_ = true;
   bool use_seed_ = false;
   unsigned long long srand_seed_ = 0;

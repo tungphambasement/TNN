@@ -49,8 +49,7 @@ int main(int argc, char **argv) {
   } catch (const std::exception &e) {
     cerr << "Could not load from file, trying ExampleModels: " << e.what() << endl;
     Sequential temp_model = ExampleModels::create("gpt2");
-    temp_model.init();
-    temp_model.set_context(graph.context());
+    graph.add_layer(temp_model);
     model = std::make_unique<Sequential>(std::move(temp_model));
   }
   model->set_training(false);

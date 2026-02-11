@@ -11,15 +11,15 @@ signed main() {
   auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
   Graph graph(allocator);
 
-  Conv2DLayer conv_layer(3, 128, 3, 3, 1, 1, 1, 1, true, "conv2d_test");
+  Conv2DLayer conv_layer(16, 128, 3, 3, 1, 1, 0, 0, true, "conv2d_test");
   graph.add_layer(conv_layer);
 
-  LegacyConv2DLayer legacy_conv_layer(3, 128, 3, 3, 1, 1, 1, 1, true, "legacy_conv2d_test");
+  LegacyConv2DLayer legacy_conv_layer(16, 128, 3, 3, 1, 1, 0, 0, true, "legacy_conv2d_test");
   graph.add_layer(legacy_conv_layer);
 
   graph.compile();
 
-  Tensor input = make_tensor<float>({128, 224, 224, 3}, getGPU());
+  Tensor input = make_tensor<float>({128, 224, 224, 16}, getGPU());
   input->fill_random_normal(0.5f, 0.2f, 676767);
   Tensor output = make_tensor<float>({128, 224, 224, 128}, getGPU());
 
@@ -45,7 +45,7 @@ signed main() {
   std::cout << "Conv2D Average time per forward pass: " << duration.count() / passes << " ms"
             << std::endl;
 
-  Tensor nchw_input = make_tensor<float>({128, 3, 224, 224}, getGPU());
+  Tensor nchw_input = make_tensor<float>({128, 16, 224, 224}, getGPU());
   nchw_input->fill_random_normal(0.5f, 0.2f, 676767);
   Tensor nchw_output = make_tensor<float>({128, 128, 224, 224}, getGPU());
   // legacy conv2d benchmark

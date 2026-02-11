@@ -38,6 +38,7 @@ private:
   std::vector<ParamDescriptor> param_descriptors() override {
     std::vector<ParamDescriptor> descriptors;
     auto weight_desc = ParamDescriptor{
+        param_dtype_,
         {vocab_size_, embed_dim_},
         &weight_,
         &grad_weight_,

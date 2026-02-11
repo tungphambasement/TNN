@@ -35,6 +35,7 @@ private:
   std::vector<ParamDescriptor> param_descriptors() override {
     std::vector<ParamDescriptor> descriptors;
     auto pos_emb_desc = ParamDescriptor{
+        param_dtype_,
         {seq_len_, embed_dim_},
         &pos_embedding_,
         &pos_embedding_gradients_,

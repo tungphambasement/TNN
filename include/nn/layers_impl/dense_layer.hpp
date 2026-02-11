@@ -73,6 +73,7 @@ private:
   std::vector<ParamDescriptor> param_descriptors() override {
     std::vector<ParamDescriptor> descriptors;
     auto weight_desc = ParamDescriptor{
+        param_dtype_,
         {output_features_, input_features_},
         &weights_,
         &weight_gradients_,
@@ -80,6 +81,7 @@ private:
     descriptors.push_back(weight_desc);
     if (use_bias_) {
       auto bias_desc = ParamDescriptor{
+          param_dtype_,
           {output_features_},
           &bias_,
           &bias_gradients_,

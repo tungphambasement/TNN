@@ -40,7 +40,6 @@ public:
   static constexpr const char *TYPE_NAME = "slice";
 
   SliceLayer(size_t axis, size_t start, size_t length, const std::string &name = "slice");
-  ~SliceLayer() override;
 
   std::string type() const override { return TYPE_NAME; }
   LayerConfig get_config() const override;

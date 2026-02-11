@@ -55,61 +55,11 @@ FlashAttentionBlock::~FlashAttentionBlock() {
 #endif
 }
 
-void FlashAttentionBlock::on_set_context(GraphContext &graph_ctx) {
-  q_proj_->set_context(graph_ctx);
-  k_proj_->set_context(graph_ctx);
-  v_proj_->set_context(graph_ctx);
-  out_proj_->set_context(graph_ctx);
-}
-
 void FlashAttentionBlock::init_impl() {
   q_proj_->init();
   k_proj_->init();
   v_proj_->init();
   out_proj_->init();
-}
-
-void FlashAttentionBlock::on_set_io_dtype(DType_t dtype) {
-  q_proj_->set_io_dtype(dtype);
-  k_proj_->set_io_dtype(dtype);
-  v_proj_->set_io_dtype(dtype);
-  out_proj_->set_io_dtype(dtype);
-}
-
-void FlashAttentionBlock::on_set_param_dtype(DType_t dtype) {
-  q_proj_->set_param_dtype(dtype);
-  k_proj_->set_param_dtype(dtype);
-  v_proj_->set_param_dtype(dtype);
-  out_proj_->set_param_dtype(dtype);
-}
-
-void FlashAttentionBlock::on_set_compute_dtype(DType_t dtype) {
-  q_proj_->set_compute_dtype(dtype);
-  k_proj_->set_compute_dtype(dtype);
-  v_proj_->set_compute_dtype(dtype);
-  out_proj_->set_compute_dtype(dtype);
-}
-
-void FlashAttentionBlock::on_set_training(bool training) {
-  this->is_training_ = training;
-  q_proj_->set_training(training);
-  k_proj_->set_training(training);
-  v_proj_->set_training(training);
-  out_proj_->set_training(training);
-}
-
-void FlashAttentionBlock::on_set_flow_handle(flowHandle_t handle) {
-  q_proj_->set_flow_handle(handle);
-  k_proj_->set_flow_handle(handle);
-  v_proj_->set_flow_handle(handle);
-  out_proj_->set_flow_handle(handle);
-}
-
-void FlashAttentionBlock::on_set_seed(unsigned long long seed) {
-  q_proj_->set_seed(seed);
-  k_proj_->set_seed(seed);
-  v_proj_->set_seed(seed);
-  out_proj_->set_seed(seed);
 }
 
 size_t FlashAttentionBlock::get_shape_hash(size_t b, size_t h, size_t s, size_t d) const {
@@ -396,32 +346,6 @@ std::unique_ptr<FlashAttentionBlock> FlashAttentionBlock::create_from_config(
   size_t num_heads = config.get<size_t>("num_heads");
   bool is_causal = config.get<bool>("is_causal", true);
   return std::make_unique<FlashAttentionBlock>(embed_dim, num_heads, is_causal, config.name);
-}
-
-std::vector<Tensor> FlashAttentionBlock::parameters() {
-  std::vector<Tensor> params;
-  auto q_params = q_proj_->parameters();
-  auto k_params = k_proj_->parameters();
-  auto v_params = v_proj_->parameters();
-  auto out_params = out_proj_->parameters();
-  params.insert(params.end(), q_params.begin(), q_params.end());
-  params.insert(params.end(), k_params.begin(), k_params.end());
-  params.insert(params.end(), v_params.begin(), v_params.end());
-  params.insert(params.end(), out_params.begin(), out_params.end());
-  return params;
-}
-
-std::vector<Tensor> FlashAttentionBlock::gradients() {
-  std::vector<Tensor> grads;
-  auto q_grads = q_proj_->gradients();
-  auto k_grads = k_proj_->gradients();
-  auto v_grads = v_proj_->gradients();
-  auto out_grads = out_proj_->gradients();
-  grads.insert(grads.end(), q_grads.begin(), q_grads.end());
-  grads.insert(grads.end(), k_grads.begin(), k_grads.end());
-  grads.insert(grads.end(), v_grads.begin(), v_grads.end());
-  grads.insert(grads.end(), out_grads.begin(), out_grads.end());
-  return grads;
 }
 
 }  // namespace tnn

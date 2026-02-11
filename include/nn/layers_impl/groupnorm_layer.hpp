@@ -48,12 +48,14 @@ private:
     std::vector<ParamDescriptor> descriptors;
     if (affine_) {
       auto gamma_desc = ParamDescriptor{
+          param_dtype_,
           {num_channels_},
           &gamma_,
           &gamma_gradients_,
       };
       descriptors.push_back(gamma_desc);
       auto beta_desc = ParamDescriptor{
+          param_dtype_,
           {num_channels_},
           &beta_,
           &beta_gradients_,

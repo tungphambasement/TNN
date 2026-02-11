@@ -27,14 +27,14 @@ private:
   void compute_max_size(const std::vector<size_t> &input_shape, DType_t dtype);
 
 protected:
+  std::vector<Layer *> layers() override {
+    std::vector<Layer *> layers;
+    for (auto &layer : layers_) {
+      layers.push_back(layer.get());
+    }
+    return layers;
+  }
   void init_impl() override;
-  void on_set_context(GraphContext &graph_ctx) override;
-  void on_set_flow_handle(flowHandle_t handle) override {}
-  void on_set_seed(unsigned long long seed) override;
-  void on_set_io_dtype(DType_t dtype) override;
-  void on_set_param_dtype(DType_t dtype) override;
-  void on_set_compute_dtype(DType_t dtype) override;
-  void on_set_training(bool training) override;
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
   void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
                      size_t mb_id = 0) override;
@@ -52,13 +52,9 @@ public:
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
   void print_summary(const std::vector<size_t> &input_shape) const;
   const std::vector<Layer *> &get_layers() const;
-
   std::string type() const override { return TYPE_NAME; }
   LayerConfig get_config() const override;
   static std::unique_ptr<Sequential> create_from_config(const LayerConfig &config);
-
-  std::vector<Tensor> parameters() override;
-  std::vector<Tensor> gradients() override;
 };
 
 }  // namespace tnn

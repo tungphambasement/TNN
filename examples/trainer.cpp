@@ -79,7 +79,8 @@ signed main() {
       optimizer.get(), 5 * train_loader->size() / train_config.batch_size, 0.1f);
 
   try {
-    train_model(model, train_loader, val_loader, optimizer, criterion, scheduler, train_config);
+    train_model(model, graph.context(), train_loader, val_loader, optimizer, criterion, scheduler,
+                train_config);
   } catch (const std::exception &e) {
     cerr << "Training failed: " << e.what() << endl;
     return 1;

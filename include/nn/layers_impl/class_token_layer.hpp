@@ -35,6 +35,7 @@ private:
   std::vector<ParamDescriptor> param_descriptors() override {
     std::vector<ParamDescriptor> descriptors;
     auto token_desc = ParamDescriptor{
+        param_dtype_,
         {1, embed_dim_},
         &class_token_,
         &class_token_gradients_,

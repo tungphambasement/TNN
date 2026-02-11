@@ -1,7 +1,6 @@
 #pragma once
 
 #include "common/config.hpp"
-#include "device/device.hpp"
 #include "nn/graph_context.hpp"
 
 namespace tnn {
@@ -10,13 +9,10 @@ using NodeConfig = TConfig;
 
 class INode {
 public:
-  INode();
+  INode(GraphContext &ctx)
+      : context_(ctx) {}
+
   virtual ~INode() = default;
-
-  const Device &device() const { return context_->device(); }
-
-  void set_context(GraphContext &graph_ctx);
-  GraphContext &context() const;
 
   /**
    * @brief Initialize the layer (e.g., allocate parameters)
@@ -28,8 +24,6 @@ public:
   virtual NodeConfig get_config() const = 0;
 
 protected:
-  GraphContext *context_ = nullptr;
-
-  virtual void on_set_context(GraphContext &graph_ctx) {}
+  GraphContext &context_;
 };
 }  // namespace tnn

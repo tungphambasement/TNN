@@ -7,22 +7,15 @@
 
 #include "nn/layer.hpp"
 
-#include "nn/graph_context.hpp"
+#include <numeric>
+
+#include "type/type.hpp"
 
 namespace tnn {
 
 void Layer::init() {
-  if (!context_) {
-    throw std::runtime_error("Layer " + name_ + " has no context. Cannot initialize.");
-  }
-  auto param_descriptors = this->param_descriptors();
-  for (const auto &descriptor : param_descriptors) {
-    Tensor param = this->context_->get_param(descriptor.shape, param_dtype_);
-    Tensor grad = this->context_->get_grad(descriptor.shape, param_dtype_);
-    *descriptor.data_ptr = param;
-    *descriptor.grad_ptr = grad;
-    params_.push_back(param);
-    grads_.push_back(grad);
+  if (initialized_) {
+    throw std::runtime_error("Cannot initalize Layer more than once. ");
   }
   init_impl();
   initialized_ = true;
@@ -100,6 +93,14 @@ void Layer::backward(const std::vector<ConstTensor> &gradients,
   clear_cache(mb_id);
 }
 
+Layer &Layer::set_allocator(IAllocator &allocator) {
+  allocator_ = &allocator;
+  on_set_allocator(allocator);
+  return *this;
+}
+
+IAllocator *Layer::get_allocator() const { return allocator_; }
+
 Layer &Layer::set_flow_handle(flowHandle_t handle) {
   flow_handle_ = handle;
   on_set_flow_handle(handle);
@@ -154,32 +155,42 @@ void Layer::save_state(std::ofstream &file) {
   size_t j_size = j_str.size();
   file.write(reinterpret_cast<const char *>(&j_size), sizeof(size_t));
   file.write(j_str.c_str(), j_size);
-  auto params = this->context_->parameters();
-  for (const auto &param : params) {
+  auto descs = param_descriptors();
+  for (const auto &desc : descs) {
+    Tensor param = *desc.data_ptr;
     param->save(file);
   }
 }
 
-void Layer::on_set_context(GraphContext &context) {
-  cached_tensors_.clear();
-  mutable_tensors_.clear();
-  for (const auto &descriptor : param_descriptors()) {
-    this->context_->register_param(descriptor.shape, param_dtype_);
+std::vector<Tensor> Layer::parameters() {
+  std::vector<Tensor> params;
+  auto descs = this->param_descriptors();
+  for (const auto &desc : descs) {
+    params.push_back(*desc.data_ptr);
   }
+  return params;
 }
 
-Tensor Layer::make_io_tensor(std::vector<size_t> shape) {
-  if (!context_) {
-    throw std::runtime_error("Context is not set");
+std::vector<Tensor> Layer::gradients() {
+  std::vector<Tensor> grads;
+  auto descs = this->param_descriptors();
+  for (const auto &desc : descs) {
+    grads.push_back(*desc.grad_ptr);
   }
-  return context_->get_workspace(shape, io_dtype_);
+  return grads;
 }
+
+Vec<Vec<size_t>> Layer::output_shape(const Vec<Vec<size_t>> &input_shape) const {
+  if (input_shape.size() != 1) {
+    throw std::runtime_error("Currently only single input supported in output_shape.");
+  }
+  return {compute_output_shape(input_shape[0])};
+}
+
+Tensor Layer::make_io_tensor(std::vector<size_t> shape) { return get_buffer(shape, io_dtype_); }
 
 Tensor Layer::make_compute_tensor(std::vector<size_t> shape) {
-  if (!context_) {
-    throw std::runtime_error("Context is not set");
-  }
-  return context_->get_workspace(shape, compute_dtype_);
+  return get_buffer(shape, compute_dtype_);
 }
 
 ConstTensor &Layer::get_cached_tensor(size_t mb_id, const std::string &key) {
@@ -191,10 +202,13 @@ Tensor &Layer::get_mutable_tensor(size_t mb_id, const std::string &key) {
 }
 
 Tensor Layer::get_buffer(const std::vector<size_t> &shape, DType_t dtype) {
-  if (!context_) {
-    throw std::runtime_error("Context is not set");
+  if (!allocator_) {
+    throw std::runtime_error("Allocator is not set");
   }
-  return context_->get_workspace(shape, dtype);
+  auto byte_size = std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<size_t>()) *
+                   get_dtype_size(dtype);
+  dptr buffer = allocator_->allocate(byte_size);
+  return make_tensor(*allocator_, dtype, std::move(buffer), shape);
 }
 
 void Layer::clear_cache(size_t mb_id) {

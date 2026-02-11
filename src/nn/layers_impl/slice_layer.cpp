@@ -20,8 +20,6 @@ SliceLayer::SliceLayer(size_t axis, size_t start, size_t length, const std::stri
       start_(start),
       length_(length) {}
 
-SliceLayer::~SliceLayer() = default;
-
 void SliceLayer::forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id) {
   micro_batch_original_shapes_[mb_id] = input->shape();
 
