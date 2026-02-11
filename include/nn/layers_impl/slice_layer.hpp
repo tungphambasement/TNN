@@ -46,7 +46,7 @@ public:
   uint64_t backward_flops(const std::vector<size_t> &input_shape) const override;
   std::string type() const override { return TYPE_NAME; }
   LayerConfig get_config() const override;
-  std::unique_ptr<Layer> clone() const override;
+  std::unique_ptr<Layer> clone_impl() const override;
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
 
   static std::unique_ptr<SliceLayer> create_from_config(const LayerConfig &config);

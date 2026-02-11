@@ -40,6 +40,8 @@ private:
   void def_forward(const ConstTensor &input, const Tensor &output, size_t mb_id);
   void def_backward(const ConstTensor &current_gradient, const Tensor &grad_input, size_t mb_id);
 
+  void register_impl() override;
+
 #ifdef USE_CUDNN
   void cudnn_forward(const ConstTensor &input, const Tensor &output, size_t mb_id);
   void cudnn_backward(const ConstTensor &gradient, const Tensor &grad_input, size_t mb_id);
@@ -124,8 +126,6 @@ private:
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
   void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
                      size_t mb_id = 0) override;
-  void collect_parameters(std::vector<Tensor> &params) override;
-  void collect_gradients(std::vector<Tensor> &grads) override;
 
 public:
   LegacyConv2DLayer(size_t in_channels, size_t out_channels, size_t kernel_h, size_t kernel_w,
@@ -141,7 +141,7 @@ public:
 
   std::string type() const override { return TYPE_NAME; }
   LayerConfig get_config() const override;
-  std::unique_ptr<Layer> clone() const override;
+  std::unique_ptr<Layer> clone_impl() const override;
 
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
 

@@ -11,6 +11,8 @@
 
 #include "activations.hpp"
 #include "nn/blocks_impl/flash_attention_block.hpp"
+#include "nn/graph.hpp"
+#include "nn/graph_context.hpp"
 #include "nn/layer.hpp"
 #include "nn/layers_impl/legacy_dense_layer.hpp"
 #include "type/type.hpp"
@@ -157,7 +159,7 @@ public:
 };
 
 template <typename LayerType>
-static std::unique_ptr<LayerType> load_state(std::ifstream &file, const Device &device) {
+static std::unique_ptr<LayerType> load_state(std::ifstream &file, Graph &graph) {
   size_t j_size;
   file.read(reinterpret_cast<char *>(&j_size), sizeof(size_t));
   std::string j_str(j_size, '\0');
@@ -171,14 +173,14 @@ static std::unique_ptr<LayerType> load_state(std::ifstream &file, const Device &
     throw std::runtime_error("Failed to cast layer to requested type");
   }
   std::unique_ptr<LayerType> layer(raw_ptr);
-  layer->set_device(device);
-  layer->init();
+  graph.add_layer(*layer);
+  graph.compile();
   std::vector<Tensor> params = layer->parameters();
   if (!params.empty()) {
     layer->set_param_dtype(params[0]->data_type());
   }
   for (auto &param : params) {
-    load_into(file, param);
+    param = load(file, graph.context().allocator());
   }
   return layer;
 }

@@ -59,7 +59,7 @@ private:
   size_t get_shape_hash(size_t b, size_t h, size_t s, size_t d) const;
 
   void init_impl() override;
-  void on_set_device(const Device &device) override;
+  void on_set_context(GraphContext &graph_ctx) override;
   void on_set_flow_handle(flowHandle_t handle) override;
   void on_set_seed(unsigned long long seed) override;
   void on_set_io_dtype(DType_t dtype) override;
@@ -83,11 +83,8 @@ public:
   uint64_t backward_flops(const std::vector<size_t> &input_shape) const override;
   std::string type() const override { return TYPE_NAME; }
   LayerConfig get_config() const override;
-  std::unique_ptr<Layer> clone() const override;
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
   static std::unique_ptr<FlashAttentionBlock> create_from_config(const LayerConfig &config);
-  std::vector<Tensor> parameters() override;
-  std::vector<Tensor> gradients() override;
 };
 
 }  // namespace tnn

@@ -36,7 +36,6 @@ private:
                                                       size_t height, size_t width, size_t channels,
                                                       size_t output_h, size_t output_w,
                                                       flowHandle_t handle) const;
-
   template <typename Compute_T>
   std::unique_ptr<Task> compute_avg_pool_backward_impl(const ConstTensor &gradient_data,
                                                        const Tensor &grad_input_data,
@@ -60,7 +59,7 @@ public:
 
   std::string type() const override { return TYPE_NAME; }
   LayerConfig get_config() const override;
-  std::unique_ptr<Layer> clone() const override;
+  std::unique_ptr<Layer> clone_impl() const override;
 
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
 

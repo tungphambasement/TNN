@@ -11,7 +11,8 @@ namespace tnn {
 // default allocator
 class DeviceAllocator : public IAllocator {
 public:
-  DeviceAllocator(const Device& device) : device_(device) {}
+  DeviceAllocator(const Device& device)
+      : device_(device) {}
 
   static DeviceAllocator& instance(const Device& device) {
     static std::mutex registry_mutex;
@@ -28,6 +29,8 @@ public:
     auto storage = std::make_shared<device_storage>(device_, ptr, size, DEFAULT_ALIGNMENT);
     return dptr(storage, 0, size);
   }
+
+  const Device& device() const override { return *device_; }
 
 private:
   csref<Device> device_;

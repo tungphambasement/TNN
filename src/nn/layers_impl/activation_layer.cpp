@@ -11,7 +11,8 @@ namespace tnn {
 
 ActivationLayer::ActivationLayer(std::unique_ptr<ActivationFunction> activation,
                                  const std::string &name)
-    : StatelessLayer(name), activation_(std::move(activation)) {
+    : StatelessLayer(name),
+      activation_(std::move(activation)) {
   if (!activation_) {
     throw std::invalid_argument("Function function cannot be null");
   }
@@ -43,10 +44,6 @@ LayerConfig ActivationLayer::get_config() const {
   config.type = this->type();
   config.set("activation", activation_->name());
   return config;
-}
-
-std::unique_ptr<Layer> ActivationLayer::clone() const {
-  return std::make_unique<ActivationLayer>(activation_->clone(), this->name_);
 }
 
 std::vector<size_t> ActivationLayer::compute_output_shape(

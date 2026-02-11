@@ -35,12 +35,11 @@ private:
                                               size_t vocab_size, size_t embed_dim,
                                               size_t padding_idx, flowHandle_t handle) const;
 
+  void register_impl() override;
   void init_params() override;
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
   void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
                      size_t mb_id = 0) override;
-  void collect_parameters(std::vector<Tensor> &params) override;
-  void collect_gradients(std::vector<Tensor> &grads) override;
 
 public:
   EmbeddingLayer(size_t vocab_size, size_t embed_dim, const std::string &name = "embedding",
@@ -54,7 +53,7 @@ public:
 
   std::string type() const override { return TYPE_NAME; }
   LayerConfig get_config() const override;
-  std::unique_ptr<Layer> clone() const override;
+  std::unique_ptr<Layer> clone_impl() const override;
 
   static std::unique_ptr<EmbeddingLayer> create_from_config(const LayerConfig &config);
 };

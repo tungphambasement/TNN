@@ -32,12 +32,11 @@ private:
                                                  const Tensor &pos_embedding_gradients,
                                                  flowHandle_t handle) const;
 
+  void register_impl() override;
   void init_params() override;
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
   void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
                      size_t mb_id = 0) override;
-  void collect_parameters(std::vector<Tensor> &params) override;
-  void collect_gradients(std::vector<Tensor> &grads) override;
 
 public:
   explicit PositionalEmbeddingLayer(size_t embed_dim, size_t seq_len,
@@ -52,7 +51,7 @@ public:
 
   LayerConfig get_config() const override;
 
-  std::unique_ptr<Layer> clone() const override;
+  std::unique_ptr<Layer> clone_impl() const override;
 
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
 

@@ -50,8 +50,8 @@ void AvgPool2DLayer::forward_impl(const ConstTensor &input, const Tensor &output
 
   output->ensure({batch_size, output_h, output_w, channels});
 
-  DISPATCH_ON_DTYPE_TO_METHOD(compute_avg_pool_forward_impl, input, output, batch_size, input_h,
-                              input_w, channels, output_h, output_w, this->flow_handle_);
+  DISPATCH_IO_DTYPE(compute_avg_pool_forward_impl, input, output, batch_size, input_h, input_w,
+                    channels, output_h, output_w, this->flow_handle_);
 }
 
 void AvgPool2DLayer::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
@@ -77,8 +77,8 @@ void AvgPool2DLayer::backward_impl(const ConstTensor &gradient, const Tensor &gr
   grad_input->ensure({batch_size, input_h, input_w, channels});
   grad_input->fill(0);
 
-  DISPATCH_ON_DTYPE_TO_METHOD(compute_avg_pool_backward_impl, gradient, grad_input, batch_size,
-                              input_h, input_w, channels, output_h, output_w, this->flow_handle_);
+  DISPATCH_IO_DTYPE(compute_avg_pool_backward_impl, gradient, grad_input, batch_size, input_h,
+                    input_w, channels, output_h, output_w, this->flow_handle_);
 }
 
 template <typename IO_T>
@@ -146,11 +146,6 @@ LayerConfig AvgPool2DLayer::get_config() const {
   config.set("pad_h", pad_h_);
   config.set("pad_w", pad_w_);
   return config;
-}
-
-std::unique_ptr<Layer> AvgPool2DLayer::clone() const {
-  return std::make_unique<AvgPool2DLayer>(pool_h_, pool_w_, stride_h_, stride_w_, pad_h_, pad_w_,
-                                          this->name_);
 }
 
 std::vector<size_t> AvgPool2DLayer::compute_output_shape(

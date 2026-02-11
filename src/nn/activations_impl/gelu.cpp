@@ -24,7 +24,7 @@ std::unique_ptr<Task> GELU::apply(const ConstTensor &input, const Tensor &output
     throw std::runtime_error("Input and output must be on the same device for GELU");
   }
 
-  DISPATCH_ON_DTYPE(input->data_type(), T, return apply_impl<T>(input, output, defaultFlowHandle));
+  DISPATCH_DTYPE(input->data_type(), T, return apply_impl<T>(input, output, defaultFlowHandle));
 }
 
 std::unique_ptr<Task> GELU::compute_gradient(const ConstTensor &input,
@@ -36,7 +36,7 @@ std::unique_ptr<Task> GELU::compute_gradient(const ConstTensor &input,
     throw std::runtime_error("Tensors must be on the same device for GELU");
   }
 
-  DISPATCH_ON_DTYPE(
+  DISPATCH_DTYPE(
       input->data_type(), T,
       return compute_gradient_impl<T>(input, grad_output, grad_input, defaultFlowHandle));
 }

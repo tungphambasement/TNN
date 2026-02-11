@@ -28,6 +28,7 @@ set(TEST_FILES
     attention_block_test.cpp
     partitioner_test.cpp
     vbuffer_serializer_test.cpp
+    archiver_test.cpp
 )
 
 foreach(test_file IN LISTS TEST_FILES)

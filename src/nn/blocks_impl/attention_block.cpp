@@ -39,6 +39,13 @@ AttentionBlock::AttentionBlock(size_t embed_dim, size_t num_heads, bool is_causa
   out_proj_ = std::make_unique<DenseLayer>(embed_dim, embed_dim, true, name + "_out");
 }
 
+void AttentionBlock::on_set_context(GraphContext &graph_ctx) {
+  q_proj_->set_context(graph_ctx);
+  k_proj_->set_context(graph_ctx);
+  v_proj_->set_context(graph_ctx);
+  out_proj_->set_context(graph_ctx);
+}
+
 void AttentionBlock::init_impl() {
   q_proj_->init();
   k_proj_->init();
@@ -75,13 +82,6 @@ void AttentionBlock::on_set_training(bool training) {
   out_proj_->set_training(training);
 }
 
-void AttentionBlock::on_set_device(const Device &device) {
-  q_proj_->set_device(device);
-  k_proj_->set_device(device);
-  v_proj_->set_device(device);
-  out_proj_->set_device(device);
-}
-
 void AttentionBlock::on_set_flow_handle(flowHandle_t handle) {
   q_proj_->set_flow_handle(handle);
   k_proj_->set_flow_handle(handle);
@@ -111,9 +111,9 @@ void AttentionBlock::forward_impl(const ConstTensor &input, const Tensor &output
   Tensor k = this->get_buffer({batch_size, seq_len, embed_dim_}, io_dtype_);
   Tensor v = this->get_buffer({batch_size, seq_len, embed_dim_}, io_dtype_);
 
-  q_proj_->forward(input, q, mb_id);
-  k_proj_->forward(input, k, mb_id);
-  v_proj_->forward(input, v, mb_id);
+  q_proj_->forward({input}, {q}, mb_id);
+  k_proj_->forward({input}, {k}, mb_id);
+  v_proj_->forward({input}, {v}, mb_id);
 
   Tensor attn_out = this->get_buffer(input_shape, io_dtype_);
   attn_out->ensure(input_shape);
@@ -121,7 +121,7 @@ void AttentionBlock::forward_impl(const ConstTensor &input, const Tensor &output
   DISPATCH_ON_3_DTYPES_TO_METHOD(compute_attention_forward, q, k, v, attn_out, batch_size, seq_len,
                                  defaultFlowHandle);
 
-  out_proj_->forward(attn_out, output, mb_id);
+  out_proj_->forward({attn_out}, {output}, mb_id);
 }
 
 void AttentionBlock::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
@@ -138,12 +138,12 @@ void AttentionBlock::backward_impl(const ConstTensor &gradient, const Tensor &gr
   Tensor k = this->get_buffer({batch_size, seq_len, embed_dim_}, io_dtype_);
   Tensor v = this->get_buffer({batch_size, seq_len, embed_dim_}, io_dtype_);
 
-  q_proj_->forward(input, q, mb_id);
-  k_proj_->forward(input, k, mb_id);
-  v_proj_->forward(input, v, mb_id);
+  q_proj_->forward({input}, {q}, mb_id);
+  k_proj_->forward({input}, {k}, mb_id);
+  v_proj_->forward({input}, {v}, mb_id);
 
   Tensor d_attn_out = this->get_buffer(gradient->shape(), io_dtype_);
-  out_proj_->backward(gradient, d_attn_out, mb_id);
+  out_proj_->backward({gradient}, {d_attn_out}, mb_id);
 
   Tensor dq = this->get_buffer(q->shape(), io_dtype_);
   Tensor dk = this->get_buffer(k->shape(), io_dtype_);
@@ -156,19 +156,19 @@ void AttentionBlock::backward_impl(const ConstTensor &gradient, const Tensor &gr
   Tensor dk_in = this->get_buffer(k->shape(), io_dtype_);
   Tensor dv_in = this->get_buffer(v->shape(), io_dtype_);
 
-  q_proj_->backward(dq, dq_in, mb_id);
-  k_proj_->backward(dk, dk_in, mb_id);
-  v_proj_->backward(dv, dv_in, mb_id);
+  q_proj_->backward({dq}, {dq_in}, mb_id);
+  k_proj_->backward({dk}, {dk_in}, mb_id);
+  v_proj_->backward({dv}, {dv_in}, mb_id);
 
   grad_input->ensure(dq_in->shape());
   size_t size = dq_in->size();
 
   Tensor temp = this->get_buffer(dq_in->shape(), io_dtype_);
 
-  DISPATCH_ON_DTYPE_TO_METHOD(ops::add, dq_in->data_ptr(), dk_in->data_ptr(), temp->data_ptr(),
-                              size, defaultFlowHandle);
-  DISPATCH_ON_DTYPE_TO_METHOD(ops::add, temp->data_ptr(), dv_in->data_ptr(), grad_input->data_ptr(),
-                              size, defaultFlowHandle);
+  DISPATCH_IO_DTYPE(ops::add, dq_in->data_ptr(), dk_in->data_ptr(), temp->data_ptr(), size,
+                    defaultFlowHandle);
+  DISPATCH_IO_DTYPE(ops::add, temp->data_ptr(), dv_in->data_ptr(), grad_input->data_ptr(), size,
+                    defaultFlowHandle);
 }
 
 uint64_t AttentionBlock::forward_flops(const std::vector<size_t> &input_shape) const { return 0; }
@@ -184,39 +184,9 @@ LayerConfig AttentionBlock::get_config() const {
   return config;
 }
 
-std::unique_ptr<Layer> AttentionBlock::clone() const {
-  return std::make_unique<AttentionBlock>(embed_dim_, num_heads_, is_causal_, this->name_);
-}
-
 std::vector<size_t> AttentionBlock::compute_output_shape(
     const std::vector<size_t> &input_shape) const {
   return input_shape;
-}
-
-std::vector<Tensor> AttentionBlock::parameters() {
-  std::vector<Tensor> params;
-  auto q_params = q_proj_->parameters();
-  params.insert(params.end(), q_params.begin(), q_params.end());
-  auto k_params = k_proj_->parameters();
-  params.insert(params.end(), k_params.begin(), k_params.end());
-  auto v_params = v_proj_->parameters();
-  params.insert(params.end(), v_params.begin(), v_params.end());
-  auto out_params = out_proj_->parameters();
-  params.insert(params.end(), out_params.begin(), out_params.end());
-  return params;
-}
-
-std::vector<Tensor> AttentionBlock::gradients() {
-  std::vector<Tensor> grads;
-  auto q_grads = q_proj_->gradients();
-  grads.insert(grads.end(), q_grads.begin(), q_grads.end());
-  auto k_grads = k_proj_->gradients();
-  grads.insert(grads.end(), k_grads.begin(), k_grads.end());
-  auto v_grads = v_proj_->gradients();
-  grads.insert(grads.end(), v_grads.begin(), v_grads.end());
-  auto out_grads = out_proj_->gradients();
-  grads.insert(grads.end(), out_grads.begin(), out_grads.end());
-  return grads;
 }
 
 template <typename IO_T, typename Param_T, typename Compute_T>
@@ -228,11 +198,11 @@ std::unique_ptr<Task> AttentionBlock::compute_attention_forward(
     throw std::runtime_error("AttentionBlock IO tensor dtype mismatch with dispatch IO_T");
   }
 
-  if (this->device_->device_type() == DeviceType::CPU) {
+  if (this->device().device_type() == DeviceType::CPU) {
     throw std::runtime_error("AttentionBlock CPU implementation not yet available.");
   }
 #ifdef USE_CUDA
-  else if (this->device_->device_type() == DeviceType::GPU) {
+  else if (this->device().device_type() == DeviceType::GPU) {
 
     size_t L = seq_len;
     size_t batch_count = batch_size * num_heads_;
@@ -266,7 +236,7 @@ std::unique_ptr<Task> AttentionBlock::compute_attention_forward(
                        L, static_cast<IO_T>(-INFINITY));
     }
 
-    auto context = dynamic_cast<CUDAContext *>(this->device_->context());
+    auto context = dynamic_cast<CUDAContext *>(this->device().context());
     if (!context) {
       throw std::runtime_error("AttentionBlock requires CUDAContext for CUDA operations.");
     }
@@ -311,11 +281,11 @@ std::unique_ptr<Task> AttentionBlock::compute_attention_backward(
     throw std::runtime_error("AttentionBlock IO tensor dtype mismatch with dispatch IO_T");
   }
 
-  if (this->device_->device_type() == DeviceType::CPU) {
+  if (this->device().device_type() == DeviceType::CPU) {
     throw std::runtime_error("AttentionBlock CPU implementation not yet available.");
   }
 #ifdef USE_CUDA
-  else if (this->device_->device_type() == DeviceType::GPU) {
+  else if (this->device().device_type() == DeviceType::GPU) {
     auto q_raw = q->data_as<IO_T>();
     auto k_raw = k->data_as<IO_T>();
     auto v_raw = v->data_as<IO_T>();
@@ -352,7 +322,7 @@ std::unique_ptr<Task> AttentionBlock::compute_attention_backward(
                        L, static_cast<IO_T>(-INFINITY));
     }
 
-    CUDAContext *context = dynamic_cast<CUDAContext *>(this->device_->context());
+    CUDAContext *context = dynamic_cast<CUDAContext *>(this->device().context());
     if (!context) {
       throw std::runtime_error("AttentionBlock requires CUDAContext for CUDA operations.");
     }

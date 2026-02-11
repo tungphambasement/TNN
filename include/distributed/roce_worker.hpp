@@ -33,7 +33,8 @@ public:
   explicit RoCEWorker(Endpoint worker_endpoint, bool use_gpu)
       : Worker(use_gpu) {
     auto &allocator = PoolAllocator::instance(use_gpu ? getGPU() : getCPU(), defaultFlowHandle);
-    auto communicator = std::make_unique<RoCECommunicator>(worker_endpoint, allocator);
+    auto communicator =
+        std::make_unique<RoCECommunicator>(worker_endpoint, allocator, RoCECommunicator::Config{});
 
     communicator->start_server();
 

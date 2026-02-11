@@ -51,13 +51,20 @@ size_t DenseLayer::get_shape_hash(size_t batch_size) const {
   return seed;
 }
 
+void DenseLayer::register_impl() {
+  register_param({output_features_, input_features_});
+  if (use_bias_) {
+    register_param({output_features_});
+  }
+}
+
 void DenseLayer::init_params() {
   weights_ = make_param_tensor({output_features_, input_features_});
-  weight_gradients_ = make_param_tensor({output_features_, input_features_});
+  weight_gradients_ = make_grad_tensor({output_features_, input_features_});
   weight_gradients_->fill(0);
   if (use_bias_) {
     bias_ = make_param_tensor({output_features_});
-    bias_gradients_ = make_param_tensor({output_features_});
+    bias_gradients_ = make_grad_tensor({output_features_});
     bias_gradients_->fill(0);
   }
   // PyTorch default Kaiming Uniform: Uniform(-bound, bound) where bound = 1 / sqrt(fan_in)
@@ -98,7 +105,7 @@ void DenseLayer::forward_impl(const ConstTensor &input, const Tensor &output, si
   output->ensure(out_shape);
 
 #ifdef USE_CUDNN
-  if (this->device_->device_type() == DeviceType::GPU) {
+  if (this->device().device_type() == DeviceType::GPU) {
     cudnn_forward(input, output, mb_id);
     return;
   }
@@ -111,7 +118,7 @@ void DenseLayer::backward_impl(const ConstTensor &gradient, const Tensor &grad_i
     throw std::invalid_argument("Gradient feature size mismatch in DenseLayer");
   }
 #ifdef USE_CUDNN
-  if (this->device_->device_type() == DeviceType::GPU) {
+  if (this->device().device_type() == DeviceType::GPU) {
     cudnn_backward(gradient, grad_input, mb_id);
     return;
   }
@@ -135,7 +142,7 @@ void DenseLayer::cudnn_forward(const ConstTensor &input, const Tensor &output, s
     cudnnDataType_t param_dtype = cuda::cudnn::to_cudnn_datatype(param_dtype_);
     cudnnDataType_t compute_dtype = cuda::cudnn::to_cudnn_datatype(compute_dtype_);
 
-    CUDAContext *context = dynamic_cast<CUDAContext *>(this->device_->context());
+    CUDAContext *context = dynamic_cast<CUDAContext *>(this->device().context());
     cudnnHandle_t cudnn_handle = context->getCudnnHandle();
 
     GemmStats stats;
@@ -218,7 +225,7 @@ std::unique_ptr<Task> DenseLayer::compute_bias_gradients(const ConstTensor &grad
   if (bias_gradient->data_type() != dtype_of<Param_T>()) {
     throw std::runtime_error("DenseLayer bias gradient dtype mismatch with dispatch Param_T");
   }
-  if (this->device_->device_type() == DeviceType::CPU) {
+  if (this->device().device_type() == DeviceType::CPU) {
     if constexpr (!std::is_same_v<IO_T, Compute_T> || !std::is_same_v<Param_T, Compute_T>) {
       throw std::runtime_error(
           "DenseLayer mixed dtype dispatch not implemented for CPU (io/param/compute must match).");
@@ -228,7 +235,7 @@ std::unique_ptr<Task> DenseLayer::compute_bias_gradients(const ConstTensor &grad
                            output_features);
   }
 #ifdef USE_CUDA
-  else if (this->device_->device_type() == DeviceType::GPU) {
+  else if (this->device().device_type() == DeviceType::GPU) {
     return create_cuda_task(
         handle, cuda::legacy_dense::compute_bias_gradients_ex<IO_T, Param_T, Compute_T>,
         gradient->data_as<IO_T>(), bias_gradient->data_as<Param_T>(), batch_size, output_features);
@@ -250,7 +257,7 @@ std::unique_ptr<Task> DenseLayer::add_bias_vector(const Tensor &output, const Co
   if (bias->data_type() != dtype_of<Param_T>()) {
     throw std::runtime_error("DenseLayer bias dtype mismatch with dispatch Param_T");
   }
-  if (this->device_->device_type() == DeviceType::CPU) {
+  if (this->device().device_type() == DeviceType::CPU) {
     if constexpr (!std::is_same_v<IO_T, Compute_T> || !std::is_same_v<Param_T, Compute_T>) {
       throw std::runtime_error(
           "DenseLayer mixed dtype dispatch not implemented for CPU (io/param/compute must match).");
@@ -260,7 +267,7 @@ std::unique_ptr<Task> DenseLayer::add_bias_vector(const Tensor &output, const Co
                            output_features);
   }
 #ifdef USE_CUDA
-  else if (this->device_->device_type() == DeviceType::GPU) {
+  else if (this->device().device_type() == DeviceType::GPU) {
     return create_cuda_task(
         handle, cuda::legacy_dense::add_bias_vector_ex<IO_T, Param_T, Compute_T>,
         output->data_as<IO_T>(), bias->data_as<Param_T>(), batch_size, output_features);
@@ -282,10 +289,6 @@ LayerConfig DenseLayer::get_config() const {
   return config;
 }
 
-std::unique_ptr<Layer> DenseLayer::clone() const {
-  return std::make_unique<DenseLayer>(input_features_, output_features_, use_bias_, this->name_);
-}
-
 std::vector<size_t> DenseLayer::compute_output_shape(const std::vector<size_t> &input_shape) const {
   if (input_shape.empty()) {
     throw std::runtime_error("DenseLayer::compute_output_shape: Input shape is empty.");
@@ -293,20 +296,6 @@ std::vector<size_t> DenseLayer::compute_output_shape(const std::vector<size_t> &
   std::vector<size_t> out_shape = input_shape;
   out_shape.back() = output_features_;
   return out_shape;
-}
-
-void DenseLayer::collect_parameters(std::vector<Tensor> &params) {
-  params.push_back(weights_);
-  if (use_bias_) {
-    params.push_back(bias_);
-  }
-}
-
-void DenseLayer::collect_gradients(std::vector<Tensor> &grads) {
-  grads.push_back(weight_gradients_);
-  if (use_bias_) {
-    grads.push_back(bias_gradients_);
-  }
 }
 
 std::unique_ptr<DenseLayer> DenseLayer::create_from_config(const LayerConfig &config) {

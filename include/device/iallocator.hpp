@@ -1,5 +1,6 @@
 #pragma once
 
+#include "device/device.hpp"
 #include "device/dptr.hpp"
 
 namespace tnn {
@@ -9,7 +10,9 @@ class IAllocator {
 public:
   virtual ~IAllocator() = default;
 
-  // allocate a ptr with capacity >= size
+  // allocate a ptr with capacity == size
   virtual dptr allocate(size_t size) = 0;
+
+  virtual const Device &device() const = 0;
 };
 }  // namespace tnn

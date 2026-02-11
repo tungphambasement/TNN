@@ -35,7 +35,7 @@ void DropoutLayer::forward_impl(const ConstTensor &input, const Tensor &output, 
 
   Tensor &mask = micro_batch_masks_[mb_id];
   if (mask == nullptr)
-    mask = make_tensor<float>(input->shape(), this->device_);
+    mask = make_tensor<float>(input->shape(), this->device());
   else {
     mask->ensure(input->shape());
   }
@@ -107,10 +107,6 @@ LayerConfig DropoutLayer::get_config() const {
   config.type = this->type();
   config.set("dropout_rate", dropout_rate_);
   return config;
-}
-
-std::unique_ptr<Layer> DropoutLayer::clone() const {
-  return std::make_unique<DropoutLayer>(dropout_rate_, this->name_);
 }
 
 std::vector<size_t> DropoutLayer::compute_output_shape(

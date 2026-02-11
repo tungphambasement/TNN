@@ -40,11 +40,11 @@ ResidualBlock::ResidualBlock(const ResidualBlock &other)
   this->is_training_ = other.is_training_;
 
   for (const auto &layer : other.main_path_) {
-    main_path_.push_back(layer->clone());
+    main_path_.push_back(layer->clone_impl());
   }
 
   for (const auto &layer : other.shortcut_path_) {
-    shortcut_path_.push_back(layer->clone());
+    shortcut_path_.push_back(layer->clone_impl());
   }
 
   if (other.final_activation_) {
@@ -54,21 +54,21 @@ ResidualBlock::ResidualBlock(const ResidualBlock &other)
   }
 }
 
+void ResidualBlock::on_set_context(GraphContext &graph_ctx) {
+  for (auto &layer : main_path_) {
+    layer->set_context(graph_ctx);
+  }
+  for (auto &layer : shortcut_path_) {
+    layer->set_context(graph_ctx);
+  }
+}
+
 void ResidualBlock::init_impl() {
   for (auto &layer : main_path_) {
     layer->init();
   }
   for (auto &layer : shortcut_path_) {
     layer->init();
-  }
-}
-
-void ResidualBlock::on_set_device(const Device &device) {
-  for (auto &layer : main_path_) {
-    layer->set_device(device);
-  }
-  for (auto &layer : shortcut_path_) {
-    layer->set_device(device);
   }
 }
 
@@ -137,7 +137,7 @@ void ResidualBlock::forward_impl(const ConstTensor &input, const Tensor &output,
   for (auto &layer : main_path_) {
     Tensor temp_output = this->get_buffer(layer->compute_output_shape(main_output->shape()),
                                           main_output->data_type());
-    layer->forward(main_output, temp_output, mb_id);
+    layer->forward({main_output}, {temp_output}, mb_id);
     main_output = temp_output;
   }
 
@@ -145,7 +145,7 @@ void ResidualBlock::forward_impl(const ConstTensor &input, const Tensor &output,
   for (auto &layer : shortcut_path_) {
     Tensor temp_output = this->get_buffer(layer->compute_output_shape(shortcut_output->shape()),
                                           shortcut_output->data_type());
-    layer->forward(shortcut_output, temp_output, mb_id);
+    layer->forward({shortcut_output}, {temp_output}, mb_id);
     shortcut_output = temp_output;
   }
 
@@ -155,15 +155,15 @@ void ResidualBlock::forward_impl(const ConstTensor &input, const Tensor &output,
       pre_act = this->get_buffer(main_output->shape(), main_output->data_type());
     else
       pre_act->ensure(main_output->shape());
-    DISPATCH_ON_DTYPE_TO_METHOD(ops::add, main_output->data_ptr(), shortcut_output->data_ptr(),
-                                pre_act->data_ptr(), pre_act->size());
+    DISPATCH_IO_DTYPE(ops::add, main_output->data_ptr(), shortcut_output->data_ptr(),
+                      pre_act->data_ptr(), pre_act->size());
 
     output->ensure(main_output->shape());
     final_activation_->apply(pre_act, output);
   } else {
     output->ensure(main_output->shape());
-    DISPATCH_ON_DTYPE_TO_METHOD(ops::add, main_output->data_ptr(), shortcut_output->data_ptr(),
-                                output->data_ptr(), output->size());
+    DISPATCH_IO_DTYPE(ops::add, main_output->data_ptr(), shortcut_output->data_ptr(),
+                      output->data_ptr(), output->size());
   }
 }
 
@@ -198,7 +198,7 @@ void ResidualBlock::backward_impl(const ConstTensor &gradient, const Tensor &gra
   ConstTensor main_grad = grad_to_propagate;
   for (int i = static_cast<int>(main_path_.size()) - 1; i >= 0; --i) {
     Tensor temp_grad = this->get_buffer({main_path_max_size}, gradient->data_type());
-    main_path_[i]->backward(main_grad, temp_grad, mb_id);
+    main_path_[i]->backward({main_grad}, {temp_grad}, mb_id);
     main_grad = temp_grad;
   }
 
@@ -206,41 +206,14 @@ void ResidualBlock::backward_impl(const ConstTensor &gradient, const Tensor &gra
   if (!shortcut_path_.empty()) {
     for (int i = static_cast<int>(shortcut_path_.size()) - 1; i >= 0; --i) {
       Tensor temp_grad = this->get_buffer({shortcut_path_max_size}, gradient->data_type());
-      shortcut_path_[i]->backward(shortcut_grad, temp_grad, mb_id);
+      shortcut_path_[i]->backward({shortcut_grad}, {temp_grad}, mb_id);
       shortcut_grad = temp_grad;
     }
   }
 
   grad_input->ensure(main_grad->shape());
-  DISPATCH_ON_DTYPE_TO_METHOD(ops::add, main_grad->data_ptr(), shortcut_grad->data_ptr(),
-                              grad_input->data_ptr(), grad_input->size());
-}
-
-std::vector<Tensor> ResidualBlock::parameters() {
-  std::vector<Tensor> params;
-  for (auto &layer : main_path_) {
-    auto layer_params = layer->parameters();
-    params.insert(params.end(), layer_params.begin(), layer_params.end());
-  }
-
-  for (auto &layer : shortcut_path_) {
-    auto layer_params = layer->parameters();
-    params.insert(params.end(), layer_params.begin(), layer_params.end());
-  }
-  return params;
-}
-
-std::vector<Tensor> ResidualBlock::gradients() {
-  std::vector<Tensor> grads;
-  for (auto &layer : main_path_) {
-    auto layer_grads = layer->gradients();
-    grads.insert(grads.end(), layer_grads.begin(), layer_grads.end());
-  }
-  for (auto &layer : shortcut_path_) {
-    auto layer_grads = layer->gradients();
-    grads.insert(grads.end(), layer_grads.begin(), layer_grads.end());
-  }
-  return grads;
+  DISPATCH_IO_DTYPE(ops::add, main_grad->data_ptr(), shortcut_grad->data_ptr(),
+                    grad_input->data_ptr(), grad_input->size());
 }
 
 void ResidualBlock::on_set_training(bool training) {
@@ -334,17 +307,12 @@ LayerConfig ResidualBlock::get_config() const {
   return config;
 }
 
-std::unique_ptr<Layer> ResidualBlock::clone() const {
-  std::vector<std::unique_ptr<Layer>> main_clone;
-  for (const auto &layer : main_path_) {
-    main_clone.push_back(layer->clone());
-  }
-  std::vector<std::unique_ptr<Layer>> shortcut_clone;
-  for (const auto &layer : shortcut_path_) {
-    shortcut_clone.push_back(layer->clone());
-  }
-  return std::make_unique<ResidualBlock>(std::move(main_clone), std::move(shortcut_clone),
-                                         activation_type_, this->name_);
+std::vector<std::unique_ptr<Layer>> shortcut_clone;
+for (const auto &layer : shortcut_path_) {
+  shortcut_clone.push_back(layer->clone_impl());
+}
+return std::make_unique<ResidualBlock>(std::move(main_clone), std::move(shortcut_clone),
+                                       activation_type_, this->name_);
 }
 
 const std::vector<std::unique_ptr<Layer>> &ResidualBlock::get_main_path() const {

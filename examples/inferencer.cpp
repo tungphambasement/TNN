@@ -3,6 +3,7 @@
 #include "data_loading/data_loader_factory.hpp"
 #include "device/device_manager.hpp"
 #include "nn/example_models.hpp"
+#include "nn/graph_context.hpp"
 #include "nn/layers.hpp"
 #include "nn/loss.hpp"
 #include "nn/train.hpp"
@@ -24,6 +25,8 @@ signed main() {
 
   std::string device_str = Env::get<std::string>("DEVICE_TYPE", "CPU");
   const auto &device = device_str == "GPU" ? getGPU(0) : getCPU();
+  auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
+  Graph graph(allocator);
 
   string dataset_name = Env::get<std::string>("DATASET_NAME", "");
   if (dataset_name.empty()) {
@@ -43,7 +46,7 @@ signed main() {
     if (!file.is_open()) {
       throw std::runtime_error("Failed to open model file");
     }
-    model = load_state<Sequential>(file, device);
+    model = load_state<Sequential>(file, graph);
     file.close();
     std::cout << "Loaded model config: " << model->get_config().to_json().dump(2) << std::endl;
   } else {

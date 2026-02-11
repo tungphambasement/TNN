@@ -44,12 +44,12 @@ LegacyConv2DLayer::~LegacyConv2DLayer() {}
 
 void LegacyConv2DLayer::init_params() {
   weights_ = make_param_tensor({out_channels_, in_channels_, kernel_h_, kernel_w_});
-  weight_gradients_ = make_param_tensor({out_channels_, in_channels_, kernel_h_, kernel_w_});
+  weight_gradients_ = make_grad_tensor({out_channels_, in_channels_, kernel_h_, kernel_w_});
   weight_gradients_->fill(0);
 
   if (use_bias_) {
     bias_ = make_param_tensor({out_channels_, 1, 1, 1});
-    bias_gradients_ = make_param_tensor({out_channels_, 1, 1, 1});
+    bias_gradients_ = make_grad_tensor({out_channels_, 1, 1, 1});
     bias_gradients_->fill(0);
   }
 
@@ -72,6 +72,13 @@ void LegacyConv2DLayer::init_params() {
     } else {
       bias_->fill_random_uniform(-bound, bound);
     }
+  }
+}
+
+void LegacyConv2DLayer::register_impl() {
+  register_param({out_channels_, in_channels_, kernel_h_, kernel_w_});
+  if (use_bias_) {
+    register_param({out_channels_, 1, 1, 1});
   }
 }
 
@@ -98,7 +105,7 @@ void LegacyConv2DLayer::forward_impl(const ConstTensor &input, const Tensor &out
   }
 
 #ifdef USE_CUDNN
-  if (this->device_->device_type() == DeviceType::GPU) {
+  if (this->device().device_type() == DeviceType::GPU) {
     cudnn_forward(input, output, mb_id);
     return;
   }
@@ -122,7 +129,7 @@ void LegacyConv2DLayer::backward_impl(const ConstTensor &gradient, const Tensor 
   }
 
 #ifdef USE_CUDNN
-  if (this->device_->device_type() == DeviceType::GPU) {
+  if (this->device().device_type() == DeviceType::GPU) {
     cudnn_backward(gradient, grad_input, mb_id);
     return;
   }
@@ -160,15 +167,15 @@ void LegacyConv2DLayer::def_forward(const ConstTensor &input, const Tensor &outp
   size_t output_buffer_size = out_channels_ * output_size;
   temp_output_buffer_->ensure({output_buffer_size});
 
-  DISPATCH_ON_DTYPE_TO_METHOD(ops::im2col, input, col_buffer, kernel_h_, kernel_w_, stride_h_,
-                              stride_w_, pad_h_, pad_w_, this->flow_handle_);
+  DISPATCH_IO_DTYPE(ops::im2col, input, col_buffer, kernel_h_, kernel_w_, stride_h_, stride_w_,
+                    pad_h_, pad_w_, this->flow_handle_);
 
   DISPATCH_ON_3_DTYPES_TO_METHOD(compute_conv_forward_impl, col_buffer, weights_,
                                  temp_output_buffer_, output_size, kernel_size, out_channels_,
                                  this->flow_handle_);
 
-  DISPATCH_ON_DTYPE_TO_METHOD(ops::cnhw_to_nchw, temp_output_buffer_, output, batch_size,
-                              out_channels_, output_h, output_w, this->flow_handle_);
+  DISPATCH_IO_DTYPE(ops::cnhw_to_nchw, temp_output_buffer_, output, batch_size, out_channels_,
+                    output_h, output_w, this->flow_handle_);
 
   if (use_bias_) {
     DISPATCH_ON_3_DTYPES_TO_METHOD(add_bias_to_output_impl, output, bias_, batch_size, output_h,
@@ -209,8 +216,8 @@ void LegacyConv2DLayer::def_backward(const ConstTensor &gradient, const Tensor &
   temp_gradient_buffer_->ensure({gradient_buffer_size});
   temp_col_grad_matrix_buffer_->ensure({col_grad_matrix_size});
 
-  DISPATCH_ON_DTYPE_TO_METHOD(ops::nchw_to_cnhw, gradient, temp_gradient_buffer_, batch_size,
-                              out_channels_, output_h, output_w, this->flow_handle_);
+  DISPATCH_IO_DTYPE(ops::nchw_to_cnhw, gradient, temp_gradient_buffer_, batch_size, out_channels_,
+                    output_h, output_w, this->flow_handle_);
 
   DISPATCH_ON_3_DTYPES_TO_METHOD(compute_weight_gradients_impl, it_col_buffer->second,
                                  temp_gradient_buffer_, weight_gradients_, output_size, kernel_size,
@@ -220,9 +227,9 @@ void LegacyConv2DLayer::def_backward(const ConstTensor &gradient, const Tensor &
                                  temp_col_grad_matrix_buffer_, output_size, kernel_size,
                                  out_channels_, this->flow_handle_);
 
-  DISPATCH_ON_DTYPE_TO_METHOD(ops::col2im, temp_col_grad_matrix_buffer_, grad_input, batch_size,
-                              in_channels_, input_h, input_w, kernel_h_, kernel_w_, stride_h_,
-                              stride_w_, pad_h_, pad_w_, this->flow_handle_);
+  DISPATCH_IO_DTYPE(ops::col2im, temp_col_grad_matrix_buffer_, grad_input, batch_size, in_channels_,
+                    input_h, input_w, kernel_h_, kernel_w_, stride_h_, stride_w_, pad_h_, pad_w_,
+                    this->flow_handle_);
 
   if (use_bias_) {
     DISPATCH_ON_3_DTYPES_TO_METHOD(compute_bias_gradients_impl, gradient, bias_gradients_,
@@ -249,7 +256,7 @@ void LegacyConv2DLayer::cudnn_forward(const ConstTensor &input, const Tensor &ou
   if (!convolution_handle_) {
     init_convolution_stats(stats_, batch_size, in_channels_, input_h, input_w, out_channels_,
                            kernel_h_, kernel_w_, stride_h_, stride_w_, pad_h_, pad_w_, use_bias_);
-    CUDAContext *cuda_context = dynamic_cast<CUDAContext *>(this->device_->context());
+    CUDAContext *cuda_context = dynamic_cast<CUDAContext *>(this->device().context());
     if (!cuda_context) {
       throw std::runtime_error("Conv2DLayer requires CUDAContext for cuDNN operations");
     }
@@ -603,12 +610,6 @@ LayerConfig LegacyConv2DLayer::get_config() const {
   return config;
 }
 
-std::unique_ptr<Layer> LegacyConv2DLayer::clone() const {
-  return std::make_unique<LegacyConv2DLayer>(in_channels_, out_channels_, kernel_h_, kernel_w_,
-                                             stride_h_, stride_w_, pad_h_, pad_w_, use_bias_,
-                                             this->name_);
-}
-
 std::vector<size_t> LegacyConv2DLayer::compute_output_shape(
     const std::vector<size_t> &input_shape) const {
   if (input_shape.size() != 4) {
@@ -621,20 +622,6 @@ std::vector<size_t> LegacyConv2DLayer::compute_output_shape(
   size_t output_w = (input_shape[3] + 2 * pad_w_ - kernel_w_) / stride_w_ + 1;
 
   return {batch_size, out_channels_, output_h, output_w};
-}
-
-void LegacyConv2DLayer::collect_parameters(std::vector<Tensor> &params) {
-  params.push_back(weights_);
-  if (use_bias_) {
-    params.push_back(bias_);
-  }
-}
-
-void LegacyConv2DLayer::collect_gradients(std::vector<Tensor> &grads) {
-  grads.push_back(weight_gradients_);
-  if (use_bias_) {
-    grads.push_back(bias_gradients_);
-  }
 }
 
 uint64_t LegacyConv2DLayer::forward_flops(const std::vector<size_t> &input_shape) const {

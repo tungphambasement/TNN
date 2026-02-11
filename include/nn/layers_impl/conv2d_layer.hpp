@@ -69,9 +69,8 @@ private:
   std::unordered_map<size_t, ConvolutionStats> stats_cache;
   size_t get_shape_hash(size_t n, size_t c, size_t h, size_t w) const;
 
+  void register_impl() override;
   void init_params() override;
-  void collect_parameters(std::vector<Tensor> &params) override;
-  void collect_gradients(std::vector<Tensor> &grads) override;
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
   void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
                      size_t mb_id = 0) override;
@@ -89,7 +88,7 @@ public:
   uint64_t backward_flops(const std::vector<size_t> &input_shape) const override;
   std::string type() const override { return TYPE_NAME; }
   LayerConfig get_config() const override;
-  std::unique_ptr<Layer> clone() const override;
+  std::unique_ptr<Layer> clone_impl() const override;
 
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
 

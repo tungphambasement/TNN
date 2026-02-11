@@ -11,7 +11,9 @@
 namespace tnn {
 
 FlattenLayer::FlattenLayer(int start_dim, int end_dim, const std::string &name)
-    : StatelessLayer(name), start_dim_(start_dim), end_dim_(end_dim) {}
+    : StatelessLayer(name),
+      start_dim_(start_dim),
+      end_dim_(end_dim) {}
 
 void FlattenLayer::forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id) {
   micro_batch_original_shapes_[mb_id] = input->shape();
@@ -46,10 +48,6 @@ LayerConfig FlattenLayer::get_config() const {
   config.set("start_dim", start_dim_);
   config.set("end_dim", end_dim_);
   return config;
-}
-
-std::unique_ptr<Layer> FlattenLayer::clone() const {
-  return std::make_unique<FlattenLayer>(this->start_dim_, this->end_dim_, this->name_);
 }
 
 std::vector<size_t> FlattenLayer::compute_output_shape(

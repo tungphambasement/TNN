@@ -45,23 +45,23 @@ void BatchNormLayer::init_params() {
     return;
   }
 
-  gamma_gradients_ = make_param_tensor({num_features_});
-  beta_gradients_ = make_param_tensor({num_features_});
-  gamma_gradients_->fill(0.0f);
-  beta_gradients_->fill(0.0f);
-
   gamma_ = make_param_tensor({num_features_});
   beta_ = make_param_tensor({num_features_});
   gamma_->fill(1.0f);
   beta_->fill(0.0f);
+
+  gamma_gradients_ = make_grad_tensor({num_features_});
+  beta_gradients_ = make_grad_tensor({num_features_});
+  gamma_gradients_->fill(0.0f);
+  beta_gradients_->fill(0.0f);
 
   running_mean_ = make_param_tensor({num_features_});
   running_var_ = make_param_tensor({num_features_});
   running_mean_->fill(0.0f);
   running_var_->fill(1.0f);
 
-  dummy_mean_gradients_ = make_param_tensor({num_features_});
-  dummy_var_gradients_ = make_param_tensor({num_features_});
+  dummy_mean_gradients_ = make_grad_tensor({num_features_});
+  dummy_var_gradients_ = make_grad_tensor({num_features_});
   dummy_mean_gradients_->fill(0.0f);
   dummy_var_gradients_->fill(0.0f);
 
@@ -82,6 +82,13 @@ size_t BatchNormLayer::get_shape_hash(size_t n, size_t c, size_t h, size_t w) co
 }
 #endif
 
+void BatchNormLayer::register_impl() {
+  register_param({num_features_});
+  register_param({num_features_});
+  register_param({num_features_});
+  register_param({num_features_});
+}
+
 /**
  * @brief Forward pass for BatchNormLayer
  * @param input Tensor in NHWC format
@@ -100,7 +107,7 @@ void BatchNormLayer::forward_impl(const ConstTensor &input, const Tensor &output
   }
 
 #ifdef USE_CUDNN
-  if (this->device_->device_type() == DeviceType::GPU) {
+  if (this->device().device_type() == DeviceType::GPU) {
     cudnn_forward(input, output, mb_id);
   } else
 #endif
@@ -112,7 +119,7 @@ void BatchNormLayer::forward_impl(const ConstTensor &input, const Tensor &output
 void BatchNormLayer::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
                                    size_t mb_id) {
 #ifdef USE_CUDNN
-  if (this->device_->device_type() == DeviceType::GPU) {
+  if (this->device().device_type() == DeviceType::GPU) {
     cudnn_backward(gradient, grad_input, mb_id);
   } else
 #endif
@@ -142,7 +149,7 @@ void BatchNormLayer::cudnn_forward(const ConstTensor &input, const Tensor &outpu
     BatchNormStats new_stats;
     init_batchnorm_stats(new_stats, batch_size, channels, height, width, epsilon_, momentum_,
                          use_relu_);
-    auto cuda_context = dynamic_cast<CUDAContext *>(this->device_->context());
+    auto cuda_context = dynamic_cast<CUDAContext *>(this->device().context());
     if (!cuda_context) {
       throw std::runtime_error("BatchNormLayer requires CUDAContext for cuDNN operations");
     }
@@ -246,7 +253,7 @@ std::unique_ptr<Task> BatchNormLayer::forward_training_task(
     throw std::runtime_error("BatchNormLayer gamma dtype mismatch with dispatch Param_T");
   }
 
-  if (this->device_->device_type() == DeviceType::GPU) {
+  if (this->device().device_type() == DeviceType::GPU) {
 #ifdef USE_CUDNN
     return create_cuda_task(handle, cuda::cudnn_batchnorm::run_forward_training, fe_handle, stats,
                             input->data(), gamma->data(), beta->data(), output->data(),
@@ -273,7 +280,7 @@ std::unique_ptr<Task> BatchNormLayer::forward_inference_task(
     throw std::runtime_error("BatchNormLayer gamma dtype mismatch with dispatch Param_T");
   }
 
-  if (this->device_->device_type() == DeviceType::GPU) {
+  if (this->device().device_type() == DeviceType::GPU) {
 #ifdef USE_CUDNN
     return create_cuda_task(handle, cuda::cudnn_batchnorm::run_forward_inference, fe_handle, stats,
                             input->data(), gamma->data(), beta->data(), saved_mean->data(),
@@ -299,7 +306,7 @@ std::unique_ptr<Task> BatchNormLayer::backward_task(
     throw std::runtime_error("BatchNormLayer gamma dtype mismatch with dispatch Param_T");
   }
 
-  if (this->device_->device_type() == DeviceType::GPU) {
+  if (this->device().device_type() == DeviceType::GPU) {
 #ifdef USE_CUDNN
     return create_cuda_task(handle, cuda::cudnn_batchnorm::run_backward, fe_handle, stats,
                             input->data(), gradient->data(),
@@ -326,32 +333,9 @@ LayerConfig BatchNormLayer::get_config() const {
   return config;
 }
 
-std::unique_ptr<Layer> BatchNormLayer::clone() const {
-  return std::make_unique<BatchNormLayer>(num_features_, epsilon_, momentum_, affine_, use_relu_,
-                                          this->name_);
-}
-
 std::vector<size_t> BatchNormLayer::compute_output_shape(
     const std::vector<size_t> &input_shape) const {
   return input_shape;
-}
-
-void BatchNormLayer::collect_parameters(std::vector<Tensor> &params) {
-  if (affine_) {
-    params.push_back(gamma_);
-    params.push_back(beta_);
-  }
-  params.push_back(running_mean_);
-  params.push_back(running_var_);
-}
-
-void BatchNormLayer::collect_gradients(std::vector<Tensor> &grads) {
-  if (affine_) {
-    grads.push_back(gamma_gradients_);
-    grads.push_back(beta_gradients_);
-  }
-  grads.push_back(dummy_mean_gradients_);
-  grads.push_back(dummy_var_gradients_);
 }
 
 std::unique_ptr<BatchNormLayer> BatchNormLayer::create_from_config(const LayerConfig &config) {

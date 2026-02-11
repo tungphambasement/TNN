@@ -8,7 +8,6 @@
 #pragma once
 
 #include <string>
-#include <vector>
 
 #include "nn/layer.hpp"
 
@@ -17,9 +16,6 @@ namespace tnn {
 class StatelessLayer : public Layer {
 public:
   explicit StatelessLayer(const std::string &name = "") { this->name_ = name; }
-  std::vector<Tensor> parameters() override { return {}; }
-  std::vector<Tensor> gradients() override { return {}; }
-  bool has_parameters() const override { return false; }
 
 private:
   // Stateless layers do not need initialization
@@ -27,10 +23,8 @@ private:
     (void)this;  // no-op
   }
 
-  // stateless layers don't have params so device change don't really matter but there may be
-  // special cases.
-  void on_set_device(const Device &device) override {
-    (void)device;  // no-op
+  void register_impl() override {
+    // no-op
   }
 };
 

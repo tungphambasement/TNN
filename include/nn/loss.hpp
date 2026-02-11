@@ -51,8 +51,8 @@ public:
       throw std::runtime_error(
           "Predictions and targets must be on the same device for CrossEntropyLoss.");
     }
-    DISPATCH_ON_DTYPE(predictions->data_type(), T,
-                      return compute_loss_impl<T>(predictions, targets, loss));
+    DISPATCH_DTYPE(predictions->data_type(), T,
+                   return compute_loss_impl<T>(predictions, targets, loss));
   }
 
   std::unique_ptr<Task> compute_gradient(const ConstTensor &predictions, const ConstTensor &targets,
@@ -61,8 +61,8 @@ public:
       throw std::runtime_error(
           "Predictions, targets, and gradient must be on the same device for CrossEntropyLoss.");
     }
-    DISPATCH_ON_DTYPE(predictions->data_type(), T,
-                      return compute_gradient_impl<T>(predictions, targets, gradient));
+    DISPATCH_DTYPE(predictions->data_type(), T,
+                   return compute_gradient_impl<T>(predictions, targets, gradient));
   }
 
   std::string name() const override { return "CrossEntropyLoss"; }
@@ -145,7 +145,7 @@ public:
       throw std::runtime_error(
           "Logits and targets must be on the same device for LogSoftmaxCrossEntropyLoss.");
     }
-    DISPATCH_ON_DTYPE(logits->data_type(), T, return compute_loss_impl<T>(logits, targets, loss));
+    DISPATCH_DTYPE(logits->data_type(), T, return compute_loss_impl<T>(logits, targets, loss));
   }
 
   std::unique_ptr<Task> compute_gradient(const ConstTensor &logits, const ConstTensor &targets,
@@ -155,8 +155,8 @@ public:
           "Logits, targets, and gradient must be on the same device for "
           "LogSoftmaxCrossEntropyLoss.");
     }
-    DISPATCH_ON_DTYPE(logits->data_type(), T,
-                      return compute_gradient_impl<T>(logits, targets, gradient));
+    DISPATCH_DTYPE(logits->data_type(), T,
+                   return compute_gradient_impl<T>(logits, targets, gradient));
   }
 
   std::string name() const override { return "LogSoftmaxCrossEntropyLoss"; }
@@ -234,8 +234,8 @@ public:
     if (predictions->device() != targets->device()) {
       throw std::runtime_error("Predictions and targets must be on the same device for MSELoss.");
     }
-    DISPATCH_ON_DTYPE(predictions->data_type(), T,
-                      return compute_loss_impl<T>(predictions, targets, loss));
+    DISPATCH_DTYPE(predictions->data_type(), T,
+                   return compute_loss_impl<T>(predictions, targets, loss));
   }
 
   std::unique_ptr<Task> compute_gradient(const ConstTensor &predictions, const ConstTensor &targets,
@@ -244,8 +244,8 @@ public:
       throw std::runtime_error(
           "Predictions, targets, and gradient must be on the same device for MSELoss.");
     }
-    DISPATCH_ON_DTYPE(predictions->data_type(), T,
-                      return compute_gradient_impl<T>(predictions, targets, gradient));
+    DISPATCH_DTYPE(predictions->data_type(), T,
+                   return compute_gradient_impl<T>(predictions, targets, gradient));
   }
 
   std::string name() const override { return "MSELoss"; }
@@ -319,8 +319,8 @@ public:
     if (predictions->device() != targets->device()) {
       throw std::runtime_error("Predictions and targets must be on the same device for MAELoss.");
     }
-    DISPATCH_ON_DTYPE(predictions->data_type(), T,
-                      return compute_loss_impl<T>(predictions, targets, loss));
+    DISPATCH_DTYPE(predictions->data_type(), T,
+                   return compute_loss_impl<T>(predictions, targets, loss));
   }
 
   std::unique_ptr<Task> compute_gradient(const ConstTensor &predictions, const ConstTensor &targets,
@@ -329,8 +329,8 @@ public:
       throw std::runtime_error(
           "Predictions, targets, and gradient must be on the same device for MAELoss.");
     }
-    DISPATCH_ON_DTYPE(predictions->data_type(), T,
-                      return compute_gradient_impl<T>(predictions, targets, gradient));
+    DISPATCH_DTYPE(predictions->data_type(), T,
+                   return compute_gradient_impl<T>(predictions, targets, gradient));
   }
 
   std::string name() const override { return "MAELoss"; }
@@ -405,8 +405,8 @@ public:
     if (predictions->device() != targets->device()) {
       throw std::runtime_error("Predictions and targets must be on the same device for HuberLoss.");
     }
-    DISPATCH_ON_DTYPE(predictions->data_type(), T,
-                      return compute_loss_impl<T>(predictions, targets, loss));
+    DISPATCH_DTYPE(predictions->data_type(), T,
+                   return compute_loss_impl<T>(predictions, targets, loss));
   }
 
   std::unique_ptr<Task> compute_gradient(const ConstTensor &predictions, const ConstTensor &targets,
@@ -415,8 +415,8 @@ public:
       throw std::runtime_error(
           "Predictions, targets, and gradient must be on the same device for HuberLoss.");
     }
-    DISPATCH_ON_DTYPE(predictions->data_type(), T,
-                      return compute_gradient_impl<T>(predictions, targets, gradient));
+    DISPATCH_DTYPE(predictions->data_type(), T,
+                   return compute_gradient_impl<T>(predictions, targets, gradient));
   }
 
   std::string name() const override { return "HuberLoss"; }

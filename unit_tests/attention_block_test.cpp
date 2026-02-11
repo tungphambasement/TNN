@@ -31,7 +31,7 @@ TEST(AttentionBlockTest, ForwardPassCPU) {
   attention->init();
 
   Tensor output;
-  attention->forward(input, output);
+  attention->forward({input}, {output});
 
   // Check output shape
   auto output_shape = output->shape();

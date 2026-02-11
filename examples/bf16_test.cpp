@@ -3,6 +3,7 @@
 #include "device/device_manager.hpp"
 #include "nn/blocks_impl/attention_block.hpp"
 #include "nn/example_models.hpp"
+#include "nn/graph.hpp"
 #include "nn/layers.hpp"
 #include "nn/layers_impl/dense_layer.hpp"
 #include "nn/loss.hpp"
@@ -15,15 +16,19 @@ void test_dense() {
   constexpr size_t batch_size = 8;
   constexpr size_t input_dim = 32;
   constexpr size_t output_dim = 16;
+  auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
+  Graph graph(allocator);
+
   DenseLayer fp32_dense(input_dim, output_dim, false, "fp32_dense");
   fp32_dense.set_io_dtype(DType_t::FP32);
-  fp32_dense.set_device(getGPU());
-  fp32_dense.init();
+  graph.add_layer(fp32_dense);
 
   DenseLayer bf16_dense(input_dim, output_dim, false, "bf16_dense");
   bf16_dense.set_io_dtype(DType_t::BF16);
-  bf16_dense.set_device(getGPU());
-  bf16_dense.init();
+  bf16_dense.set_param_dtype(DType_t::BF16);
+  graph.add_layer(bf16_dense);
+
+  graph.compile();
 
   auto bf16_params = bf16_dense.parameters();
   auto fp32_params = fp32_dense.parameters();
@@ -48,8 +53,8 @@ void test_dense() {
   output_fp32 = make_tensor(DType_t::FP32, {batch_size, output_dim}, getGPU());
   output_bf16 = make_tensor(DType_t::BF16, {batch_size, output_dim}, getGPU());
 
-  fp32_dense.forward(input_fp32, output_fp32, 0);
-  bf16_dense.forward(input_bf16, output_bf16, 0);
+  fp32_dense.forward({input_fp32}, {output_fp32});
+  bf16_dense.forward({input_bf16}, {output_bf16});
 
   Tensor cpu_output_fp32 = output_fp32->to_host();
   Tensor cpu_output_bf16 = output_bf16->to_host();
@@ -96,8 +101,8 @@ void test_dense() {
   Tensor grad_input_bf16 = make_tensor(DType_t::BF16, {batch_size, input_dim}, getGPU());
   Tensor grad_input_fp32 = make_tensor(DType_t::FP32, {batch_size, input_dim}, getGPU());
 
-  bf16_dense.backward(gpu_gradient_bf16, grad_input_bf16, 0);
-  fp32_dense.backward(gpu_gradient_fp32, grad_input_fp32, 0);
+  bf16_dense.backward({gpu_gradient_bf16}, {grad_input_bf16});
+  fp32_dense.backward({gpu_gradient_fp32}, {grad_input_fp32});
 
   Tensor cpu_grad_input_fp32 = grad_input_fp32->to_host();
   Tensor cpu_grad_input_bf16 = grad_input_bf16->to_host();
@@ -124,16 +129,19 @@ void test_attention() {
   constexpr size_t seq_len = 16;
   constexpr size_t embed_dim = 16;
   constexpr size_t num_heads = 4;
+  auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
+  Graph graph(allocator);
+
   AttentionBlock fp32_attention(embed_dim, num_heads, false, "fp32_attention");
   fp32_attention.set_io_dtype(DType_t::FP32);
-  fp32_attention.set_device(getGPU());
-  fp32_attention.init();
+  graph.add_layer(fp32_attention);
 
   AttentionBlock bf16_attention(embed_dim, num_heads, false, "bf16_attention");
   bf16_attention.set_io_dtype(DType_t::BF16);
   bf16_attention.set_param_dtype(DType_t::BF16);
-  bf16_attention.set_device(getGPU());
-  bf16_attention.init();
+  graph.add_layer(bf16_attention);
+
+  graph.compile();
 
   auto bf16_params = bf16_attention.parameters();
   auto fp32_params = fp32_attention.parameters();
@@ -165,8 +173,8 @@ void test_attention() {
   output_fp32 = make_tensor(DType_t::FP32, {batch_size, seq_len, embed_dim}, getGPU());
   output_bf16 = make_tensor(DType_t::BF16, {batch_size, seq_len, embed_dim}, getGPU());
 
-  fp32_attention.forward(input_fp32, output_fp32, 0);
-  bf16_attention.forward(input_bf16, output_bf16, 0);
+  fp32_attention.forward({input_fp32}, {output_fp32});
+  bf16_attention.forward({input_bf16}, {output_bf16});
 
   Tensor cpu_output_fp32 = output_fp32->to_host();
   Tensor cpu_output_bf16 = output_bf16->to_host();
@@ -213,8 +221,8 @@ void test_attention() {
   Tensor grad_input_bf16 = make_tensor(DType_t::BF16, {batch_size, seq_len, embed_dim}, getGPU());
   Tensor grad_input_fp32 = make_tensor(DType_t::FP32, {batch_size, seq_len, embed_dim}, getGPU());
 
-  bf16_attention.backward(gpu_gradient_bf16, grad_input_bf16, 0);
-  fp32_attention.backward(gpu_gradient_fp32, grad_input_fp32, 0);
+  bf16_attention.backward({gpu_gradient_bf16}, {grad_input_bf16});
+  fp32_attention.backward({gpu_gradient_fp32}, {grad_input_fp32});
 
   Tensor cpu_grad_input_fp32 = grad_input_fp32->to_host();
   Tensor cpu_grad_input_bf16 = grad_input_bf16->to_host();

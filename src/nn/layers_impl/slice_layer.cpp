@@ -134,10 +134,6 @@ LayerConfig SliceLayer::get_config() const {
   return config;
 }
 
-std::unique_ptr<Layer> SliceLayer::clone() const {
-  return std::make_unique<SliceLayer>(axis_, start_, length_, this->name_);
-}
-
 std::unique_ptr<SliceLayer> SliceLayer::create_from_config(const LayerConfig &config) {
   size_t axis = (size_t)config.get<int>("axis", 0);
   size_t start = (size_t)config.get<int>("start", 0);

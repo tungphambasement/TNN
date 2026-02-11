@@ -31,10 +31,12 @@ EmbeddingLayer::EmbeddingLayer(size_t vocab_size, size_t embed_dim, const std::s
   }
 }
 
+void EmbeddingLayer::register_impl() { register_param({vocab_size_, embed_dim_}); }
+
 void EmbeddingLayer::init_params() {
   // weight shape: [vocab_size, embed_dim]
   weight_ = make_param_tensor({vocab_size_, embed_dim_});
-  grad_weight_ = make_param_tensor({vocab_size_, embed_dim_});
+  grad_weight_ = make_grad_tensor({vocab_size_, embed_dim_});
 
   if (this->use_seed_) {
     weight_->fill_random_normal(0.0, 0.02, this->srand_seed_);
@@ -150,12 +152,6 @@ std::unique_ptr<Task> EmbeddingLayer::compute_backward_impl(const ConstTensor &i
   return nullptr;
 }
 
-void EmbeddingLayer::collect_parameters(std::vector<Tensor> &params) { params.push_back(weight_); }
-
-void EmbeddingLayer::collect_gradients(std::vector<Tensor> &grads) {
-  grads.push_back(grad_weight_);
-}
-
 std::vector<size_t> EmbeddingLayer::compute_output_shape(
     const std::vector<size_t> &input_shape) const {
   std::vector<size_t> out = input_shape;
@@ -175,10 +171,6 @@ LayerConfig EmbeddingLayer::get_config() const {
   config.set("embed_dim", embed_dim_);
   config.set("padding_idx", padding_idx_);
   return config;
-}
-
-std::unique_ptr<Layer> EmbeddingLayer::clone() const {
-  return std::make_unique<EmbeddingLayer>(vocab_size_, embed_dim_, this->name_, padding_idx_);
 }
 
 std::unique_ptr<EmbeddingLayer> EmbeddingLayer::create_from_config(const LayerConfig &config) {

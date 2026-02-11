@@ -119,8 +119,8 @@ std::unique_ptr<Task> LegacyAvgPool2DLayer::compute_avg_pool_forward_impl(
 std::unique_ptr<Task> LegacyAvgPool2DLayer::compute_avg_pool_forward(
     const ConstTensor &input_data, const Tensor &output_data, size_t batch_size, size_t channels,
     size_t input_h, size_t input_w, size_t output_h, size_t output_w, flowHandle_t handle) const {
-  DISPATCH_ON_DTYPE_TO_METHOD(compute_avg_pool_forward_impl, input_data, output_data, batch_size,
-                              channels, input_h, input_w, output_h, output_w, handle);
+  DISPATCH_IO_DTYPE(compute_avg_pool_forward_impl, input_data, output_data, batch_size, channels,
+                    input_h, input_w, output_h, output_w, handle);
   return nullptr;
 }
 
@@ -163,8 +163,8 @@ std::unique_ptr<Task> LegacyAvgPool2DLayer::compute_avg_pool_backward(
     const ConstTensor &gradient_data, const Tensor &grad_input_data, size_t batch_size,
     size_t channels, size_t input_h, size_t input_w, size_t output_h, size_t output_w,
     flowHandle_t handle) const {
-  DISPATCH_ON_DTYPE_TO_METHOD(compute_avg_pool_backward_impl, gradient_data, grad_input_data,
-                              batch_size, channels, input_h, input_w, output_h, output_w, handle);
+  DISPATCH_IO_DTYPE(compute_avg_pool_backward_impl, gradient_data, grad_input_data, batch_size,
+                    channels, input_h, input_w, output_h, output_w, handle);
   return nullptr;
 }
 
@@ -179,11 +179,6 @@ LayerConfig LegacyAvgPool2DLayer::get_config() const {
   config.set("pad_h", pad_h_);
   config.set("pad_w", pad_w_);
   return config;
-}
-
-std::unique_ptr<Layer> LegacyAvgPool2DLayer::clone() const {
-  return std::make_unique<LegacyAvgPool2DLayer>(pool_h_, pool_w_, stride_h_, stride_w_, pad_h_,
-                                                pad_w_, this->name_);
 }
 
 std::vector<size_t> LegacyAvgPool2DLayer::compute_output_shape(

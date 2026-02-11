@@ -30,27 +30,34 @@ void LegacyBatchNormLayer::init_params() {
     return;
   }
 
-  gamma_gradients_ = make_param_tensor({num_features_});
-  beta_gradients_ = make_param_tensor({num_features_});
-  gamma_gradients_->fill(0.0f);
-  beta_gradients_->fill(0.0f);
-
   gamma_ = make_param_tensor({num_features_});
   beta_ = make_param_tensor({num_features_});
   gamma_->fill(1.0f);
   beta_->fill(0.0f);
+
+  gamma_gradients_ = make_grad_tensor({num_features_});
+  beta_gradients_ = make_grad_tensor({num_features_});
+  gamma_gradients_->fill(0.0f);
+  beta_gradients_->fill(0.0f);
 
   running_mean_ = make_param_tensor({num_features_});
   running_var_ = make_param_tensor({num_features_});
   running_mean_->fill(0.0f);
   running_var_->fill(1.0f);
 
-  dummy_mean_gradients_ = make_param_tensor({num_features_});
-  dummy_var_gradients_ = make_param_tensor({num_features_});
+  dummy_mean_gradients_ = make_grad_tensor({num_features_});
+  dummy_var_gradients_ = make_grad_tensor({num_features_});
   dummy_mean_gradients_->fill(0.0f);
   dummy_var_gradients_->fill(0.0f);
 
   this->initialized_ = true;
+}
+
+void LegacyBatchNormLayer::register_impl() {
+  register_param({num_features_});
+  register_param({num_features_});
+  register_param({num_features_});
+  register_param({num_features_});
 }
 
 void LegacyBatchNormLayer::forward_impl(const ConstTensor &input, const Tensor &output,
@@ -88,17 +95,17 @@ void LegacyBatchNormLayer::def_forward(const ConstTensor &input, const Tensor &o
   Tensor &batch_mean = this->get_mutable_tensor(mb_id, "mean");
 
   if (!norm)
-    norm = make_tensor<float>(input->shape(), this->device_);
+    norm = make_tensor<float>(input->shape(), this->device());
   else
     norm->ensure(input->shape());
 
   if (!batch_inv_std)
-    batch_inv_std = make_tensor<float>({num_features_}, this->device_);
+    batch_inv_std = make_tensor<float>({num_features_}, this->device());
   else
     batch_inv_std->ensure({num_features_});
 
   if (!batch_mean)
-    batch_mean = make_tensor<float>({num_features_}, this->device_);
+    batch_mean = make_tensor<float>({num_features_}, this->device());
   else
     batch_mean->ensure({num_features_});
 
@@ -252,32 +259,9 @@ LayerConfig LegacyBatchNormLayer::get_config() const {
   return config;
 }
 
-std::unique_ptr<Layer> LegacyBatchNormLayer::clone() const {
-  return std::make_unique<LegacyBatchNormLayer>(num_features_, epsilon_, momentum_, affine_,
-                                                this->name_);
-}
-
 std::vector<size_t> LegacyBatchNormLayer::compute_output_shape(
     const std::vector<size_t> &input_shape) const {
   return input_shape;
-}
-
-void LegacyBatchNormLayer::collect_parameters(std::vector<Tensor> &params) {
-  if (affine_) {
-    params.push_back(gamma_);
-    params.push_back(beta_);
-  }
-  params.push_back(running_mean_);
-  params.push_back(running_var_);
-}
-
-void LegacyBatchNormLayer::collect_gradients(std::vector<Tensor> &grads) {
-  if (affine_) {
-    grads.push_back(gamma_gradients_);
-    grads.push_back(beta_gradients_);
-  }
-  grads.push_back(dummy_mean_gradients_);
-  grads.push_back(dummy_var_gradients_);
 }
 
 std::unique_ptr<LegacyBatchNormLayer> LegacyBatchNormLayer::create_from_config(

@@ -39,6 +39,8 @@ int main() {
   std::string device_str = Env::get<std::string>("DEVICE_TYPE", "CPU");
   DeviceType device_type = (device_str == "GPU") ? DeviceType::GPU : DeviceType::CPU;
   const auto &device = DeviceManager::getInstance().getDevice(device_type);
+  auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
+  Graph graph(allocator);
 
   string dataset_name = Env::get<std::string>("DATASET_NAME", "");
   if (dataset_name.empty()) {
@@ -58,12 +60,14 @@ int main() {
     if (!file.is_open()) {
       throw std::runtime_error("Failed to open model file");
     }
-    model = load_state<Sequential>(file, device);
+    model = load_state<Sequential>(file, graph);
     file.close();
   } else {
     cout << "Creating model: " << model_name << endl;
     try {
       Sequential temp_model = legacy::ExampleModels::create(model_name);
+      graph.add_layer(temp_model);
+      graph.compile();
       model = std::make_unique<Sequential>(std::move(temp_model));
     } catch (const std::exception &e) {
       cerr << "Error creating model: " << e.what() << endl;
@@ -74,7 +78,6 @@ int main() {
       cout << endl;
       return 1;
     }
-    model->set_device(device);
     model->init();
   }
 

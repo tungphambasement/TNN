@@ -78,9 +78,8 @@ private:
   void cudnn_backward(const ConstTensor &gradient, const Tensor &grad_input, size_t mb_id);
 #endif
 
+  void register_impl() override;
   void init_params() override;
-  void collect_parameters(std::vector<Tensor> &params) override;
-  void collect_gradients(std::vector<Tensor> &grads) override;
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
   void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
                      size_t mb_id = 0) override;
@@ -99,7 +98,7 @@ public:
   std::string type() const override { return TYPE_NAME; }
   LayerConfig get_config() const override;
   static std::unique_ptr<BatchNormLayer> create_from_config(const LayerConfig &config);
-  std::unique_ptr<Layer> clone() const override;
+  std::unique_ptr<Layer> clone_impl() const override;
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
 };
 

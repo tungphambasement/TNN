@@ -17,11 +17,13 @@
 
 #include "communicator.hpp"
 #include "device/device_manager.hpp"
+#include "device/flow.hpp"
 #include "device/iallocator.hpp"
 #include "distributed/command_type.hpp"
 #include "job.hpp"
 #include "message.hpp"
 #include "nn/blocks_impl/sequential.hpp"
+#include "nn/graph.hpp"
 #include "nn/layers.hpp"
 #include "nn/optimizers.hpp"
 #include "nn/schedulers.hpp"
@@ -87,16 +89,20 @@ public:
     // setup model, optimizer, criterion
     LayerConfig model_config = config.model_config;
     this->model_ = Sequential::create_from_config(model_config);
-    this->model_->set_device(use_gpu_ ? getGPU() : getCPU());
+    auto &device = use_gpu_ ? getGPU() : getCPU();
+    auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
+    Graph graph(allocator);
+    graph.add_layer(*model_);
     this->model_->set_seed(123456);
-    this->model_->init();
+    graph.compile();
+
     this->model_->enable_profiling(true);
     auto parsed_config = this->model_->get_config();
     std::cout << parsed_config.to_json().dump(4) << std::endl;
 
     OptimizerConfig optimizer_config = config.optimizer_config;
     this->optimizer_ = OptimizerFactory::create_from_config(optimizer_config);
-    this->optimizer_->attach(this->model_->parameters(), this->model_->gradients());
+    this->optimizer_->attach(graph.context());
 
     this->scheduler_ =
         SchedulerFactory::create_from_config(config.scheduler_config, this->optimizer_.get());
@@ -133,7 +139,7 @@ protected:
         DType_t input_dtype = forward_job.data->data_type();
         auto output_shape = this->model_->compute_output_shape(forward_job.data->shape());
         Tensor output_tensor = make_tensor(out_allocator, input_dtype, output_shape);
-        this->model_->forward(forward_job.data, output_tensor, forward_job.mb_id);
+        this->model_->forward({forward_job.data}, {output_tensor}, forward_job.mb_id);
         auto forward_end = std::chrono::system_clock::now();
         GlobalProfiler::add_event(
             {EventType::COMPUTE, forward_start, forward_end, "Forward Pass", this->id_});
@@ -146,7 +152,7 @@ protected:
         const Job &backward_job = message.get<Job>();
         IAllocator &out_allocator = communicator_->out_allocator();
         Tensor output_tensor = make_tensor(out_allocator, backward_job.data->data_type(), {1});
-        this->model_->backward(backward_job.data, output_tensor, backward_job.mb_id);
+        this->model_->backward({backward_job.data}, {output_tensor}, backward_job.mb_id);
         auto backward_end = std::chrono::system_clock::now();
         GlobalProfiler::add_event(
             {EventType::COMPUTE, backward_start, backward_end, "Backward Pass", this->id_});
@@ -205,7 +211,7 @@ protected:
       }
       case CommandType::PRINT_PROFILING:
         if (model_) {
-          model_->print_profiling_info();
+          model_->print_profiling();
           Message outgoing_message(CommandType::PROFILING_PRINTED);
           communicator_->send_message(std::move(outgoing_message), coordinator_endpoint_);
         } else {
@@ -214,7 +220,7 @@ protected:
         break;
       case CommandType::CLEAR_PROFILING:
         if (model_) {
-          model_->reset_profiling_info();
+          model_->reset_profiling();
           Message outgoing_message(CommandType::PROFILING_CLEARED);
           communicator_->send_message(std::move(outgoing_message), coordinator_endpoint_);
         } else {

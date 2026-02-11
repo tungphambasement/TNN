@@ -44,7 +44,7 @@ public:
     device_storage *ptr = allocate_storage(size);
     auto storage =
         std::shared_ptr<device_storage>(ptr, [this](device_storage *ptr) { this->reclaim(ptr); });
-    return dptr(storage, 0, storage->capacity());
+    return dptr(storage, 0, size);
   }
 
   void clear() {
@@ -69,7 +69,7 @@ public:
     return total;
   }
 
-  const Device &device() const { return device_; }
+  const Device &device() const override { return device_; }
 
 private:
   std::multimap<size_t, device_storage *> free_blocks_;
@@ -81,11 +81,8 @@ private:
     if (size == 0) {
       return new device_storage(device_);
     }
-
     std::lock_guard<std::mutex> lock(mutex_);
-
     auto it = free_blocks_.lower_bound(size);
-
     if (it != free_blocks_.end()) {
       device_storage *block = it->second;
       if (block->capacity() <= size * 2) {
@@ -94,10 +91,8 @@ private:
       }
     }
 #ifndef NDEBUG
-    if (size > 0)
-      std::cout << "PoolAllocator: Allocating new tensor of size " << size << " bytes.\n";
+    std::cout << "PoolAllocator: Allocating new tensor of size " << size << " bytes.\n";
 #endif
-
     void *ptr = device_.allocateAlignedMemory(size, DEFAULT_ALIGNMENT);
     return new device_storage(device_, ptr, size, DEFAULT_ALIGNMENT);
   }

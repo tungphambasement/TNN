@@ -52,7 +52,7 @@ void MaxPool2DLayer::forward_impl(const ConstTensor &input, const Tensor &output
 
   Tensor &mask_indices = micro_batch_mask_indices_[mb_id];
   if (mask_indices == nullptr)
-    mask_indices = make_tensor<int>({batch_size, output_h, output_w, channels}, this->device_);
+    mask_indices = make_tensor<int>({batch_size, output_h, output_w, channels}, this->device());
   else {
     mask_indices->ensure({batch_size, output_h, output_w, channels});
   }
@@ -128,8 +128,8 @@ std::unique_ptr<Task> MaxPool2DLayer::compute_max_pool_forward(
     const ConstTensor &input_data, const Tensor &output_data, size_t batch_size, size_t height,
     size_t width, size_t channels, size_t output_h, size_t output_w, const Tensor &mask_indices,
     flowHandle_t handle) const {
-  DISPATCH_ON_DTYPE_TO_METHOD(compute_max_pool_forward_impl, input_data, output_data, batch_size,
-                              height, width, channels, output_h, output_w, mask_indices, handle);
+  DISPATCH_IO_DTYPE(compute_max_pool_forward_impl, input_data, output_data, batch_size, height,
+                    width, channels, output_h, output_w, mask_indices, handle);
   return nullptr;
 }
 
@@ -167,8 +167,8 @@ std::unique_ptr<Task> MaxPool2DLayer::compute_max_pool_backward(const ConstTenso
                                                                 size_t output_h, size_t output_w,
                                                                 const ConstTensor &mask_indices,
                                                                 flowHandle_t handle) const {
-  DISPATCH_ON_DTYPE_TO_METHOD(compute_max_pool_backward_impl, gradient_data, grad_input_data,
-                              batch_size, channels, output_h, output_w, mask_indices, handle);
+  DISPATCH_IO_DTYPE(compute_max_pool_backward_impl, gradient_data, grad_input_data, batch_size,
+                    channels, output_h, output_w, mask_indices, handle);
   return nullptr;
 }
 
@@ -183,11 +183,6 @@ LayerConfig MaxPool2DLayer::get_config() const {
   config.set("pad_h", pad_h_);
   config.set("pad_w", pad_w_);
   return config;
-}
-
-std::unique_ptr<Layer> MaxPool2DLayer::clone() const {
-  return std::make_unique<MaxPool2DLayer>(pool_h_, pool_w_, stride_h_, stride_w_, pad_h_, pad_w_,
-                                          this->name_);
 }
 
 std::vector<size_t> MaxPool2DLayer::compute_output_shape(

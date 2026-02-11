@@ -1,5 +1,6 @@
 #include "device/device_manager.hpp"
 #include "nn/example_models.hpp"
+#include "nn/graph.hpp"
 #include "nn/layers.hpp"
 #include "nn/layers_impl/dense_layer.hpp"
 #include "type/type.hpp"
@@ -10,16 +11,19 @@ using namespace tnn;
 signed main() {
   ExampleModels::register_defaults();
 
+  auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
+  Graph graph(allocator);
+
   DenseLayer fp32_dense(128, 64, false, "fp32_dense");
   fp32_dense.set_io_dtype(DType_t::FP32);
-  fp32_dense.set_device(getGPU());
-  fp32_dense.init();
+  graph.add_layer(fp32_dense);
 
   DenseLayer fp16_dense(128, 64, false, "fp16_dense");
   fp16_dense.set_io_dtype(DType_t::FP16);
   fp16_dense.set_param_dtype(DType_t::FP16);
-  fp16_dense.set_device(getGPU());
-  fp16_dense.init();
+  graph.add_layer(fp16_dense);
+
+  graph.compile();
 
   auto fp16_params = fp16_dense.parameters();
   auto fp32_params = fp32_dense.parameters();
@@ -51,8 +55,8 @@ signed main() {
   output_fp32 = make_tensor(DType_t::FP32, {32, 64}, getGPU());
   output_fp16 = make_tensor(DType_t::FP16, {32, 64}, getGPU());
 
-  fp32_dense.forward(input_fp32, output_fp32, 0);
-  fp16_dense.forward(input_fp16, output_fp16, 0);
+  fp32_dense.forward({input_fp32}, {output_fp32});
+  fp16_dense.forward({input_fp16}, {output_fp16});
 
   Tensor cpu_output_fp32 = output_fp32->to_host();
   Tensor cpu_output_fp16 = output_fp16->to_host();

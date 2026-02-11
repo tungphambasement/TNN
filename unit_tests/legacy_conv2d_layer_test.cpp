@@ -13,6 +13,8 @@
 #include <vector>
 
 #include "device/device_manager.hpp"
+#include "device/pool_allocator.hpp"
+#include "nn/graph.hpp"
 #include "tensor/tensor.hpp"
 
 using namespace tnn;
@@ -185,15 +187,17 @@ protected:
 
 TEST_F(LegacyConv2DLayerTest, BasicForwardPass) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, true, "test_conv");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 1, 3, 3, 1, 1, 0, 0);
   auto out_shape = output->shape();
@@ -207,15 +211,17 @@ TEST_F(LegacyConv2DLayerTest, BasicForwardPass) {
 
 TEST_F(LegacyConv2DLayerTest, ForwardPassWithStride) {
   LegacyConv2DLayer layer(1, 2, 3, 3, 2, 2, 0, 0, false, "test_conv_stride");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 1, 7, 7}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 2, 3, 3, 2, 2, 0, 0);
   auto out_shape = output->shape();
@@ -226,15 +232,17 @@ TEST_F(LegacyConv2DLayerTest, ForwardPassWithStride) {
 
 TEST_F(LegacyConv2DLayerTest, ForwardPassWithPadding) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 1, 1, true, "test_conv_padding");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 1, 3, 3, 1, 1, 1, 1);
   auto out_shape = output->shape();
@@ -244,8 +252,10 @@ TEST_F(LegacyConv2DLayerTest, ForwardPassWithPadding) {
 
 TEST_F(LegacyConv2DLayerTest, ForwardPassMultiChannel) {
   LegacyConv2DLayer layer(3, 2, 3, 3, 1, 1, 0, 0, true, "test_conv_multichannel");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 3, 5, 5}, getCPU());
   float *input_data = input->data_as<float>();
@@ -255,7 +265,7 @@ TEST_F(LegacyConv2DLayerTest, ForwardPassMultiChannel) {
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 2, 3, 3, 1, 1, 0, 0);
   auto out_shape = output->shape();
@@ -266,15 +276,17 @@ TEST_F(LegacyConv2DLayerTest, ForwardPassMultiChannel) {
 
 TEST_F(LegacyConv2DLayerTest, ForwardPassMultiBatch) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, false, "test_conv_multibatch");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({4, 1, 5, 5}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 1, 3, 3, 1, 1, 0, 0);
   auto out_shape = output->shape();
@@ -283,15 +295,17 @@ TEST_F(LegacyConv2DLayerTest, ForwardPassMultiBatch) {
 
 TEST_F(LegacyConv2DLayerTest, ForwardPassNonSquareKernel) {
   LegacyConv2DLayer layer(1, 1, 3, 5, 1, 1, 0, 0, true, "test_conv_nonsquare");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 1, 7, 9}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 1, 3, 5, 1, 1, 0, 0);
   auto out_shape = output->shape();
@@ -301,15 +315,17 @@ TEST_F(LegacyConv2DLayerTest, ForwardPassNonSquareKernel) {
 
 TEST_F(LegacyConv2DLayerTest, ForwardPassWithBias) {
   LegacyConv2DLayer layer(1, 2, 3, 3, 1, 1, 0, 0, true, "test_conv_bias");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 2, 3, 3, 1, 1, 0, 0);
   auto out_shape = output->shape();
@@ -318,15 +334,17 @@ TEST_F(LegacyConv2DLayerTest, ForwardPassWithBias) {
 
 TEST_F(LegacyConv2DLayerTest, ForwardPassWithoutBias) {
   LegacyConv2DLayer layer(1, 2, 3, 3, 1, 1, 0, 0, false, "test_conv_no_bias");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 2, 3, 3, 1, 1, 0, 0);
   auto out_shape = output->shape();
@@ -335,21 +353,23 @@ TEST_F(LegacyConv2DLayerTest, ForwardPassWithoutBias) {
 
 TEST_F(LegacyConv2DLayerTest, BasicBackwardPass) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, true, "test_conv_backward");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   verify_gradient_shape(gradient, grad_input, input);
 
@@ -359,21 +379,23 @@ TEST_F(LegacyConv2DLayerTest, BasicBackwardPass) {
 
 TEST_F(LegacyConv2DLayerTest, BackwardPassWithPadding) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 1, 1, true, "test_conv_backward_pad");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   verify_gradient_shape(gradient, grad_input, input);
   EXPECT_EQ(grad_input->shape(), input->shape());
@@ -381,21 +403,23 @@ TEST_F(LegacyConv2DLayerTest, BackwardPassWithPadding) {
 
 TEST_F(LegacyConv2DLayerTest, BackwardPassMultiChannel) {
   LegacyConv2DLayer layer(3, 2, 3, 3, 1, 1, 0, 0, true, "test_conv_backward_multichannel");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 3, 5, 5}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   verify_gradient_shape(gradient, grad_input, input);
   auto grad_input_shape = grad_input->shape();
@@ -404,21 +428,23 @@ TEST_F(LegacyConv2DLayerTest, BackwardPassMultiChannel) {
 
 TEST_F(LegacyConv2DLayerTest, BackwardPassMultiBatch) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, false, "test_conv_backward_multibatch");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({4, 1, 5, 5}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   verify_gradient_shape(gradient, grad_input, input);
   auto grad_input_shape = grad_input->shape();
@@ -427,8 +453,10 @@ TEST_F(LegacyConv2DLayerTest, BackwardPassMultiBatch) {
 
 TEST_F(LegacyConv2DLayerTest, BackwardPassVariableGradient) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, true, "test_conv_backward_var");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getCPU());
   float *input_data = input->data_as<float>();
@@ -438,7 +466,7 @@ TEST_F(LegacyConv2DLayerTest, BackwardPassVariableGradient) {
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   float *grad_data = gradient->data_as<float>();
@@ -447,7 +475,7 @@ TEST_F(LegacyConv2DLayerTest, BackwardPassVariableGradient) {
   }
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   verify_gradient_shape(gradient, grad_input, input);
   EXPECT_EQ(grad_input->shape(), input->shape());
@@ -504,15 +532,17 @@ TEST_F(LegacyConv2DLayerTest, Clone) {
 
 TEST_F(LegacyConv2DLayerTest, EdgeCase1x1Convolution) {
   LegacyConv2DLayer layer(3, 16, 1, 1, 1, 1, 0, 0, true, "test_1x1_conv");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 3, 8, 8}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   auto out_shape = output->shape();
   EXPECT_EQ(out_shape[2], 8);
@@ -522,36 +552,40 @@ TEST_F(LegacyConv2DLayerTest, EdgeCase1x1Convolution) {
 
 TEST_F(LegacyConv2DLayerTest, EdgeCaseZeroGradient) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, true, "test_zero_gradient");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(0.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
 }
 
 TEST_F(LegacyConv2DLayerTest, EdgeCaseLargeValues) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, false, "test_large_values");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getCPU());
   input->fill(1e6f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 1, 3, 3, 1, 1, 0, 0);
   EXPECT_EQ(output->size(), 9);
@@ -559,8 +593,10 @@ TEST_F(LegacyConv2DLayerTest, EdgeCaseLargeValues) {
 
 TEST_F(LegacyConv2DLayerTest, EdgeCaseNegativeValues) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, true, "test_negative_values");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getCPU());
   float *input_data = input->data_as<float>();
@@ -570,22 +606,24 @@ TEST_F(LegacyConv2DLayerTest, EdgeCaseNegativeValues) {
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 1, 3, 3, 1, 1, 0, 0);
 }
 
 TEST_F(LegacyConv2DLayerTest, NumericalStabilitySmallValues) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, true, "test_small_values");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getCPU());
   input->fill(1e-6f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 1, 3, 3, 1, 1, 0, 0);
   EXPECT_EQ(output->size(), 9);
@@ -593,29 +631,33 @@ TEST_F(LegacyConv2DLayerTest, NumericalStabilitySmallValues) {
 
 TEST_F(LegacyConv2DLayerTest, BackwardNumericalStability) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, false, "test_backward_stability");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getCPU());
   input->fill(1e-6f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(1e-6f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   verify_gradient_shape(gradient, grad_input, input);
 }
 
 TEST_F(LegacyConv2DLayerTest, ParameterCollectionWithBias) {
   LegacyConv2DLayer layer(3, 16, 3, 3, 1, 1, 0, 0, true, "test_params_bias");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   std::vector<Tensor> params = layer.parameters();
 
@@ -624,8 +666,10 @@ TEST_F(LegacyConv2DLayerTest, ParameterCollectionWithBias) {
 
 TEST_F(LegacyConv2DLayerTest, ParameterCollectionWithoutBias) {
   LegacyConv2DLayer layer(3, 16, 3, 3, 1, 1, 0, 0, false, "test_params_no_bias");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   std::vector<Tensor> params = layer.parameters();
   EXPECT_EQ(params.size(), 1);
@@ -633,8 +677,10 @@ TEST_F(LegacyConv2DLayerTest, ParameterCollectionWithoutBias) {
 
 TEST_F(LegacyConv2DLayerTest, GradientCollectionWithBias) {
   LegacyConv2DLayer layer(3, 16, 3, 3, 1, 1, 0, 0, true, "test_grads_bias");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   std::vector<Tensor> grads = layer.gradients();
 
@@ -643,8 +689,10 @@ TEST_F(LegacyConv2DLayerTest, GradientCollectionWithBias) {
 
 TEST_F(LegacyConv2DLayerTest, GradientCollectionWithoutBias) {
   LegacyConv2DLayer layer(3, 16, 3, 3, 1, 1, 0, 0, false, "test_grads_no_bias");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   std::vector<Tensor> grads = layer.gradients();
 
@@ -653,8 +701,10 @@ TEST_F(LegacyConv2DLayerTest, GradientCollectionWithoutBias) {
 
 TEST_F(LegacyConv2DLayerTest, ResNet1x1ChannelIncrease) {
   LegacyConv2DLayer layer(64, 256, 1, 1, 1, 1, 0, 0, false, "resnet_1x1_increase");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 64, 8, 8}, getCPU());
   float *input_data = input->data_as<float>();
@@ -664,7 +714,7 @@ TEST_F(LegacyConv2DLayerTest, ResNet1x1ChannelIncrease) {
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   auto output_shape_actual = output->shape();
   EXPECT_EQ(output_shape_actual[0], 2);
@@ -678,7 +728,7 @@ TEST_F(LegacyConv2DLayerTest, ResNet1x1ChannelIncrease) {
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(1.0f);
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
   verify_backward_result(gradient, grad_input, params[0], 1, 1, 1, 1, 0, 0);
@@ -686,8 +736,10 @@ TEST_F(LegacyConv2DLayerTest, ResNet1x1ChannelIncrease) {
 
 TEST_F(LegacyConv2DLayerTest, ResNet1x1ChannelDecrease) {
   LegacyConv2DLayer layer(256, 64, 1, 1, 1, 1, 0, 0, false, "resnet_1x1_decrease");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 256, 8, 8}, getCPU());
   float *input_data = input->data_as<float>();
@@ -697,7 +749,7 @@ TEST_F(LegacyConv2DLayerTest, ResNet1x1ChannelDecrease) {
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   auto out_shape = output->shape();
   EXPECT_EQ(out_shape[0], 2);
@@ -711,7 +763,7 @@ TEST_F(LegacyConv2DLayerTest, ResNet1x1ChannelDecrease) {
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(1.0f);
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
   verify_backward_result(gradient, grad_input, params[0], 1, 1, 1, 1, 0, 0);
@@ -719,8 +771,10 @@ TEST_F(LegacyConv2DLayerTest, ResNet1x1ChannelDecrease) {
 
 TEST_F(LegacyConv2DLayerTest, ResNetStridedDownsample) {
   LegacyConv2DLayer layer(64, 128, 3, 3, 2, 2, 0, 0, false, "resnet_strided_downsample");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 64, 9, 9}, getCPU());
   float *input_data = input->data_as<float>();
@@ -730,7 +784,7 @@ TEST_F(LegacyConv2DLayerTest, ResNetStridedDownsample) {
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   auto output_shape_actual = output->shape();
   EXPECT_EQ(output_shape_actual[0], 2);
@@ -744,7 +798,7 @@ TEST_F(LegacyConv2DLayerTest, ResNetStridedDownsample) {
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(1.0f);
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
   verify_backward_result(gradient, grad_input, params[0], 3, 3, 2, 2, 0, 0);
@@ -752,8 +806,10 @@ TEST_F(LegacyConv2DLayerTest, ResNetStridedDownsample) {
 
 TEST_F(LegacyConv2DLayerTest, ResNetStridedWithPadding) {
   LegacyConv2DLayer layer(64, 128, 3, 3, 2, 2, 1, 1, false, "resnet_strided_padded");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 64, 8, 8}, getCPU());
   float *input_data = input->data_as<float>();
@@ -763,7 +819,7 @@ TEST_F(LegacyConv2DLayerTest, ResNetStridedWithPadding) {
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   auto output_shape_actual = output->shape();
   EXPECT_EQ(output_shape_actual[0], 2);
@@ -777,7 +833,7 @@ TEST_F(LegacyConv2DLayerTest, ResNetStridedWithPadding) {
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(1.0f);
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
   verify_backward_result(gradient, grad_input, params[0], 3, 3, 2, 2, 1, 1);
@@ -785,8 +841,10 @@ TEST_F(LegacyConv2DLayerTest, ResNetStridedWithPadding) {
 
 TEST_F(LegacyConv2DLayerTest, ResNet1x1StridedDownsample) {
   LegacyConv2DLayer layer(64, 256, 1, 1, 2, 2, 0, 0, false, "resnet_1x1_strided");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 64, 8, 8}, getCPU());
   float *input_data = input->data_as<float>();
@@ -796,7 +854,7 @@ TEST_F(LegacyConv2DLayerTest, ResNet1x1StridedDownsample) {
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   auto output_shape_actual = output->shape();
   EXPECT_EQ(output_shape_actual[0], 2);
@@ -810,7 +868,7 @@ TEST_F(LegacyConv2DLayerTest, ResNet1x1StridedDownsample) {
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(1.0f);
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
   verify_backward_result(gradient, grad_input, params[0], 1, 1, 2, 2, 0, 0);
@@ -818,8 +876,10 @@ TEST_F(LegacyConv2DLayerTest, ResNet1x1StridedDownsample) {
 
 TEST_F(LegacyConv2DLayerTest, ResNetBottleneck3x3) {
   LegacyConv2DLayer layer(64, 64, 3, 3, 1, 1, 1, 1, false, "resnet_bottleneck_3x3");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 64, 8, 8}, getCPU());
   float *input_data = input->data_as<float>();
@@ -829,7 +889,7 @@ TEST_F(LegacyConv2DLayerTest, ResNetBottleneck3x3) {
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   auto output_shape_actual = output->shape();
   EXPECT_EQ(output_shape_actual[0], 2);
@@ -843,7 +903,7 @@ TEST_F(LegacyConv2DLayerTest, ResNetBottleneck3x3) {
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(1.0f);
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
   verify_backward_result(gradient, grad_input, params[0], 3, 3, 1, 1, 1, 1);
@@ -851,8 +911,10 @@ TEST_F(LegacyConv2DLayerTest, ResNetBottleneck3x3) {
 
 TEST_F(LegacyConv2DLayerTest, ResNetFirstConv7x7) {
   LegacyConv2DLayer layer(3, 64, 7, 7, 2, 2, 3, 3, true, "resnet_first_conv");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 3, 15, 15}, getCPU());
   float *input_data = input->data_as<float>();
@@ -862,7 +924,7 @@ TEST_F(LegacyConv2DLayerTest, ResNetFirstConv7x7) {
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   auto output_shape_actual = output->shape();
   EXPECT_EQ(output_shape_actual[0], 2);
@@ -877,7 +939,7 @@ TEST_F(LegacyConv2DLayerTest, ResNetFirstConv7x7) {
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(0.01f);
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
   verify_backward_result(gradient, grad_input, params[0], 7, 7, 2, 2, 3, 3);
@@ -885,8 +947,10 @@ TEST_F(LegacyConv2DLayerTest, ResNetFirstConv7x7) {
 
 TEST_F(LegacyConv2DLayerTest, ResNetAsymmetricStride) {
   LegacyConv2DLayer layer(32, 64, 3, 3, 2, 1, 1, 1, false, "resnet_asymmetric_stride");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 32, 8, 8}, getCPU());
   float *input_data = input->data_as<float>();
@@ -896,7 +960,7 @@ TEST_F(LegacyConv2DLayerTest, ResNetAsymmetricStride) {
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   auto output_shape_actual = output->shape();
   EXPECT_EQ(output_shape_actual[0], 1);
@@ -910,7 +974,7 @@ TEST_F(LegacyConv2DLayerTest, ResNetAsymmetricStride) {
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(1.0f);
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
   verify_backward_result(gradient, grad_input, params[0], 3, 3, 2, 1, 1, 1);
@@ -918,8 +982,10 @@ TEST_F(LegacyConv2DLayerTest, ResNetAsymmetricStride) {
 
 TEST_F(LegacyConv2DLayerTest, ResNetSmallFeatureMap) {
   LegacyConv2DLayer layer(64, 64, 3, 3, 2, 2, 1, 1, false, "resnet_small_feature");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 64, 7, 7}, getCPU());
   float *input_data = input->data_as<float>();
@@ -929,7 +995,7 @@ TEST_F(LegacyConv2DLayerTest, ResNetSmallFeatureMap) {
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   auto output_shape_actual = output->shape();
   EXPECT_EQ(output_shape_actual[0], 2);
@@ -943,7 +1009,7 @@ TEST_F(LegacyConv2DLayerTest, ResNetSmallFeatureMap) {
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(1.0f);
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
   verify_backward_result(gradient, grad_input, params[0], 3, 3, 2, 2, 1, 1);

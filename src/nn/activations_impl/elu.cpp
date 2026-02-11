@@ -26,7 +26,7 @@ std::unique_ptr<Task> ELU::apply(const ConstTensor &input, const Tensor &output)
     throw std::runtime_error("Input and output must be on the same device for ELU");
   }
 
-  DISPATCH_ON_DTYPE(input->data_type(), T, return apply_impl<T>(input, output, defaultFlowHandle));
+  DISPATCH_DTYPE(input->data_type(), T, return apply_impl<T>(input, output, defaultFlowHandle));
 }
 
 std::unique_ptr<Task> ELU::compute_gradient(const ConstTensor &input,
@@ -37,7 +37,7 @@ std::unique_ptr<Task> ELU::compute_gradient(const ConstTensor &input,
   if (grad_output->device() != grad_input->device()) {
     throw std::runtime_error("Input and upstream gradient must be on the same device for ELU");
   }
-  DISPATCH_ON_DTYPE(
+  DISPATCH_DTYPE(
       input->data_type(), T,
       return compute_gradient_impl<T>(input, grad_output, grad_input, defaultFlowHandle));
 }

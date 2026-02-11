@@ -65,12 +65,6 @@ void Sequential::on_set_compute_dtype(DType_t dtype) {
   }
 }
 
-void Sequential::on_set_device(const Device &device) {
-  for (auto &layer : layers_) {
-    layer->set_device(device);
-  }
-}
-
 void Sequential::on_set_training(bool training) {
   for (auto &layer : layers_) {
     layer->set_training(training);
@@ -95,7 +89,7 @@ void Sequential::forward_impl(const ConstTensor &input, const Tensor &output, si
       } else {
         current_output = output;
       }
-      layers_[i]->forward(current_input, current_output, mb_id);
+      layers_[i]->forward({current_input}, {current_output}, mb_id);
       current_input = current_output;
       auto end = Clock::now();
       this->profiler_.add_event(
@@ -105,7 +99,7 @@ void Sequential::forward_impl(const ConstTensor &input, const Tensor &output, si
                                layers_[i]->name() + "): " + e.what());
     }
   }
-  this->device_->getFlow(this->flow_handle_)->synchronize();
+  this->device().getFlow(this->flow_handle_)->synchronize();
   auto end = Clock::now();
   this->profiler_.add_event(Event{EventType::COMPUTE, start, end, "Sequential forward"});
 }
@@ -124,10 +118,10 @@ void Sequential::backward_impl(const ConstTensor &gradient, const Tensor &grad_i
       auto start = Clock::now();
       if (i > 0) {
         current_grad_input = this->get_buffer({max_size_}, gradient->data_type());
-        layers_[i]->backward(current_gradient, current_grad_input, mb_id);
+        layers_[i]->backward({current_gradient}, {current_grad_input}, mb_id);
         current_gradient = current_grad_input;
       } else {
-        layers_[i]->backward(current_gradient, grad_input, mb_id);
+        layers_[i]->backward({current_gradient}, {grad_input}, mb_id);
       }
       auto end = Clock::now();
       this->profiler_.add_event(
@@ -137,7 +131,7 @@ void Sequential::backward_impl(const ConstTensor &gradient, const Tensor &grad_i
                                layers_[i]->type() + "): " + e.what());
     }
   }
-  this->device_->getFlow(this->flow_handle_)->synchronize();
+  this->device().getFlow(this->flow_handle_)->synchronize();
   auto end = Clock::now();
   this->profiler_.add_event(Event{EventType::COMPUTE, start, end, "Sequential backward"});
 }
@@ -147,25 +141,10 @@ Sequential::Sequential(const std::string &name, std::vector<std::unique_ptr<Laye
   layers_ = std::move(layers);
 }
 
-Sequential::Sequential()
-    : Block() {}
-
-std::vector<Tensor> Sequential::parameters() {
-  std::vector<Tensor> all_params;
+void Sequential::on_set_context(GraphContext &graph_ctx) {
   for (auto &layer : layers_) {
-    auto layer_params = layer->parameters();
-    all_params.insert(all_params.end(), layer_params.begin(), layer_params.end());
+    layer->set_context(graph_ctx);
   }
-  return all_params;
-}
-
-std::vector<Tensor> Sequential::gradients() {
-  std::vector<Tensor> all_grads;
-  for (auto &layer : layers_) {
-    auto layer_grads = layer->gradients();
-    all_grads.insert(all_grads.end(), layer_grads.begin(), layer_grads.end());
-  }
-  return all_grads;
 }
 
 std::vector<size_t> Sequential::compute_output_shape(const std::vector<size_t> &input_shape) const {
@@ -257,15 +236,6 @@ uint64_t Sequential::backward_flops(const std::vector<size_t> &input_shape) cons
   return total_flops;
 }
 
-bool Sequential::has_parameters() const {
-  for (const auto &layer : layers_) {
-    if (layer->has_parameters()) {
-      return true;
-    }
-  }
-  return false;
-}
-
 LayerConfig Sequential::get_config() const {
   LayerConfig config;
   config.name = name_;
@@ -294,13 +264,8 @@ std::unique_ptr<Sequential> Sequential::create_from_config(const LayerConfig &co
   return std::make_unique<Sequential>(config.name, std::move(layers));
 }
 
-std::unique_ptr<Layer> Sequential::clone() const {
-  auto cloned_layers = std::vector<std::unique_ptr<Layer>>();
-  for (const auto &layer : layers_) {
-    cloned_layers.push_back(layer->clone());
-  }
-  auto cloned = std::make_unique<Sequential>(name_, std::move(cloned_layers));
-  return cloned;
+auto cloned = std::make_unique<Sequential>(name_, std::move(cloned_layers));
+return cloned;
 }
 
 size_t Sequential::cached_memory_bytes() const {

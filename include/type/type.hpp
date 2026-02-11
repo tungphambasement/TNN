@@ -174,4 +174,61 @@ inline std::string dtype_to_string(DType_t dtype) {
   }
 }
 
+#define DISPATCH_DTYPE(dtype_value, type_alias, ...)         \
+  switch (dtype_value) {                                     \
+    case DType_t::FP16: {                                    \
+      using type_alias = fp16;                               \
+      __VA_ARGS__;                                           \
+      break;                                                 \
+    }                                                        \
+    case DType_t::BF16: {                                    \
+      using type_alias = bf16;                               \
+      __VA_ARGS__;                                           \
+      break;                                                 \
+    }                                                        \
+    case DType_t::FP32: {                                    \
+      using type_alias = float;                              \
+      __VA_ARGS__;                                           \
+      break;                                                 \
+    }                                                        \
+    case DType_t::FP64: {                                    \
+      using type_alias = double;                             \
+      __VA_ARGS__;                                           \
+      break;                                                 \
+    }                                                        \
+    default:                                                 \
+      throw std::runtime_error("Unknown dtype in dispatch"); \
+  }
+
+#define DISPATCH_ON_ANY_DTYPE(dtype_value, type_alias, ...)  \
+  switch (dtype_value) {                                     \
+    case DType_t::UINT8_T: {                                 \
+      using type_alias = uint8_t;                            \
+      __VA_ARGS__;                                           \
+      break;                                                 \
+    }                                                        \
+    case DType_t::FP16: {                                    \
+      using type_alias = fp16;                               \
+      __VA_ARGS__;                                           \
+      break;                                                 \
+    }                                                        \
+    case DType_t::BF16: {                                    \
+      using type_alias = bf16;                               \
+      __VA_ARGS__;                                           \
+      break;                                                 \
+    }                                                        \
+    case DType_t::FP32: {                                    \
+      using type_alias = float;                              \
+      __VA_ARGS__;                                           \
+      break;                                                 \
+    }                                                        \
+    case DType_t::FP64: {                                    \
+      using type_alias = double;                             \
+      __VA_ARGS__;                                           \
+      break;                                                 \
+    }                                                        \
+    default:                                                 \
+      throw std::runtime_error("Unknown dtype in dispatch"); \
+  }
+
 }  // namespace tnn

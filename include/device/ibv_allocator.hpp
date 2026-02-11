@@ -31,7 +31,11 @@ namespace tnn {
 class IbvAllocator : public IAllocator {
 public:
   IbvAllocator(const Device &device, ibv_pd *pd, size_t slab_size)
-      : device_(device), pd_(pd), slab_size_(slab_size), allocated_(0), using_host_memory_(true) {
+      : device_(device),
+        pd_(pd),
+        slab_size_(slab_size),
+        allocated_(0),
+        using_host_memory_(true) {
     if (!pd_) {
       throw std::invalid_argument("Protection Domain cannot be null");
     }
@@ -41,12 +45,10 @@ public:
 
     int access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ;
 
-    // Host pinned memory only (no GPU Direct RDMA)
     if (posix_memalign(&slab_ptr_, DEFAULT_ALIGNMENT, slab_size_) != 0) {
       throw std::runtime_error("Failed to allocate host pinned memory");
     }
 
-    // Register host memory with InfiniBand
     slab_mr_ = ibv_reg_mr(pd_, slab_ptr_, slab_size_, access_flags);
     if (!slab_mr_) {
       int err = errno;
@@ -66,13 +68,11 @@ public:
   ~IbvAllocator() {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    // Deregister the memory region
     if (slab_mr_) {
       ibv_dereg_mr(slab_mr_);
       slab_mr_ = nullptr;
     }
 
-    // Free the master slab
     if (slab_ptr_) {
       if (using_host_memory_) {
         free(slab_ptr_);
@@ -128,6 +128,7 @@ public:
   void clear() {
     std::lock_guard<std::mutex> lock(mutex_);
     free_blocks_.clear();
+    free_blocks_.emplace(slab_size_, 0);
     allocated_ = 0;
   }
 
@@ -170,7 +171,7 @@ public:
   };
 
   ibv_mr_info get_mr_info(const dptr &ptr) const {
-    const void *ptr_addr = ptr.get<void>();
+    const void *ptr_addr = ptr.get();
     size_t offset =
         static_cast<const uint8_t *>(ptr_addr) - static_cast<const uint8_t *>(slab_ptr_);
 
@@ -200,7 +201,6 @@ private:
             storage_info->allocator->reclaim(storage_info->offset, storage_info->size);
           }
           delete storage_info;
-          storage->ptr = nullptr;  // Prevent device_storage destructor from freeing
           delete storage;
         });
 

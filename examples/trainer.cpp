@@ -1,10 +1,10 @@
 #include <memory>
 
-#include "data_augmentation/augmentation.hpp"
 #include "data_loading/data_loader_factory.hpp"
 #include "device/device_manager.hpp"
 #include "nn/blocks_impl/sequential.hpp"
 #include "nn/example_models.hpp"
+#include "nn/graph.hpp"
 #include "nn/layers.hpp"
 #include "nn/schedulers.hpp"
 #include "nn/train.hpp"
@@ -27,6 +27,8 @@ signed main() {
   std::string device_str = Env::get<std::string>("DEVICE_TYPE", "CPU");
   DeviceType device_type = (device_str == "GPU") ? DeviceType::GPU : DeviceType::CPU;
   const auto &device = DeviceManager::getInstance().getDevice(device_type);
+  auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
+  Graph graph(allocator);
 
   string dataset_name = Env::get<std::string>("DATASET_NAME", "");
   if (dataset_name.empty()) {
@@ -47,7 +49,7 @@ signed main() {
     if (!file.is_open()) {
       throw std::runtime_error("Failed to open model file");
     }
-    model = load_state<Sequential>(file, device);
+    model = load_state<Sequential>(file, graph);
     file.close();
   } else {
     cout << "Creating model: " << model_name << endl;
@@ -63,9 +65,9 @@ signed main() {
       cout << endl;
       return 1;
     }
-    model->set_device(device);
     model->set_seed(123456);
-    model->init();
+    graph.add_layer(*model);
+    graph.compile();
   }
 
   cout << "Training model on device: " << (device_type == DeviceType::CPU ? "CPU" : "GPU") << endl;

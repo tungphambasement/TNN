@@ -60,7 +60,7 @@ void Conv2DLayer::init_params() {
       kernel_w_,
       in_channels_,
   });
-  weight_gradients_ = make_param_tensor({
+  weight_gradients_ = make_grad_tensor({
       out_channels_,
       kernel_h_,
       kernel_w_,
@@ -70,7 +70,7 @@ void Conv2DLayer::init_params() {
 
   if (use_bias_) {
     bias_ = make_param_tensor({out_channels_});
-    bias_gradients_ = make_param_tensor({out_channels_});
+    bias_gradients_ = make_grad_tensor({out_channels_});
     bias_gradients_->fill(0.0f);
   }
 
@@ -104,6 +104,13 @@ size_t Conv2DLayer::get_shape_hash(size_t n, size_t c, size_t h, size_t w) const
   return seed;
 }
 
+void Conv2DLayer::register_impl() {
+  register_param({out_channels_, kernel_h_, kernel_w_, in_channels_});
+  if (use_bias_) {
+    register_param({out_channels_});
+  }
+}
+
 /**
  * @brief Perform convolution 2d forward on input and save it to output->
  * ! Only support GPU device with cuDNN backend. CPU implementation is to be added.
@@ -127,7 +134,7 @@ void Conv2DLayer::forward_impl(const ConstTensor &input, const Tensor &output, s
   }
 
 #ifdef USE_CUDNN
-  if (this->device_->device_type() == DeviceType::GPU) {
+  if (this->device().device_type() == DeviceType::GPU) {
     cudnn_forward(input, output, mb_id);
   } else
 #endif
@@ -160,7 +167,7 @@ void Conv2DLayer::backward_impl(const ConstTensor &gradient, const Tensor &grad_
   }
 
 #ifdef USE_CUDNN
-  if (this->device_->device_type() == DeviceType::GPU) {
+  if (this->device().device_type() == DeviceType::GPU) {
     cudnn_backward(gradient, grad_input, mb_id);
   }
 #endif
@@ -243,7 +250,7 @@ void Conv2DLayer::cudnn_forward(const ConstTensor &input, const Tensor &output, 
     init_convolution_stats(new_stats, batch_size, in_channels_, input_h, input_w, out_channels_,
                            kernel_h_, kernel_w_, stride_h_, stride_w_, pad_h_, pad_w_, use_bias_);
 
-    auto cuda_context = dynamic_cast<CUDAContext *>(this->device_->context());
+    auto cuda_context = dynamic_cast<CUDAContext *>(this->device().context());
     if (!cuda_context) {
       throw std::runtime_error("Conv2DLayer requires CUDAContext for cuDNN operations");
     }
@@ -330,11 +337,6 @@ LayerConfig Conv2DLayer::get_config() const {
   return config;
 }
 
-std::unique_ptr<Layer> Conv2DLayer::clone() const {
-  return std::make_unique<Conv2DLayer>(in_channels_, out_channels_, kernel_h_, kernel_w_, stride_h_,
-                                       stride_w_, pad_h_, pad_w_, use_bias_, this->name_);
-}
-
 std::vector<size_t> Conv2DLayer::compute_output_shape(
     const std::vector<size_t> &input_shape) const {
   if (input_shape.size() != 4) {
@@ -346,20 +348,6 @@ std::vector<size_t> Conv2DLayer::compute_output_shape(
   size_t output_w = (input_shape[2] + 2 * pad_w_ - kernel_w_) / stride_w_ + 1;
 
   return {batch_size, output_h, output_w, out_channels_};
-}
-
-void Conv2DLayer::collect_parameters(std::vector<Tensor> &params) {
-  params.push_back(weights_);
-  if (use_bias_) {
-    params.push_back(bias_);
-  }
-}
-
-void Conv2DLayer::collect_gradients(std::vector<Tensor> &grads) {
-  grads.push_back(weight_gradients_);
-  if (use_bias_) {
-    grads.push_back(bias_gradients_);
-  }
 }
 
 uint64_t Conv2DLayer::forward_flops(const std::vector<size_t> &input_shape) const {

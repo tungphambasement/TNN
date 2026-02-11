@@ -28,7 +28,7 @@ private:
 
 protected:
   void init_impl() override;
-  void on_set_device(const Device &device) override;
+  void on_set_context(GraphContext &graph_ctx) override;
   void on_set_flow_handle(flowHandle_t handle) override {}
   void on_set_seed(unsigned long long seed) override;
   void on_set_io_dtype(DType_t dtype) override;
@@ -43,50 +43,20 @@ public:
   explicit Sequential(const std::string &name = "seq",
                       std::vector<std::unique_ptr<Layer>> layers = {});
 
-  Sequential();
-
   static constexpr const char *TYPE_NAME = "sequential";
-
-  Sequential(const Sequential &) = delete;
-  Sequential &operator=(const Sequential &) = delete;
-
-  Sequential(Sequential &&) = default;
-  Sequential &operator=(Sequential &&) = default;
-
-  /**
-   * @brief Returns a vector of pointers to all params in the model
-   */
-  std::vector<Tensor> parameters() override;
-
-  /**
-   * @brief Returns a vector of pointers to all gradients in the model
-   */
-  std::vector<Tensor> gradients() override;
 
   /**
    * @brief Returns the output shape for given input shape
    * @param input_shape The shape of the input tensor as a vector of sizes.
    */
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
-
   void print_summary(const std::vector<size_t> &input_shape) const;
-
   const std::vector<Layer *> &get_layers() const;
-
   uint64_t forward_flops(const std::vector<size_t> &input_shape) const override;
-
   uint64_t backward_flops(const std::vector<size_t> &input_shape) const override;
-
-  bool has_parameters() const override;
-
   std::string type() const override { return TYPE_NAME; }
-
   LayerConfig get_config() const override;
-
   static std::unique_ptr<Sequential> create_from_config(const LayerConfig &config);
-
-  std::unique_ptr<Layer> clone() const override;
-
   size_t cached_memory_bytes() const override;
 };
 

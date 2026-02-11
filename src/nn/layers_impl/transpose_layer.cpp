@@ -28,12 +28,12 @@ std::unique_ptr<Task> TransposeLayer::permute(const ConstTensor &input, const Te
     throw std::runtime_error("TransposeLayer IO tensor dtype mismatch with dispatch IO_T");
   }
 
-  if (this->device_->device_type() == DeviceType::CPU) {
+  if (this->device().device_type() == DeviceType::CPU) {
     return create_cpu_task(handle, cpu::permute_heads<Compute_T, Compute_T>,
                            input->data_as<Compute_T>(), output->data_as<Compute_T>(), B, L, H, D);
   }
 #ifdef USE_CUDA
-  else if (this->device_->device_type() == DeviceType::GPU) {
+  else if (this->device().device_type() == DeviceType::GPU) {
     return create_cuda_task(handle, cuda::permute_heads<Compute_T, Compute_T>,
                             input->data_as<Compute_T>(), output->data_as<Compute_T>(), B, L, H, D);
   }
@@ -87,10 +87,6 @@ LayerConfig TransposeLayer::get_config() const {
   config.name = this->name_;
   config.type = this->type();
   return config;
-}
-
-std::unique_ptr<Layer> TransposeLayer::clone() const {
-  return std::make_unique<TransposeLayer>(this->name_);
 }
 
 std::unique_ptr<TransposeLayer> TransposeLayer::create_from_config(const LayerConfig &config) {

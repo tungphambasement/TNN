@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "device/device_manager.hpp"
+#include "nn/graph.hpp"
 #include "tensor/tensor.hpp"
 
 using namespace tnn;
@@ -125,15 +126,17 @@ protected:
 
 TEST_F(LegacyLegacyDenseLayerTest, BasicForwardPass) {
   LegacyDenseLayer layer(10, 5, true, "test_dense");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 10}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> expected_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(expected_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 5);
   auto output_shape = output->shape();
@@ -146,8 +149,10 @@ TEST_F(LegacyLegacyDenseLayerTest, BasicForwardPass) {
 
 TEST_F(LegacyLegacyDenseLayerTest, ForwardPassSingleBatch) {
   LegacyDenseLayer layer(20, 10, true, "test_dense_single");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 20}, getCPU());
   float *input_data = input->data_as<float>();
@@ -157,7 +162,7 @@ TEST_F(LegacyLegacyDenseLayerTest, ForwardPassSingleBatch) {
 
   std::vector<size_t> expected_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(expected_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 10);
   auto output_shape = output->shape();
@@ -167,15 +172,17 @@ TEST_F(LegacyLegacyDenseLayerTest, ForwardPassSingleBatch) {
 
 TEST_F(LegacyLegacyDenseLayerTest, ForwardPassMultiBatch) {
   LegacyDenseLayer layer(15, 8, false, "test_dense_multibatch");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({4, 15}, getCPU());
   input->fill(0.5f);
 
   std::vector<size_t> expected_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(expected_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 8);
   auto output_shape = output->shape();
@@ -185,15 +192,17 @@ TEST_F(LegacyLegacyDenseLayerTest, ForwardPassMultiBatch) {
 
 TEST_F(LegacyLegacyDenseLayerTest, ForwardPassLargeLayer) {
   LegacyDenseLayer layer(128, 64, true, "test_dense_large");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 128}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> expected_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(expected_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 64);
   auto output_shape = output->shape();
@@ -202,15 +211,17 @@ TEST_F(LegacyLegacyDenseLayerTest, ForwardPassLargeLayer) {
 
 TEST_F(LegacyLegacyDenseLayerTest, ForwardPassWithBias) {
   LegacyDenseLayer layer(10, 5, true, "test_dense_bias");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 10}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 5);
   auto out_shape = output->shape();
@@ -219,15 +230,17 @@ TEST_F(LegacyLegacyDenseLayerTest, ForwardPassWithBias) {
 
 TEST_F(LegacyLegacyDenseLayerTest, ForwardPassWithoutBias) {
   LegacyDenseLayer layer(10, 5, false, "test_dense_no_bias");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 10}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 5);
   auto out_shape = output->shape();
@@ -236,8 +249,10 @@ TEST_F(LegacyLegacyDenseLayerTest, ForwardPassWithoutBias) {
 
 TEST_F(LegacyLegacyDenseLayerTest, ForwardPassVariableInput) {
   LegacyDenseLayer layer(6, 3, true, "test_dense_variable");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 6}, getCPU());
   float *input_data = input->data_as<float>();
@@ -247,28 +262,30 @@ TEST_F(LegacyLegacyDenseLayerTest, ForwardPassVariableInput) {
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 3);
 }
 
 TEST_F(LegacyLegacyDenseLayerTest, BasicBackwardPass) {
   LegacyDenseLayer layer(10, 5, true, "test_dense_backward");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 10}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   verify_gradient_shape(gradient, grad_input, input);
   auto grad_input_shape = grad_input->shape();
@@ -280,21 +297,23 @@ TEST_F(LegacyLegacyDenseLayerTest, BasicBackwardPass) {
 
 TEST_F(LegacyLegacyDenseLayerTest, BackwardPassSingleBatch) {
   LegacyDenseLayer layer(20, 10, true, "test_dense_backward_single");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 20}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   verify_gradient_shape(gradient, grad_input, input);
   auto grad_input_shape = grad_input->shape();
@@ -303,21 +322,23 @@ TEST_F(LegacyLegacyDenseLayerTest, BackwardPassSingleBatch) {
 
 TEST_F(LegacyLegacyDenseLayerTest, BackwardPassMultiBatch) {
   LegacyDenseLayer layer(15, 8, false, "test_dense_backward_multibatch");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({4, 15}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   verify_gradient_shape(gradient, grad_input, input);
   auto grad_input_shape = grad_input->shape();
@@ -326,8 +347,10 @@ TEST_F(LegacyLegacyDenseLayerTest, BackwardPassMultiBatch) {
 
 TEST_F(LegacyLegacyDenseLayerTest, BackwardPassVariableGradient) {
   LegacyDenseLayer layer(8, 4, true, "test_dense_backward_var");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 8}, getCPU());
   float *input_data = input->data_as<float>();
@@ -337,7 +360,7 @@ TEST_F(LegacyLegacyDenseLayerTest, BackwardPassVariableGradient) {
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   float *grad_data = gradient->data_as<float>();
@@ -346,7 +369,7 @@ TEST_F(LegacyLegacyDenseLayerTest, BackwardPassVariableGradient) {
   }
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   verify_gradient_shape(gradient, grad_input, input);
   EXPECT_EQ(grad_input->shape(), input->shape());
@@ -354,42 +377,46 @@ TEST_F(LegacyLegacyDenseLayerTest, BackwardPassVariableGradient) {
 
 TEST_F(LegacyLegacyDenseLayerTest, BackwardPassWithBias) {
   LegacyDenseLayer layer(10, 5, true, "test_dense_backward_bias");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 10}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   verify_gradient_shape(gradient, grad_input, input);
 }
 
 TEST_F(LegacyLegacyDenseLayerTest, BackwardPassWithoutBias) {
   LegacyDenseLayer layer(10, 5, false, "test_dense_backward_no_bias");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 10}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   verify_gradient_shape(gradient, grad_input, input);
 }
@@ -441,15 +468,17 @@ TEST_F(LegacyLegacyDenseLayerTest, Clone) {
 
 TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseSmallLayer) {
   LegacyDenseLayer layer(2, 1, true, "test_small_layer");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 2}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   auto out_shape = output->shape();
   EXPECT_EQ(out_shape[1], 1);
@@ -458,44 +487,50 @@ TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseSmallLayer) {
 
 TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseZeroGradient) {
   LegacyDenseLayer layer(10, 5, true, "test_zero_gradient");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 10}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(0.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   verify_gradient_shape(gradient, grad_input, input);
 }
 
 TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseLargeValues) {
   LegacyDenseLayer layer(10, 5, false, "test_large_values");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 10}, getCPU());
   input->fill(1e6f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 5);
 }
 
 TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseNegativeValues) {
   LegacyDenseLayer layer(8, 4, true, "test_negative_values");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({1, 8}, getCPU());
   float *input_data = input->data_as<float>();
@@ -505,22 +540,24 @@ TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseNegativeValues) {
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 4);
 }
 
 TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseLargeBatch) {
   LegacyDenseLayer layer(20, 10, true, "test_large_batch");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({32, 20}, getCPU());
   input->fill(1.0f);
 
   std::vector<size_t> expected_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(expected_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 10);
   auto output_shape = output->shape();
@@ -529,44 +566,50 @@ TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseLargeBatch) {
 
 TEST_F(LegacyLegacyDenseLayerTest, NumericalStabilitySmallValues) {
   LegacyDenseLayer layer(10, 5, true, "test_small_values");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 10}, getCPU());
   input->fill(1e-6f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 5);
 }
 
 TEST_F(LegacyLegacyDenseLayerTest, BackwardNumericalStability) {
   LegacyDenseLayer layer(10, 5, false, "test_backward_stability");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 10}, getCPU());
   input->fill(1e-6f);
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   Tensor gradient = make_tensor<float>(output->shape(), getCPU());
   gradient->fill(1e-6f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward(gradient, grad_input);
+  layer.backward({gradient}, {grad_input});
 
   verify_gradient_shape(gradient, grad_input, input);
 }
 
 TEST_F(LegacyLegacyDenseLayerTest, NumericalStabilityMixedValues) {
   LegacyDenseLayer layer(10, 5, true, "test_mixed_values");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input = make_tensor<float>({2, 10}, getCPU());
   float *input_data = input->data_as<float>();
@@ -576,35 +619,37 @@ TEST_F(LegacyLegacyDenseLayerTest, NumericalStabilityMixedValues) {
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
   Tensor output = make_tensor<float>(output_shape, getCPU());
-  layer.forward(input, output);
+  layer.forward({input}, {output});
 
   verify_output_shape(input, output, 5);
 }
 
 TEST_F(LegacyLegacyDenseLayerTest, MultipleForwardBackwardPasses) {
   LegacyDenseLayer layer(10, 5, true, "test_multiple_passes");
-  layer.set_device(getCPU());
-  layer.init();
+  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  Graph graph(allocator);
+  graph.add_layer(layer);
+  graph.compile();
 
   Tensor input1 = make_tensor<float>({2, 10}, getCPU());
   input1->fill(1.0f);
   std::vector<size_t> output_shape1 = layer.compute_output_shape(input1->shape());
   Tensor output1 = make_tensor<float>(output_shape1, getCPU());
-  layer.forward(input1, output1);
+  layer.forward({input1}, {output1});
   Tensor gradient1 = make_tensor<float>(output1->shape(), getCPU());
   gradient1->fill(1.0f);
   Tensor grad_input1 = make_tensor<float>(input1->shape(), getCPU());
-  layer.backward(gradient1, grad_input1);
+  layer.backward({gradient1}, {grad_input1});
 
   Tensor input2 = make_tensor<float>({2, 10}, getCPU());
   input2->fill(2.0f);
   std::vector<size_t> output_shape2 = layer.compute_output_shape(input2->shape());
   Tensor output2 = make_tensor<float>(output_shape2, getCPU());
-  layer.forward(input2, output2);
+  layer.forward({input2}, {output2});
   Tensor gradient2 = make_tensor<float>(output2->shape(), getCPU());
   gradient2->fill(1.0f);
   Tensor grad_input2 = make_tensor<float>(input2->shape(), getCPU());
-  layer.backward(gradient2, grad_input2);
+  layer.backward({gradient2}, {grad_input2});
 
   verify_gradient_shape(gradient2, grad_input2, input2);
 }

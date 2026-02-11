@@ -35,6 +35,8 @@ int main(int argc, char **argv) {
 
   // Create model using ExampleModels or load from file
   const Device &device = device_type == DeviceType::GPU ? getGPU() : getCPU();
+  auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
+  Graph graph(allocator);
   std::unique_ptr<Sequential> model;
   // Try to load from file, otherwise create from ExampleModels
   try {
@@ -42,13 +44,13 @@ int main(int argc, char **argv) {
     if (!file.is_open()) {
       throw std::runtime_error("Failed to open model file");
     }
-    model = load_state<Sequential>(file, device);
+    model = load_state<Sequential>(file, graph);
     file.close();
   } catch (const std::exception &e) {
     cerr << "Could not load from file, trying ExampleModels: " << e.what() << endl;
     Sequential temp_model = ExampleModels::create("gpt2");
-    temp_model.set_device(device);
     temp_model.init();
+    temp_model.set_context(graph.context());
     model = std::make_unique<Sequential>(std::move(temp_model));
   }
   model->set_training(false);
@@ -91,7 +93,7 @@ int main(int argc, char **argv) {
     }
 
     Tensor output;
-    model->forward(model_input, output);
+    model->forward({model_input}, {output});
 
     // Transfer output to CPU for sampling
     Tensor cpu_output = output->to_host();

@@ -51,8 +51,8 @@ void LayerNormLayer::init_params() {
     gamma_->fill(1);
     beta_->fill(0);
 
-    gamma_gradients_ = make_param_tensor({normalized_shape_});
-    beta_gradients_ = make_param_tensor({normalized_shape_});
+    gamma_gradients_ = make_grad_tensor({normalized_shape_});
+    beta_gradients_ = make_grad_tensor({normalized_shape_});
     gamma_gradients_->fill(0);
     beta_gradients_->fill(0);
   }
@@ -70,6 +70,13 @@ size_t LayerNormLayer::get_shape_hash(size_t n, size_t c) const {
   return seed;
 }
 
+void LayerNormLayer::register_impl() {
+  if (affine_) {
+    register_param({normalized_shape_});
+    register_param({normalized_shape_});
+  }
+}
+
 template <typename IO_T, typename Param_T, typename Compute_T>
 std::unique_ptr<Task> LayerNormLayer::layer_norm_forward(
     const ConstTensor &input, const Tensor &output, const ConstTensor &gamma,
@@ -85,7 +92,7 @@ std::unique_ptr<Task> LayerNormLayer::layer_norm_forward(
     throw std::runtime_error("LayerNormLayer gamma dtype mismatch with dispatch Param_T");
   }
 
-  if (this->device_->device_type() == DeviceType::CPU) {
+  if (this->device().device_type() == DeviceType::CPU) {
     return create_cpu_task(this->flow_handle_, cpu::layer_norm::layer_norm_forward<Compute_T>,
                            input->data_as<Compute_T>(), output->data_as<Compute_T>(),
                            gamma ? gamma->data_as<Compute_T>() : nullptr,
@@ -93,7 +100,7 @@ std::unique_ptr<Task> LayerNormLayer::layer_norm_forward(
                            epsilon_);
   }
 #ifdef USE_CUDA
-  else if (this->device_->device_type() == DeviceType::GPU) {
+  else if (this->device().device_type() == DeviceType::GPU) {
     return create_cuda_task(this->flow_handle_, cuda::layer_norm::layer_norm_forward<Compute_T>,
                             input->data_as<Compute_T>(), output->data_as<Compute_T>(),
                             gamma ? gamma->data_as<Compute_T>() : nullptr,
@@ -122,7 +129,7 @@ std::unique_ptr<Task> LayerNormLayer::layer_norm_backward(
     throw std::runtime_error("LayerNormLayer gamma dtype mismatch with dispatch Param_T");
   }
 
-  if (this->device_->device_type() == DeviceType::CPU) {
+  if (this->device().device_type() == DeviceType::CPU) {
     return create_cpu_task(this->flow_handle_, cpu::layer_norm::layer_norm_backward<Compute_T>,
                            gradient->data_as<Compute_T>(), input->data_as<Compute_T>(),
                            gamma ? gamma->data_as<Compute_T>() : nullptr,
@@ -132,7 +139,7 @@ std::unique_ptr<Task> LayerNormLayer::layer_norm_backward(
                            batch_size, channels, epsilon_);
   }
 #ifdef USE_CUDA
-  else if (this->device_->device_type() == DeviceType::GPU) {
+  else if (this->device().device_type() == DeviceType::GPU) {
     return create_cuda_task(this->flow_handle_, cuda::layer_norm::layer_norm_backward<Compute_T>,
                             gradient->data_as<Compute_T>(), input->data_as<Compute_T>(),
                             gamma ? gamma->data_as<Compute_T>() : nullptr,
@@ -208,7 +215,7 @@ void LayerNormLayer::cudnn_forward(const ConstTensor &input, const Tensor &outpu
     LayerNormStats new_stats;
     init_layer_norm_stats(new_stats, batch_size, channels, affine_, epsilon_);
 
-    auto cuda_context = dynamic_cast<CUDAContext *>(this->device_->context());
+    auto cuda_context = dynamic_cast<CUDAContext *>(this->device().context());
     if (!cuda_context) {
       throw std::runtime_error("LayerNormLayer requires CUDAContext for cuDNN operations");
     }
@@ -335,7 +342,7 @@ void LayerNormLayer::forward_impl(const ConstTensor &input, const Tensor &output
   }
 
 #ifdef USE_CUDNN
-  if (this->device_->device_type() == DeviceType::GPU) {
+  if (this->device().device_type() == DeviceType::GPU) {
     cudnn_forward(input, output, mb_id);
   } else
 #endif
@@ -347,7 +354,7 @@ void LayerNormLayer::forward_impl(const ConstTensor &input, const Tensor &output
 void LayerNormLayer::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
                                    size_t mb_id) {
 #ifdef USE_CUDNN
-  if (this->device_->device_type() == DeviceType::GPU) {
+  if (this->device().device_type() == DeviceType::GPU) {
     cudnn_backward(gradient, grad_input, mb_id);
   } else
 #endif
@@ -378,24 +385,6 @@ LayerConfig LayerNormLayer::get_config() const {
   config.set("epsilon", epsilon_);
   config.set("affine", affine_);
   return config;
-}
-
-std::unique_ptr<Layer> LayerNormLayer::clone() const {
-  return std::make_unique<LayerNormLayer>(normalized_shape_, epsilon_, affine_, this->name_);
-}
-
-void LayerNormLayer::collect_parameters(std::vector<Tensor> &params) {
-  if (affine_) {
-    params.push_back(gamma_);
-    params.push_back(beta_);
-  }
-}
-
-void LayerNormLayer::collect_gradients(std::vector<Tensor> &grads) {
-  if (affine_) {
-    grads.push_back(gamma_gradients_);
-    grads.push_back(beta_gradients_);
-  }
 }
 
 std::unique_ptr<LayerNormLayer> LayerNormLayer::create_from_config(const LayerConfig &config) {
