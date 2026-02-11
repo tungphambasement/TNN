@@ -90,8 +90,4 @@ std::unique_ptr<FlattenLayer> FlattenLayer::create_from_config(const LayerConfig
   return std::make_unique<FlattenLayer>(start_dim, end_dim, config.name);
 }
 
-uint64_t FlattenLayer::forward_flops(const std::vector<size_t> &input_shape) const { return 0; }
-
-uint64_t FlattenLayer::backward_flops(const std::vector<size_t> &input_shape) const { return 0; }
-
 }  // namespace tnn

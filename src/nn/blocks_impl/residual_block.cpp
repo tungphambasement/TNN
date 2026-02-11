@@ -34,26 +34,6 @@ ResidualBlock::ResidualBlock(std::vector<std::unique_ptr<Layer>> main_path,
   }
 }
 
-ResidualBlock::ResidualBlock(const ResidualBlock &other)
-    : activation_type_(other.activation_type_) {
-  this->name_ = other.name_;
-  this->is_training_ = other.is_training_;
-
-  for (const auto &layer : other.main_path_) {
-    main_path_.push_back(layer->clone_impl());
-  }
-
-  for (const auto &layer : other.shortcut_path_) {
-    shortcut_path_.push_back(layer->clone_impl());
-  }
-
-  if (other.final_activation_) {
-    auto factory = ActivationFactory();
-    factory.register_defaults();
-    final_activation_ = factory.create(activation_type_);
-  }
-}
-
 void ResidualBlock::on_set_context(GraphContext &graph_ctx) {
   for (auto &layer : main_path_) {
     layer->set_context(graph_ctx);
@@ -235,52 +215,6 @@ std::vector<size_t> ResidualBlock::compute_output_shape(
   return shape;
 }
 
-uint64_t ResidualBlock::forward_flops(const std::vector<size_t> &input_shape) const {
-  uint64_t main_complexity = 0;
-  std::vector<size_t> current_shape = input_shape;
-  for (const auto &layer : main_path_) {
-    main_complexity += layer->forward_flops(current_shape);
-    current_shape = layer->compute_output_shape(current_shape);
-  }
-
-  uint64_t shortcut_complexity = 0;
-  std::vector<size_t> shortcut_shape = input_shape;
-  for (const auto &layer : shortcut_path_) {
-    shortcut_complexity += layer->forward_flops(shortcut_shape);
-    shortcut_shape = layer->compute_output_shape(shortcut_shape);
-  }
-
-  size_t add_complexity = 1;
-  for (size_t dim : current_shape) {
-    add_complexity *= dim;
-  }
-
-  return main_complexity + shortcut_complexity + add_complexity;
-}
-
-uint64_t ResidualBlock::backward_flops(const std::vector<size_t> &input_shape) const {
-  uint64_t main_complexity = 0;
-  std::vector<size_t> current_shape = input_shape;
-  for (const auto &layer : main_path_) {
-    main_complexity += layer->backward_flops(current_shape);
-    current_shape = layer->compute_output_shape(current_shape);
-  }
-
-  uint64_t shortcut_complexity = 0;
-  std::vector<size_t> shortcut_shape = input_shape;
-  for (const auto &layer : shortcut_path_) {
-    shortcut_complexity += layer->backward_flops(shortcut_shape);
-    shortcut_shape = layer->compute_output_shape(shortcut_shape);
-  }
-
-  size_t add_complexity = 1;
-  for (size_t dim : current_shape) {
-    add_complexity *= dim;
-  }
-
-  return main_complexity + shortcut_complexity + add_complexity;
-}
-
 LayerConfig ResidualBlock::get_config() const {
   LayerConfig config;
   config.name = this->name_;
@@ -307,35 +241,12 @@ LayerConfig ResidualBlock::get_config() const {
   return config;
 }
 
-std::vector<std::unique_ptr<Layer>> shortcut_clone;
-for (const auto &layer : shortcut_path_) {
-  shortcut_clone.push_back(layer->clone_impl());
-}
-return std::make_unique<ResidualBlock>(std::move(main_clone), std::move(shortcut_clone),
-                                       activation_type_, this->name_);
-}
-
 const std::vector<std::unique_ptr<Layer>> &ResidualBlock::get_main_path() const {
   return main_path_;
 }
 
 const std::vector<std::unique_ptr<Layer>> &ResidualBlock::get_shortcut_path() const {
   return shortcut_path_;
-}
-
-size_t ResidualBlock::cached_memory_bytes() const {
-  size_t total_bytes = 0;
-  for (const auto &layer : main_path_) {
-    total_bytes += layer->cached_memory_bytes();
-  }
-  for (const auto &layer : shortcut_path_) {
-    total_bytes += layer->cached_memory_bytes();
-  }
-  for (const auto &[_, tensor] : pre_activation_cache_) {
-    size_t dtype_size = get_dtype_size(tensor->data_type());
-    total_bytes += tensor->size() * dtype_size;
-  }
-  return total_bytes;
 }
 
 std::unique_ptr<ResidualBlock> ResidualBlock::create_from_config(const LayerConfig &config) {
@@ -359,6 +270,32 @@ std::unique_ptr<ResidualBlock> ResidualBlock::create_from_config(const LayerConf
   std::string activation = config.get<std::string>("activation", "relu");
   return std::make_unique<ResidualBlock>(std::move(main_path), std::move(shortcut_path), activation,
                                          config.name);
+}
+
+std::vector<Tensor> ResidualBlock::parameters() {
+  std::vector<Tensor> params;
+  for (const auto &layer : main_path_) {
+    auto layer_params = layer->parameters();
+    params.insert(params.end(), layer_params.begin(), layer_params.end());
+  }
+  for (const auto &layer : shortcut_path_) {
+    auto layer_params = layer->parameters();
+    params.insert(params.end(), layer_params.begin(), layer_params.end());
+  }
+  return params;
+}
+
+std::vector<Tensor> ResidualBlock::gradients() {
+  std::vector<Tensor> grads;
+  for (const auto &layer : main_path_) {
+    auto layer_grads = layer->gradients();
+    grads.insert(grads.end(), layer_grads.begin(), layer_grads.end());
+  }
+  for (const auto &layer : shortcut_path_) {
+    auto layer_grads = layer->gradients();
+    grads.insert(grads.end(), layer_grads.begin(), layer_grads.end());
+  }
+  return grads;
 }
 
 }  // namespace tnn

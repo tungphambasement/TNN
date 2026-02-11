@@ -32,8 +32,18 @@ private:
                                                  const Tensor &pos_embedding_gradients,
                                                  flowHandle_t handle) const;
 
-  void register_impl() override;
-  void init_params() override;
+  std::vector<ParamDescriptor> param_descriptors() override {
+    std::vector<ParamDescriptor> descriptors;
+    auto pos_emb_desc = ParamDescriptor{
+        {seq_len_, embed_dim_},
+        &pos_embedding_,
+        &pos_embedding_gradients_,
+    };
+    descriptors.push_back(pos_emb_desc);
+    return descriptors;
+  }
+
+  void init_impl() override;
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
   void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
                      size_t mb_id = 0) override;
@@ -44,15 +54,8 @@ public:
 
   static constexpr const char *TYPE_NAME = "pos_embedding";
 
-  uint64_t forward_flops(const std::vector<size_t> &input_shape) const override;
-  uint64_t backward_flops(const std::vector<size_t> &input_shape) const override;
-
   std::string type() const override { return TYPE_NAME; }
-
   LayerConfig get_config() const override;
-
-  std::unique_ptr<Layer> clone_impl() const override;
-
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
 
 public:

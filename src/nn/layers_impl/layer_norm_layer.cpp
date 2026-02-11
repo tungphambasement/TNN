@@ -42,22 +42,11 @@ LayerNormLayer::~LayerNormLayer() {
 #endif
 }
 
-void LayerNormLayer::init_params() {
-  if (this->initialized_) return;
-
+void LayerNormLayer::init_impl() {
   if (affine_) {
-    gamma_ = make_param_tensor({normalized_shape_});
-    beta_ = make_param_tensor({normalized_shape_});
-    gamma_->fill(1);
-    beta_->fill(0);
-
-    gamma_gradients_ = make_grad_tensor({normalized_shape_});
-    beta_gradients_ = make_grad_tensor({normalized_shape_});
-    gamma_gradients_->fill(0);
-    beta_gradients_->fill(0);
+    gamma_->fill(1.0f);
+    beta_->fill(0.0f);
   }
-
-  this->initialized_ = true;
 }
 
 size_t LayerNormLayer::get_shape_hash(size_t n, size_t c) const {
@@ -68,13 +57,6 @@ size_t LayerNormLayer::get_shape_hash(size_t n, size_t c) const {
   hash_combine(n);
   hash_combine(c);
   return seed;
-}
-
-void LayerNormLayer::register_impl() {
-  if (affine_) {
-    register_param({normalized_shape_});
-    register_param({normalized_shape_});
-  }
 }
 
 template <typename IO_T, typename Param_T, typename Compute_T>
@@ -361,20 +343,6 @@ void LayerNormLayer::backward_impl(const ConstTensor &gradient, const Tensor &gr
   {
     def_backward(gradient, grad_input, mb_id);
   }
-}
-
-uint64_t LayerNormLayer::forward_flops(const std::vector<size_t> &input_shape) const {
-  if (input_shape.size() < 2) return 0;
-  size_t elements = 1;
-  for (size_t s : input_shape) elements *= s;
-  return elements * 8;
-}
-
-uint64_t LayerNormLayer::backward_flops(const std::vector<size_t> &input_shape) const {
-  if (input_shape.size() < 2) return 0;
-  size_t elements = 1;
-  for (size_t s : input_shape) elements *= s;
-  return elements * 16;
 }
 
 LayerConfig LayerNormLayer::get_config() const {

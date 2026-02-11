@@ -51,20 +51,6 @@ std::vector<size_t> ActivationLayer::compute_output_shape(
   return input_shape;
 }
 
-uint64_t ActivationLayer::forward_flops(const std::vector<size_t> &input_shape) const {
-  size_t num_elements =
-      std::accumulate(input_shape.begin(), input_shape.end(), 1, std::multiplies<size_t>());
-
-  return 2 * num_elements;
-}
-
-uint64_t ActivationLayer::backward_flops(const std::vector<size_t> &input_shape) const {
-  size_t num_elements =
-      std::accumulate(input_shape.begin(), input_shape.end(), 1, std::multiplies<size_t>());
-
-  return 2 * num_elements;
-}
-
 std::unique_ptr<ActivationLayer> ActivationLayer::create_from_config(const LayerConfig &config) {
   std::string activation_name = config.get<std::string>("activation", "relu");
   ActivationFactory::register_defaults();

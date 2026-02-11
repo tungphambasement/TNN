@@ -29,12 +29,10 @@ public:
   explicit ActivationLayer(std::unique_ptr<ActivationFunction> activation,
                            const std::string &name = "activation");
 
-  uint64_t forward_flops(const std::vector<size_t> &input_shape) const override;
-  uint64_t backward_flops(const std::vector<size_t> &input_shape) const override;
   std::string type() const override { return TYPE_NAME; }
   LayerConfig get_config() const override;
   static std::unique_ptr<ActivationLayer> create_from_config(const LayerConfig &config);
-  std::unique_ptr<Layer> clone_impl() const override;
+
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
 };
 

@@ -28,30 +28,10 @@ GroupNormLayer::GroupNormLayer(size_t num_groups, size_t num_channels, float eps
   }
 }
 
-void GroupNormLayer::init_params() {
-  if (this->initialized_) {
-    return;
-  }
-
+void GroupNormLayer::init_impl() {
   if (affine_) {
-    gamma_ = make_param_tensor({num_channels_});
-    beta_ = make_param_tensor({num_channels_});
-    gamma_->fill(1);
-    beta_->fill(0);
-  }
-
-  gamma_gradients_ = make_grad_tensor({num_channels_});
-  beta_gradients_ = make_grad_tensor({num_channels_});
-  gamma_gradients_->fill(0);
-  beta_gradients_->fill(0);
-
-  this->initialized_ = true;
-}
-
-void GroupNormLayer::register_impl() {
-  register_param({num_channels_});
-  if (affine_) {
-    register_param({num_channels_});
+    gamma_->fill(1.0f);
+    beta_->fill(0.0f);
   }
 }
 
@@ -211,45 +191,6 @@ std::unique_ptr<GroupNormLayer> GroupNormLayer::create_from_config(const LayerCo
   bool affine = config.get<bool>("affine");
 
   return std::make_unique<GroupNormLayer>(num_groups, num_channels, epsilon, affine, config.name);
-}
-
-uint64_t GroupNormLayer::forward_flops(const std::vector<size_t> &input_shape) const {
-  size_t num_elements =
-      std::accumulate(input_shape.begin(), input_shape.end(), 1, std::multiplies<size_t>());
-  size_t batch_size = input_shape[0];
-  size_t channels_per_group = num_channels_ / num_groups_;
-  size_t spatial_size = num_elements / (batch_size * num_channels_);
-
-  // Mean computation per group
-  uint64_t mean_flops = batch_size * num_groups_ * channels_per_group * spatial_size;
-
-  // Variance computation per group
-  uint64_t var_flops = 2 * num_elements + mean_flops;
-
-  // Normalization
-  uint64_t norm_flops = 3 * num_elements;
-
-  // Affine transformation
-  uint64_t affine_flops = affine_ ? (2 * num_elements) : 0;
-
-  return mean_flops + var_flops + norm_flops + affine_flops;
-}
-
-uint64_t GroupNormLayer::backward_flops(const std::vector<size_t> &input_shape) const {
-  size_t num_elements =
-      std::accumulate(input_shape.begin(), input_shape.end(), 1, std::multiplies<size_t>());
-  size_t batch_size = input_shape[0];
-  size_t channels_per_group = num_channels_ / num_groups_;
-  size_t spatial_size = num_elements / (batch_size * num_channels_);
-
-  // Parameter gradients
-  uint64_t param_grad_flops =
-      affine_ ? (2 * batch_size * num_groups_ * channels_per_group * spatial_size) : 0;
-
-  // Input gradients
-  uint64_t input_grad_flops = 9 * num_elements;
-
-  return param_grad_flops + input_grad_flops;
 }
 
 }  // namespace tnn

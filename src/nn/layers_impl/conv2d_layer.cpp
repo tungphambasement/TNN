@@ -53,27 +53,7 @@ Conv2DLayer::~Conv2DLayer() {
 #endif
 }
 
-void Conv2DLayer::init_params() {
-  weights_ = make_param_tensor({
-      out_channels_,
-      kernel_h_,
-      kernel_w_,
-      in_channels_,
-  });
-  weight_gradients_ = make_grad_tensor({
-      out_channels_,
-      kernel_h_,
-      kernel_w_,
-      in_channels_,
-  });
-  weight_gradients_->fill(0.0f);
-
-  if (use_bias_) {
-    bias_ = make_param_tensor({out_channels_});
-    bias_gradients_ = make_grad_tensor({out_channels_});
-    bias_gradients_->fill(0.0f);
-  }
-
+void Conv2DLayer::init_impl() {
   float bound = static_cast<float>(
       1.0 / std::sqrt(static_cast<double>(in_channels_ * kernel_h_ * kernel_w_)));
 
@@ -102,13 +82,6 @@ size_t Conv2DLayer::get_shape_hash(size_t n, size_t c, size_t h, size_t w) const
   hash_combine(h);
   hash_combine(w);
   return seed;
-}
-
-void Conv2DLayer::register_impl() {
-  register_param({out_channels_, kernel_h_, kernel_w_, in_channels_});
-  if (use_bias_) {
-    register_param({out_channels_});
-  }
 }
 
 /**
@@ -348,43 +321,6 @@ std::vector<size_t> Conv2DLayer::compute_output_shape(
   size_t output_w = (input_shape[2] + 2 * pad_w_ - kernel_w_) / stride_w_ + 1;
 
   return {batch_size, output_h, output_w, out_channels_};
-}
-
-uint64_t Conv2DLayer::forward_flops(const std::vector<size_t> &input_shape) const {
-  assert(input_shape.size() == 4 && "Input shape must be 4D");
-  size_t batch_size = input_shape[0];
-  size_t input_h = input_shape[1];
-  size_t input_w = input_shape[2];
-  size_t output_h = (input_h + 2 * pad_h_ - kernel_h_) / stride_h_ + 1;
-  size_t output_w = (input_w + 2 * pad_w_ - kernel_w_) / stride_w_ + 1;
-  size_t output_size = batch_size * output_h * output_w;
-  size_t kernel_size = in_channels_ * kernel_h_ * kernel_w_;
-
-  // Main convolution computation: 2 FLOPs per MAC (multiply-add)
-  uint64_t conv_flops = 2ULL * out_channels_ * kernel_size * output_size;
-
-  // Bias addition: 1 FLOP per output element
-  uint64_t bias_flops = use_bias_ ? (batch_size * out_channels_ * output_h * output_w) : 0;
-
-  return conv_flops + bias_flops;
-}
-
-uint64_t Conv2DLayer::backward_flops(const std::vector<size_t> &input_shape) const {
-  assert(input_shape.size() == 4 && "Input shape must be 4D");
-  size_t batch_size = input_shape[0];
-  size_t input_h = input_shape[1];
-  size_t input_w = input_shape[2];
-  size_t output_h = (input_h + 2 * pad_h_ - kernel_h_) / stride_h_ + 1;
-  size_t output_w = (input_w + 2 * pad_w_ - kernel_w_) / stride_w_ + 1;
-  size_t output_size = batch_size * output_h * output_w;
-  size_t kernel_size = in_channels_ * kernel_h_ * kernel_w_;
-  // weight gradients: gradient × im2col_input^T (2 FLOPs per MAC)
-  uint64_t weight_grad_flops = 2ULL * out_channels_ * kernel_size * output_size;
-  // input gradients: weights^T × gradient (2 FLOPs per MAC)
-  uint64_t input_grad_flops = 2ULL * out_channels_ * kernel_size * output_size;
-  // bias gradients: reduction across batch and spatial dimensions (1 FLOP per add)
-  uint64_t bias_grad_flops = use_bias_ ? (batch_size * out_channels_ * output_h * output_w) : 0;
-  return weight_grad_flops + input_grad_flops + bias_grad_flops;
 }
 
 std::unique_ptr<Conv2DLayer> Conv2DLayer::create_from_config(const LayerConfig &config) {

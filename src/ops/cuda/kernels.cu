@@ -349,6 +349,28 @@ __global__ void unary_op_scalar_kernel(const T* a, T* c, size_t size, Func op) {
 }
 
 template <typename T>
+__global__ void set_scalar_vector_kernel(T* __restrict__ c, T scalar, size_t size) {
+  size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+  using VecT = typename VectorizedTrait<T>::type;
+  constexpr size_t vec_size = size_t(VectorizedTrait<T>::size);
+  if (idx * vec_size + vec_size <= size) {
+    VecT vc;
+    if constexpr (vec_size == 4) {
+      vc.x = scalar;
+      vc.y = scalar;
+      vc.z = scalar;
+      vc.w = scalar;
+    } else if constexpr (vec_size == 2) {
+      vc.x = scalar;
+      vc.y = scalar;
+    } else if constexpr (vec_size == 1) {
+      vc.x = scalar;
+    }
+    reinterpret_cast<VecT*>(c)[idx] = vc;
+  }
+}
+
+template <typename T>
 __global__ void set_scalar_kernel(T* c, T scalar, size_t size) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < size) c[idx] = scalar;
@@ -676,8 +698,20 @@ void cuda_d2h_copy(const T* a, T* c, size_t size, cudaStream_t stream) {
 template <typename T>
 void cuda_set_scalar(T* c, T scalar, size_t size, cudaStream_t stream) {
   if (size == 0) return;
-  int blocks = get_num_blocks(size);
-  set_scalar_kernel<<<blocks, BLOCK_SIZE, 0, stream>>>(c, scalar, size);
+  if (scalar == T(0)) {
+    cuda_zero(c, size, stream);
+    return;
+  }
+  constexpr int vec_size = VectorizedTrait<T>::size;
+  bool is_aligned = ((uintptr_t)c % 16 == 0);
+
+  if (is_aligned && size % vec_size == 0) {
+    int blocks = get_num_blocks(size / vec_size);
+    set_scalar_vector_kernel<<<blocks, BLOCK_SIZE, 0, stream>>>(c, scalar, size);
+  } else {
+    int blocks = get_num_blocks(size);
+    set_scalar_kernel<<<blocks, BLOCK_SIZE, 0, stream>>>(c, scalar, size);
+  }
   tnn::cuda::checkCudaError(cudaGetLastError(), "set_scalar", __FILE__, __LINE__);
 }
 

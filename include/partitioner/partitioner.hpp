@@ -1,6 +1,7 @@
 #pragma once
 
 #include "nn/layer.hpp"
+#include "nn/layers.hpp"
 
 namespace tnn {
 
@@ -37,7 +38,8 @@ inline std::vector<std::vector<std::unique_ptr<Layer>>> split(
 
     auto partition_layers = std::vector<std::unique_ptr<Layer>>();
     for (size_t i = part.start_offset; i < part.start_offset + part.length; ++i) {
-      partition_layers.push_back(layers[i]->clone_impl());
+      auto layer_config = layers[i]->get_config();
+      partition_layers.push_back(LayerFactory::create(layer_config));
     }
     stages.push_back(std::move(partition_layers));
   }

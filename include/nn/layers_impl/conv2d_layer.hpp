@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include "nn/layer.hpp"
 #include "nn/layers_impl/common/conv2d.hpp"
 #include "parameterized_layer.hpp"
 #include "tensor/tensor.hpp"
@@ -20,6 +21,7 @@
 
 namespace tnn {
 
+// [N, H, W, C] input
 class Conv2DLayer : public ParameterizedLayer {
 private:
   size_t in_channels_;
@@ -69,8 +71,26 @@ private:
   std::unordered_map<size_t, ConvolutionStats> stats_cache;
   size_t get_shape_hash(size_t n, size_t c, size_t h, size_t w) const;
 
-  void register_impl() override;
-  void init_params() override;
+  std::vector<ParamDescriptor> param_descriptors() override {
+    std::vector<ParamDescriptor> descriptors;
+    auto weight_desc = ParamDescriptor{
+        {out_channels_, kernel_h_, kernel_w_, in_channels_},
+        &weights_,
+        &weight_gradients_,
+    };
+    descriptors.push_back(weight_desc);
+    if (use_bias_) {
+      auto bias_desc = ParamDescriptor{
+          {out_channels_},
+          &bias_,
+          &bias_gradients_,
+      };
+      descriptors.push_back(bias_desc);
+    }
+    return descriptors;
+  }
+
+  void init_impl() override;
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
   void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
                      size_t mb_id = 0) override;
@@ -84,12 +104,8 @@ public:
 
   ~Conv2DLayer();
 
-  uint64_t forward_flops(const std::vector<size_t> &input_shape) const override;
-  uint64_t backward_flops(const std::vector<size_t> &input_shape) const override;
   std::string type() const override { return TYPE_NAME; }
   LayerConfig get_config() const override;
-  std::unique_ptr<Layer> clone_impl() const override;
-
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
 
   static std::unique_ptr<Conv2DLayer> create_from_config(const LayerConfig &config);

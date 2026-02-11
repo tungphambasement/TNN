@@ -141,8 +141,4 @@ std::unique_ptr<SliceLayer> SliceLayer::create_from_config(const LayerConfig &co
   return std::make_unique<SliceLayer>(axis, start, length, config.name);
 }
 
-uint64_t SliceLayer::forward_flops(const std::vector<size_t> &input_shape) const { return 0; }
-
-uint64_t SliceLayer::backward_flops(const std::vector<size_t> &input_shape) const { return 0; }
-
 }  // namespace tnn

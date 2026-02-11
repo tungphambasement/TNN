@@ -21,10 +21,7 @@ ClassTokenLayer::ClassTokenLayer(size_t embed_dim, const std::string &name)
     : ParameterizedLayer(name),
       embed_dim_(embed_dim) {}
 
-void ClassTokenLayer::init_params() {
-  class_token_ = make_param_tensor({embed_dim_});
-  class_token_gradients_ = make_grad_tensor({embed_dim_});
-
+void ClassTokenLayer::init_impl() {
   float bound = static_cast<float>(1.0 / std::sqrt(static_cast<double>(embed_dim_)));
 
   if (this->use_seed_) {
@@ -32,10 +29,7 @@ void ClassTokenLayer::init_params() {
   } else {
     class_token_->fill_random_uniform(-bound, bound);
   }
-  class_token_gradients_->fill(0.0f);
 }
-
-void ClassTokenLayer::register_impl() { register_param({embed_dim_}); }
 
 template <typename IO_T, typename Param_T, typename Compute_T>
 std::unique_ptr<Task> ClassTokenLayer::forward_task(const ConstTensor &input, const Tensor &output,
@@ -145,10 +139,6 @@ void ClassTokenLayer::backward_impl(const ConstTensor &gradient, const Tensor &g
   DISPATCH_ON_3_DTYPES_TO_METHOD(backward_task, gradient, grad_input, class_token_gradients_,
                                  class_token_, batch_size, seq_len, embed_dim, this->flow_handle_);
 }
-
-uint64_t ClassTokenLayer::forward_flops(const std::vector<size_t> &input_shape) const { return 0; }
-
-uint64_t ClassTokenLayer::backward_flops(const std::vector<size_t> &input_shape) const { return 0; }
 
 LayerConfig ClassTokenLayer::get_config() const {
   LayerConfig config;

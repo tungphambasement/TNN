@@ -409,18 +409,6 @@ TEST_F(ResidualBlockTest, GetConfigWithProjection) {
   EXPECT_EQ(config.get<bool>("has_projection"), true);
 }
 
-TEST_F(ResidualBlockTest, Clone) {
-  std::vector<std::unique_ptr<Layer>> main_path;
-  main_path = create_scaling_layer(1.0f, "scale");
-
-  ResidualBlock original(std::move(main_path), {}, "relu", "test_clone");
-
-  auto cloned = original.clone();
-
-  EXPECT_NE(cloned, nullptr);
-  EXPECT_EQ(cloned->type(), "residual_block");
-}
-
 TEST_F(ResidualBlockTest, ComputeOutputShape) {
   std::vector<std::unique_ptr<Layer>> main_path;
   main_path = create_scaling_layer(1.0f, "scale", 3, 3);

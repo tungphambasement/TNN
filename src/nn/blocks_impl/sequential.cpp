@@ -18,7 +18,6 @@
 #include "nlohmann/json_fwd.hpp"
 #include "nn/block.hpp"
 #include "nn/layers.hpp"
-#include "profiling/event.hpp"
 
 namespace tnn {
 
@@ -75,14 +74,11 @@ void Sequential::forward_impl(const ConstTensor &input, const Tensor &output, si
   if (layers_.empty()) {
     throw std::runtime_error("Cannot forward through empty sequential model");
   }
-  auto start = Clock::now();
   compute_max_size(input->shape(), input->data_type());
-
   ConstTensor current_input = input;
   Tensor current_output = nullptr;
   for (size_t i = 0; i < layers_.size(); ++i) {
     try {
-      auto start = Clock::now();
       if (i < layers_.size() - 1) {
         current_output = this->get_buffer(layers_[i]->compute_output_shape(current_input->shape()),
                                           input->data_type());
@@ -91,17 +87,12 @@ void Sequential::forward_impl(const ConstTensor &input, const Tensor &output, si
       }
       layers_[i]->forward({current_input}, {current_output}, mb_id);
       current_input = current_output;
-      auto end = Clock::now();
-      this->profiler_.add_event(
-          Event{EventType::COMPUTE, start, end, layers_[i]->name() + " forward"});
     } catch (const std::exception &e) {
       throw std::runtime_error("Error while forward in layer " + std::to_string(i) + " (" +
                                layers_[i]->name() + "): " + e.what());
     }
   }
   this->device().getFlow(this->flow_handle_)->synchronize();
-  auto end = Clock::now();
-  this->profiler_.add_event(Event{EventType::COMPUTE, start, end, "Sequential forward"});
 }
 
 void Sequential::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
@@ -109,13 +100,11 @@ void Sequential::backward_impl(const ConstTensor &gradient, const Tensor &grad_i
   if (layers_.empty()) {
     throw std::runtime_error("Cannot backward through empty sequential model");
   }
-  auto start = Clock::now();
   ConstTensor current_gradient = gradient;
   Tensor current_grad_input;
   for (int i = static_cast<int>(layers_.size()) - 1; i >= 0; --i) {
     try {
       // no need to renew buffer since backward doesn't cache inputs
-      auto start = Clock::now();
       if (i > 0) {
         current_grad_input = this->get_buffer({max_size_}, gradient->data_type());
         layers_[i]->backward({current_gradient}, {current_grad_input}, mb_id);
@@ -123,17 +112,12 @@ void Sequential::backward_impl(const ConstTensor &gradient, const Tensor &grad_i
       } else {
         layers_[i]->backward({current_gradient}, {grad_input}, mb_id);
       }
-      auto end = Clock::now();
-      this->profiler_.add_event(
-          Event{EventType::COMPUTE, start, end, layers_[i]->name() + " backward"});
     } catch (const std::exception &e) {
       throw std::runtime_error("Error in backward pass of layer " + std::to_string(i) + " (" +
                                layers_[i]->type() + "): " + e.what());
     }
   }
   this->device().getFlow(this->flow_handle_)->synchronize();
-  auto end = Clock::now();
-  this->profiler_.add_event(Event{EventType::COMPUTE, start, end, "Sequential backward"});
 }
 
 Sequential::Sequential(const std::string &name, std::vector<std::unique_ptr<Layer>> layers)
@@ -180,8 +164,7 @@ void Sequential::print_summary(const std::vector<size_t> &input_shape) const {
   std::cout << "Model Summary: " << name_ << "\n";
   std::cout << std::string(100, '=') << "\n";
   std::cout << std::left << std::setw(20) << "Layer (Type)" << std::setw(20) << "Input Shape"
-            << std::setw(20) << "Output Shape" << std::setw(20) << "Forward Flops" << std::setw(20)
-            << "Backward Flops" << "\n";
+            << std::setw(20) << "Output Shape" << "\n";
 
   std::vector<size_t> current_shape = input_shape;
   for (size_t i = 0; i < layers_.size(); ++i) {
@@ -193,9 +176,6 @@ void Sequential::print_summary(const std::vector<size_t> &input_shape) const {
 
     auto output_shape = layer->compute_output_shape(current_shape);
     std::cout << std::setw(20) << format_shape(output_shape);
-
-    std::cout << std::setw(20) << layer->forward_flops(current_shape) << std::setw(20)
-              << layer->backward_flops(current_shape) << "\n";
     current_shape = layer->compute_output_shape(current_shape);
   }
   std::cout << std::string(100, '-') << "\n";
@@ -208,32 +188,6 @@ const std::vector<Layer *> &Sequential::get_layers() const {
     layer_ptrs.push_back(layer.get());
   }
   return layer_ptrs;
-}
-
-uint64_t Sequential::forward_flops(const std::vector<size_t> &input_shape) const {
-  if (layers_.empty()) {
-    return 0;
-  }
-  uint64_t total_flops = 0;
-  std::vector<size_t> current_shape = input_shape;
-  for (const auto &layer : layers_) {
-    total_flops += layer->forward_flops(current_shape);
-    current_shape = layer->compute_output_shape(current_shape);
-  }
-  return total_flops;
-}
-
-uint64_t Sequential::backward_flops(const std::vector<size_t> &input_shape) const {
-  if (layers_.empty()) {
-    return 0;
-  }
-  uint64_t total_flops = 0;
-  std::vector<size_t> current_shape = input_shape;
-  for (const auto &layer : layers_) {
-    total_flops += layer->backward_flops(current_shape);
-    current_shape = layer->compute_output_shape(current_shape);
-  }
-  return total_flops;
 }
 
 LayerConfig Sequential::get_config() const {
@@ -264,16 +218,22 @@ std::unique_ptr<Sequential> Sequential::create_from_config(const LayerConfig &co
   return std::make_unique<Sequential>(config.name, std::move(layers));
 }
 
-auto cloned = std::make_unique<Sequential>(name_, std::move(cloned_layers));
-return cloned;
+std::vector<Tensor> Sequential::parameters() {
+  std::vector<Tensor> params;
+  for (const auto &layer : layers_) {
+    auto layer_params = layer->parameters();
+    params.insert(params.end(), layer_params.begin(), layer_params.end());
+  }
+  return params;
 }
 
-size_t Sequential::cached_memory_bytes() const {
-  size_t total = 0;
+std::vector<Tensor> Sequential::gradients() {
+  std::vector<Tensor> grads;
   for (const auto &layer : layers_) {
-    total += layer->cached_memory_bytes();
+    auto layer_grads = layer->gradients();
+    grads.insert(grads.end(), layer_grads.begin(), layer_grads.end());
   }
-  return total;
+  return grads;
 }
 
 }  // namespace tnn

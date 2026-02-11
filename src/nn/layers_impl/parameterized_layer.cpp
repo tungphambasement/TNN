@@ -6,8 +6,4 @@
  */
 #include "nn/layers_impl/parameterized_layer.hpp"
 
-namespace tnn {
-
-void ParameterizedLayer::init_impl() { init_params(); }
-
-}  // namespace tnn
+namespace tnn {}  // namespace tnn

@@ -13,14 +13,14 @@ public:
 
   Graph& add_layer(Layer& layer_node) {
     layer_node.set_context(ctx);
-    nodes_.push_back(&layer_node);
+    layers_.push_back(&layer_node);
     return *this;
   }
 
   Graph& compile() {
     ctx.init();
-    for (auto& node : nodes_) {
-      node->init();
+    for (auto layer : layers_) {
+      layer->init();
     }
     return *this;
   }
@@ -29,6 +29,9 @@ public:
 
 private:
   GraphContext ctx;
+  std::vector<Layer*> layers_;
+  std::vector<INode*> inputs_;
+  std::vector<INode*> outputs_;
   std::vector<INode*> nodes_;
 };
 

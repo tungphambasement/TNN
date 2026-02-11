@@ -376,14 +376,6 @@ void FlashAttentionBlock::backward_impl(const ConstTensor &gradient, const Tenso
   }
 }
 
-uint64_t FlashAttentionBlock::forward_flops(const std::vector<size_t> &input_shape) const {
-  return 0;
-}
-
-uint64_t FlashAttentionBlock::backward_flops(const std::vector<size_t> &input_shape) const {
-  return 0;
-}
-
 LayerConfig FlashAttentionBlock::get_config() const {
   LayerConfig config;
   config.name = this->name_;
@@ -404,6 +396,32 @@ std::unique_ptr<FlashAttentionBlock> FlashAttentionBlock::create_from_config(
   size_t num_heads = config.get<size_t>("num_heads");
   bool is_causal = config.get<bool>("is_causal", true);
   return std::make_unique<FlashAttentionBlock>(embed_dim, num_heads, is_causal, config.name);
+}
+
+std::vector<Tensor> FlashAttentionBlock::parameters() {
+  std::vector<Tensor> params;
+  auto q_params = q_proj_->parameters();
+  auto k_params = k_proj_->parameters();
+  auto v_params = v_proj_->parameters();
+  auto out_params = out_proj_->parameters();
+  params.insert(params.end(), q_params.begin(), q_params.end());
+  params.insert(params.end(), k_params.begin(), k_params.end());
+  params.insert(params.end(), v_params.begin(), v_params.end());
+  params.insert(params.end(), out_params.begin(), out_params.end());
+  return params;
+}
+
+std::vector<Tensor> FlashAttentionBlock::gradients() {
+  std::vector<Tensor> grads;
+  auto q_grads = q_proj_->gradients();
+  auto k_grads = k_proj_->gradients();
+  auto v_grads = v_proj_->gradients();
+  auto out_grads = out_proj_->gradients();
+  grads.insert(grads.end(), q_grads.begin(), q_grads.end());
+  grads.insert(grads.end(), k_grads.begin(), k_grads.end());
+  grads.insert(grads.end(), v_grads.begin(), v_grads.end());
+  grads.insert(grads.end(), out_grads.begin(), out_grads.end());
+  return grads;
 }
 
 }  // namespace tnn

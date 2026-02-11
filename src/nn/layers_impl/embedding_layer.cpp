@@ -31,19 +31,22 @@ EmbeddingLayer::EmbeddingLayer(size_t vocab_size, size_t embed_dim, const std::s
   }
 }
 
-void EmbeddingLayer::register_impl() { register_param({vocab_size_, embed_dim_}); }
-
-void EmbeddingLayer::init_params() {
-  // weight shape: [vocab_size, embed_dim]
-  weight_ = make_param_tensor({vocab_size_, embed_dim_});
-  grad_weight_ = make_grad_tensor({vocab_size_, embed_dim_});
+void EmbeddingLayer::init_impl() {
+  float bound = static_cast<float>(1.0 / std::sqrt(static_cast<double>(embed_dim_)));
 
   if (this->use_seed_) {
-    weight_->fill_random_normal(0.0, 0.02, this->srand_seed_);
+    weight_->fill_random_uniform(-bound, bound, this->srand_seed_);
   } else {
-    weight_->fill_random_normal(0.0, 0.02);
+    weight_->fill_random_uniform(-bound, bound);
   }
-  grad_weight_->fill(0);
+
+  // Set padding idx to zeros if valid
+  if (padding_idx_ < vocab_size_) {
+    // Zero out the padding index row
+    for (size_t i = 0; i < embed_dim_; ++i) {
+      DISPATCH_DTYPE(weight_->data_type(), T, weight_->at<T>({padding_idx_, i}) = 0.0f);
+    }
+  }
 }
 
 void EmbeddingLayer::forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id) {
@@ -158,10 +161,6 @@ std::vector<size_t> EmbeddingLayer::compute_output_shape(
   out.push_back(embed_dim_);
   return out;
 }
-
-uint64_t EmbeddingLayer::forward_flops(const std::vector<size_t> &input_shape) const { return 0; }
-
-uint64_t EmbeddingLayer::backward_flops(const std::vector<size_t> &input_shape) const { return 0; }
 
 LayerConfig EmbeddingLayer::get_config() const {
   LayerConfig config;

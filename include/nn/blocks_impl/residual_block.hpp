@@ -63,8 +63,7 @@ public:
   static constexpr const char *TYPE_NAME = "residual_block";
 
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
-  uint64_t forward_flops(const std::vector<size_t> &input_shape) const override;
-  uint64_t backward_flops(const std::vector<size_t> &input_shape) const override;
+
   std::string type() const override { return TYPE_NAME; }
 
   LayerConfig get_config() const override;
@@ -73,6 +72,7 @@ public:
   const std::vector<std::unique_ptr<Layer>> &get_main_path() const;
   const std::vector<std::unique_ptr<Layer>> &get_shortcut_path() const;
 
-  size_t cached_memory_bytes() const override;
+  std::vector<Tensor> parameters() override;
+  std::vector<Tensor> gradients() override;
 };
 }  // namespace tnn

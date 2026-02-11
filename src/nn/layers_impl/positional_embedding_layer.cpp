@@ -18,10 +18,7 @@ PositionalEmbeddingLayer::PositionalEmbeddingLayer(size_t embed_dim, size_t seq_
       embed_dim_(embed_dim),
       seq_len_(seq_len) {}
 
-void PositionalEmbeddingLayer::init_params() {
-  pos_embedding_ = make_param_tensor({seq_len_, embed_dim_});
-  pos_embedding_gradients_ = make_grad_tensor({seq_len_, embed_dim_});
-
+void PositionalEmbeddingLayer::init_impl() {
   float bound = static_cast<float>(1.0 / std::sqrt(static_cast<double>(embed_dim_)));
 
   if (this->use_seed_) {
@@ -29,10 +26,7 @@ void PositionalEmbeddingLayer::init_params() {
   } else {
     pos_embedding_->fill_random_uniform(-bound, bound);
   }
-  pos_embedding_gradients_->fill(0.0f);
 }
-
-void PositionalEmbeddingLayer::register_impl() { register_param({seq_len_, embed_dim_}); }
 
 void PositionalEmbeddingLayer::forward_impl(const ConstTensor &input, const Tensor &output,
                                             size_t mb_id) {
@@ -188,14 +182,6 @@ std::unique_ptr<Task> PositionalEmbeddingLayer::accumulate_pos_gradients(
   else {
     throw std::runtime_error("Unsupported device type for accumulate_pos_gradients");
   }
-}
-
-uint64_t PositionalEmbeddingLayer::forward_flops(const std::vector<size_t> &input_shape) const {
-  return 0;
-}
-
-uint64_t PositionalEmbeddingLayer::backward_flops(const std::vector<size_t> &input_shape) const {
-  return 0;
 }
 
 LayerConfig PositionalEmbeddingLayer::get_config() const {

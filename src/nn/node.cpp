@@ -15,7 +15,6 @@ INode::INode()
 void INode::set_context(GraphContext &graph_ctx) {
   context_ = &graph_ctx;
   on_set_context(graph_ctx);
-  register_impl();
 }
 
 GraphContext &INode::context() const {
@@ -23,14 +22,6 @@ GraphContext &INode::context() const {
     throw std::runtime_error("Context is not set");
   }
   return *context_;
-}
-
-void INode::init() {
-  if (initialized_) {
-    return;
-  }
-  init_impl();
-  initialized_ = true;
 }
 
 }  // namespace tnn

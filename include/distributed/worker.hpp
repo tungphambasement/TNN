@@ -96,7 +96,6 @@ public:
     this->model_->set_seed(123456);
     graph.compile();
 
-    this->model_->enable_profiling(true);
     auto parsed_config = this->model_->get_config();
     std::cout << parsed_config.to_json().dump(4) << std::endl;
 
@@ -211,7 +210,6 @@ protected:
       }
       case CommandType::PRINT_PROFILING:
         if (model_) {
-          model_->print_profiling();
           Message outgoing_message(CommandType::PROFILING_PRINTED);
           communicator_->send_message(std::move(outgoing_message), coordinator_endpoint_);
         } else {
@@ -220,7 +218,6 @@ protected:
         break;
       case CommandType::CLEAR_PROFILING:
         if (model_) {
-          model_->reset_profiling();
           Message outgoing_message(CommandType::PROFILING_CLEARED);
           communicator_->send_message(std::move(outgoing_message), coordinator_endpoint_);
         } else {

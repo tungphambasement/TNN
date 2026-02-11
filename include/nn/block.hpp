@@ -7,8 +7,10 @@ class Block : public Layer {
 public:
   Block(const std::string &name = "block") { this->name_ = name; }
 
+  std::vector<Tensor> parameters() override = 0;
+  std::vector<Tensor> gradients() override = 0;
+
 protected:
-  void register_impl() override {}
   void init_impl() override = 0;
   void on_set_context(GraphContext &context) override = 0;
   void on_set_flow_handle(flowHandle_t handle) override = 0;

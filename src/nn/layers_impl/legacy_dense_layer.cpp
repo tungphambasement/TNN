@@ -28,17 +28,8 @@ LegacyDenseLayer::LegacyDenseLayer(size_t input_features, size_t output_features
       output_features_(output_features),
       use_bias_(use_bias) {}
 
-void LegacyDenseLayer::init_params() {
-  weights_ = make_param_tensor({output_features_, input_features_});
-  weight_gradients_ = make_grad_tensor({output_features_, input_features_});
-  weight_gradients_->fill(0);
-  if (use_bias_) {
-    bias_ = make_param_tensor({output_features_});
-    bias_gradients_ = make_grad_tensor({output_features_});
-    bias_gradients_->fill(0);
-  }
-
-  double bound = 1.0 / std::sqrt(static_cast<double>(input_features_));
+void LegacyDenseLayer::init_impl() {
+  float bound = static_cast<float>(1.0 / std::sqrt(static_cast<double>(input_features_)));
 
   if (this->use_seed_) {
     weights_->fill_random_uniform(-bound, bound, this->srand_seed_);
@@ -52,13 +43,6 @@ void LegacyDenseLayer::init_params() {
     } else {
       bias_->fill_random_uniform(-bound, bound);
     }
-  }
-}
-
-void LegacyDenseLayer::register_impl() {
-  register_param({output_features_, input_features_});
-  if (use_bias_) {
-    register_param({output_features_});
   }
 }
 
@@ -325,21 +309,6 @@ std::unique_ptr<LegacyDenseLayer> LegacyDenseLayer::create_from_config(const Lay
   bool use_bias = config.get<bool>("use_bias");
 
   return std::make_unique<LegacyDenseLayer>(input_features, output_features, use_bias, config.name);
-}
-
-uint64_t LegacyDenseLayer::forward_flops(const std::vector<size_t> &input_shape) const {
-  size_t batch_size = input_shape[0];
-  uint64_t gemm_flops = 2ULL * batch_size * input_features_ * output_features_;
-  uint64_t bias_flops = use_bias_ ? (batch_size * output_features_) : 0;
-  return gemm_flops + bias_flops;
-}
-
-uint64_t LegacyDenseLayer::backward_flops(const std::vector<size_t> &input_shape) const {
-  size_t batch_size = input_shape[0];
-  uint64_t weight_grad_flops = 2ULL * input_features_ * batch_size * output_features_;
-  uint64_t bias_grad_flops = use_bias_ ? (batch_size * output_features_) : 0;
-  uint64_t input_grad_flops = 2ULL * batch_size * output_features_ * input_features_;
-  return weight_grad_flops + bias_grad_flops + input_grad_flops;
 }
 
 }  // namespace tnn

@@ -40,25 +40,18 @@ LegacyConv2DLayer::LegacyConv2DLayer(size_t in_channels, size_t out_channels, si
       pad_w_(pad_w),
       use_bias_(use_bias) {}
 
-LegacyConv2DLayer::~LegacyConv2DLayer() {}
-
-void LegacyConv2DLayer::init_params() {
-  weights_ = make_param_tensor({out_channels_, in_channels_, kernel_h_, kernel_w_});
-  weight_gradients_ = make_grad_tensor({out_channels_, in_channels_, kernel_h_, kernel_w_});
-  weight_gradients_->fill(0);
-
-  if (use_bias_) {
-    bias_ = make_param_tensor({out_channels_, 1, 1, 1});
-    bias_gradients_ = make_grad_tensor({out_channels_, 1, 1, 1});
-    bias_gradients_->fill(0);
+LegacyConv2DLayer::~LegacyConv2DLayer() {
+#ifdef USE_CUDNN
+  if (convolution_handle_ != nullptr) {
+    delete convolution_handle_;
+    convolution_handle_ = nullptr;
   }
+#endif
+}
 
-  // temporary initalization, will be resized in forward/backward
-  temp_output_buffer_ = make_io_tensor({1});
-  temp_gradient_buffer_ = make_io_tensor({1});
-  temp_col_grad_matrix_buffer_ = make_io_tensor({1});
-
-  double bound = 1.0 / std::sqrt(static_cast<double>(in_channels_ * kernel_h_ * kernel_w_));
+void LegacyConv2DLayer::init_impl() {
+  float bound = static_cast<float>(
+      1.0 / std::sqrt(static_cast<double>(in_channels_ * kernel_h_ * kernel_w_)));
 
   if (this->use_seed_) {
     weights_->fill_random_uniform(-bound, bound, this->srand_seed_);
@@ -72,13 +65,6 @@ void LegacyConv2DLayer::init_params() {
     } else {
       bias_->fill_random_uniform(-bound, bound);
     }
-  }
-}
-
-void LegacyConv2DLayer::register_impl() {
-  register_param({out_channels_, in_channels_, kernel_h_, kernel_w_});
-  if (use_bias_) {
-    register_param({out_channels_, 1, 1, 1});
   }
 }
 
@@ -622,61 +608,6 @@ std::vector<size_t> LegacyConv2DLayer::compute_output_shape(
   size_t output_w = (input_shape[3] + 2 * pad_w_ - kernel_w_) / stride_w_ + 1;
 
   return {batch_size, out_channels_, output_h, output_w};
-}
-
-uint64_t LegacyConv2DLayer::forward_flops(const std::vector<size_t> &input_shape) const {
-  assert(input_shape.size() == 4 && "Input shape must be 4D");
-  size_t batch_size = input_shape[0];
-  size_t input_h = input_shape[2];
-  size_t input_w = input_shape[3];
-  size_t output_h = (input_h + 2 * pad_h_ - kernel_h_) / stride_h_ + 1;
-  size_t output_w = (input_w + 2 * pad_w_ - kernel_w_) / stride_w_ + 1;
-  size_t output_size = batch_size * output_h * output_w;
-  size_t kernel_size = in_channels_ * kernel_h_ * kernel_w_;
-
-  // Main convolution computation: 2 FLOPs per MAC (multiply-add)
-  uint64_t conv_flops = 2ULL * out_channels_ * kernel_size * output_size;
-
-  // Bias addition: 1 FLOP per output element
-  uint64_t bias_flops = use_bias_ ? (batch_size * out_channels_ * output_h * output_w) : 0;
-
-  return conv_flops + bias_flops;
-}
-
-uint64_t LegacyConv2DLayer::backward_flops(const std::vector<size_t> &input_shape) const {
-  assert(input_shape.size() == 4 && "Input shape must be 4D");
-  size_t batch_size = input_shape[0];
-  size_t input_h = input_shape[2];
-  size_t input_w = input_shape[3];
-  size_t output_h = (input_h + 2 * pad_h_ - kernel_h_) / stride_h_ + 1;
-  size_t output_w = (input_w + 2 * pad_w_ - kernel_w_) / stride_w_ + 1;
-  size_t output_size = batch_size * output_h * output_w;
-  size_t kernel_size = in_channels_ * kernel_h_ * kernel_w_;
-
-  // weight gradients: gradient × im2col_input^T (2 FLOPs per MAC)
-  uint64_t weight_grad_flops = 2ULL * out_channels_ * kernel_size * output_size;
-
-  // input gradients: weights^T × gradient (2 FLOPs per MAC)
-  uint64_t input_grad_flops = 2ULL * out_channels_ * kernel_size * output_size;
-
-  // bias gradients: reduction across batch and spatial dimensions (1 FLOP per add)
-  uint64_t bias_grad_flops = use_bias_ ? (batch_size * out_channels_ * output_h * output_w) : 0;
-
-  return weight_grad_flops + input_grad_flops + bias_grad_flops;
-}
-
-size_t LegacyConv2DLayer::cached_memory_bytes() const {
-  size_t total_bytes = 0;
-  for (const auto &pair : micro_batch_col_buffers_) {
-    size_t dtype_size = get_dtype_size(pair.second->data_type());
-    total_bytes += pair.second->capacity() * dtype_size;
-  }
-  size_t io_dtype_size = get_dtype_size(this->io_dtype_);
-  total_bytes += temp_output_buffer_->capacity() * io_dtype_size;
-  total_bytes += temp_gradient_buffer_->capacity() * io_dtype_size;
-  total_bytes += temp_col_grad_matrix_buffer_->capacity() * io_dtype_size;
-  total_bytes += Layer::cached_memory_bytes();
-  return total_bytes;
 }
 
 std::unique_ptr<LegacyConv2DLayer> LegacyConv2DLayer::create_from_config(

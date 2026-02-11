@@ -74,7 +74,26 @@ private:
   void def_forward(const ConstTensor &input, const Tensor &output, size_t mb_id = 0);
   void def_backward(const ConstTensor &gradient, const Tensor &grad_input, size_t mb_id = 0);
 
-  void register_impl() override;
+  std::vector<ParamDescriptor> param_descriptors() override {
+    std::vector<ParamDescriptor> descriptors;
+    if (affine_) {
+      auto gamma_desc = ParamDescriptor{
+          {normalized_shape_},
+          &gamma_,
+          &gamma_gradients_,
+      };
+      descriptors.push_back(gamma_desc);
+      auto beta_desc = ParamDescriptor{
+          {normalized_shape_},
+          &beta_,
+          &beta_gradients_,
+      };
+      descriptors.push_back(beta_desc);
+    }
+    return descriptors;
+  }
+
+  void init_impl() override;
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
   void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
                      size_t mb_id = 0) override;
@@ -87,17 +106,12 @@ public:
 
   static constexpr const char *TYPE_NAME = "layer_norm";
 
-  void init_params() override;
-  uint64_t forward_flops(const std::vector<size_t> &input_shape) const override;
-  uint64_t backward_flops(const std::vector<size_t> &input_shape) const override;
   std::string type() const override { return TYPE_NAME; }
   LayerConfig get_config() const override;
-  std::unique_ptr<Layer> clone_impl() const override;
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override {
     return input_shape;
   }
 
-public:
   static std::unique_ptr<LayerNormLayer> create_from_config(const LayerConfig &config);
 };
 

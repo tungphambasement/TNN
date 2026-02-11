@@ -446,16 +446,6 @@ TEST_F(LegacyBatchNormLayerTest, GetConfig) {
   EXPECT_EQ(config.get<bool>("affine"), true);
 }
 
-TEST_F(LegacyBatchNormLayerTest, Clone) {
-  LegacyBatchNormLayer original(16, 1e-5f, 0.1f, true, "test_bn_clone");
-
-  auto cloned = original.clone();
-
-  EXPECT_NE(cloned, nullptr);
-  EXPECT_EQ(cloned->type(), "legacy_batchnorm");
-  EXPECT_EQ(cloned->type(), original.type());
-}
-
 TEST_F(LegacyBatchNormLayerTest, CreateFromConfig) {
   LayerConfig config;
   config.name = "test_bn_from_config";
@@ -662,24 +652,6 @@ TEST_F(LegacyBatchNormLayerTest, NumericalStabilityMixedValues) {
   layer.forward({input}, {output});
 
   verify_output_shape(input, output);
-}
-
-TEST_F(LegacyBatchNormLayerTest, ForwardFlopsComputation) {
-  LegacyBatchNormLayer layer(16, 1e-5f, 0.1f, true, "test_bn_flops");
-
-  std::vector<size_t> input_shape = {4, 16, 32, 32};
-  uint64_t flops = layer.forward_flops(input_shape);
-
-  EXPECT_GT(flops, 0);
-}
-
-TEST_F(LegacyBatchNormLayerTest, BackwardFlopsComputation) {
-  LegacyBatchNormLayer layer(16, 1e-5f, 0.1f, true, "test_bn_backward_flops");
-
-  std::vector<size_t> input_shape = {4, 16, 32, 32};
-  uint64_t flops = layer.backward_flops(input_shape);
-
-  EXPECT_GT(flops, 0);
 }
 
 int main(int argc, char **argv) {

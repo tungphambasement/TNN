@@ -17,15 +17,8 @@ class StatelessLayer : public Layer {
 public:
   explicit StatelessLayer(const std::string &name = "") { this->name_ = name; }
 
-private:
-  // Stateless layers do not need initialization
-  void init_impl() override {
-    (void)this;  // no-op
-  }
-
-  void register_impl() override {
-    // no-op
-  }
+protected:
+  std::vector<ParamDescriptor> param_descriptors() override { return {}; }
 };
 
 }  // namespace tnn

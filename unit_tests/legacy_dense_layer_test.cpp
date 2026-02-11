@@ -456,16 +456,6 @@ TEST_F(LegacyLegacyDenseLayerTest, CreateFromConfig) {
   EXPECT_EQ(layer->type(), "dense");
 }
 
-TEST_F(LegacyLegacyDenseLayerTest, Clone) {
-  LegacyDenseLayer original(100, 50, true, "test_dense_clone");
-
-  auto cloned = original.clone();
-
-  EXPECT_NE(cloned, nullptr);
-  EXPECT_EQ(cloned->type(), "dense");
-  EXPECT_EQ(cloned->type(), original.type());
-}
-
 TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseSmallLayer) {
   LegacyDenseLayer layer(2, 1, true, "test_small_layer");
   auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);

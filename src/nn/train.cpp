@@ -129,15 +129,9 @@ static Result train_epoch(unique_ptr<Sequential> &model, unique_ptr<BaseDataLoad
     model_device->getFlow(defaultFlowHandle)->synchronize();
 
     if (num_batches % config.progress_print_interval == 0) {
-      if (model->is_profiling_enabled()) {
-        model->print_profiling();
-      }
       cout << "Batch ID: " << num_batches << ", Batch's Loss: " << fixed << setprecision(4) << loss
            << ", Cumulative Accuracy: " << setprecision(2) << (total_corrects * 100.0 / cur_samples)
            << "%" << ", Batch Time: " << batch_duration.count() << "ms" << endl;
-    }
-    if (model->is_profiling_enabled() && config.profiler_type == ProfilerType::NORMAL) {
-      model->reset_profiling();
     }
   }
   cout << endl;
@@ -196,10 +190,6 @@ static void train_val(unique_ptr<Sequential> &model, unique_ptr<BaseDataLoader> 
       cout << "Validation - Loss: " << fixed << setprecision(4) << avg_val_loss
            << ", Accuracy: " << setprecision(2) << avg_val_accuracy * 100.0 << "%" << endl;
       cout << string(60, '=') << endl;
-
-      if (model->is_profiling_enabled()) {
-        model->reset_profiling();
-      }
 
       if ((epoch + 1) % 5 == 0) {
         thread_wrapper.clean_buffers();
@@ -268,15 +258,9 @@ static void train_step(unique_ptr<Sequential> &model, unique_ptr<BaseDataLoader>
       }
 
       if (steps % config.progress_print_interval == 0) {
-        if (model->is_profiling_enabled()) {
-          model->print_profiling();
-        }
         cout << "Batch ID: " << steps << ", Batch's Loss: " << fixed << setprecision(4) << loss
              << ", Batch's Accuracy: " << setprecision(2) << (corrects * 100.0 / config.batch_size)
              << "%" << ", Batch Time: " << batch_duration.count() << "ms" << endl;
-      }
-      if (model->is_profiling_enabled() && config.profiler_type == ProfilerType::NORMAL) {
-        model->reset_profiling();
       }
     }
 
@@ -308,13 +292,6 @@ void train_model(unique_ptr<Sequential> &model, unique_ptr<BaseDataLoader> &trai
                  const TrainingConfig &config) {
   optimizer->attach(model->context());
   Tensor batch_data, batch_labels;
-
-  if (config.profiler_type == ProfilerType::NONE) {
-    model->enable_profiling(false);
-  } else if (config.profiler_type == ProfilerType::NORMAL ||
-             config.profiler_type == ProfilerType::CUMULATIVE) {
-    model->enable_profiling(true);
-  }
 
   cout << "Training batches: " << train_loader->size() / config.batch_size << endl;
   cout << "Validation batches: " << val_loader->size() / config.batch_size << endl;

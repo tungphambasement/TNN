@@ -222,33 +222,4 @@ std::unique_ptr<LegacyMaxPool2DLayer> LegacyMaxPool2DLayer::create_from_config(
                                                 config.name);
 }
 
-uint64_t LegacyMaxPool2DLayer::forward_flops(const std::vector<size_t> &input_shape) const {
-  assert(input_shape.size() == 4 && "Input shape must be 4D");
-  size_t batch_size = input_shape[0];
-  size_t channels = input_shape[1];
-  size_t input_h = input_shape[2];
-  size_t input_w = input_shape[3];
-
-  size_t output_h = (input_h + 2 * pad_h_ - pool_h_) / stride_h_ + 1;
-  size_t output_w = (input_w + 2 * pad_w_ - pool_w_) / stride_w_ + 1;
-
-  uint64_t comparisons_per_output = pool_h_ * pool_w_;
-  uint64_t total_outputs = batch_size * channels * output_h * output_w;
-
-  return comparisons_per_output * total_outputs;
-}
-
-uint64_t LegacyMaxPool2DLayer::backward_flops(const std::vector<size_t> &input_shape) const {
-  assert(input_shape.size() == 4 && "Input shape must be 4D");
-  size_t batch_size = input_shape[0];
-  size_t channels = input_shape[1];
-  size_t input_h = input_shape[2];
-  size_t input_w = input_shape[3];
-
-  size_t output_h = (input_h + 2 * pad_h_ - pool_h_) / stride_h_ + 1;
-  size_t output_w = (input_w + 2 * pad_w_ - pool_w_) / stride_w_ + 1;
-
-  return batch_size * channels * output_h * output_w;
-}
-
 }  // namespace tnn

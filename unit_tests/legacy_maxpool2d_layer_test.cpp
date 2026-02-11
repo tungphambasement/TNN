@@ -617,16 +617,6 @@ TEST_F(LegacyMaxPool2DLayerTest, CreateFromConfig) {
   EXPECT_EQ(layer->type(), "maxpool2d");
 }
 
-TEST_F(LegacyMaxPool2DLayerTest, Clone) {
-  LegacyMaxPool2DLayer original(3, 3, 1, 1, 1, 1, "test_maxpool_clone");
-
-  auto cloned = original.clone();
-
-  EXPECT_NE(cloned, nullptr);
-  EXPECT_EQ(cloned->type(), "maxpool2d");
-  EXPECT_EQ(cloned->type(), original.type());
-}
-
 // Edge Cases
 
 TEST_F(LegacyMaxPool2DLayerTest, EdgeCaseGlobalMaxPooling) {

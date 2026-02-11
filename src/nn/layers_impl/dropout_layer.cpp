@@ -119,31 +119,4 @@ std::unique_ptr<DropoutLayer> DropoutLayer::create_from_config(const LayerConfig
   return std::make_unique<DropoutLayer>(dropout_rate, config.name);
 }
 
-uint64_t DropoutLayer::forward_flops(const std::vector<size_t> &input_shape) const {
-  if (!this->is_training_) {
-    return 0;
-  }
-
-  size_t num_elements =
-      std::accumulate(input_shape.begin(), input_shape.end(), 1, std::multiplies<size_t>());
-
-  uint64_t rng_flops = num_elements;
-  uint64_t mask_flops = num_elements;
-  uint64_t scale_flops =
-      static_cast<uint64_t>((1.0 - static_cast<double>(dropout_rate_)) * num_elements);
-
-  return rng_flops + mask_flops + scale_flops;
-}
-
-uint64_t DropoutLayer::backward_flops(const std::vector<size_t> &input_shape) const {
-  if (!this->is_training_) {
-    return 0;
-  }
-
-  size_t num_elements =
-      std::accumulate(input_shape.begin(), input_shape.end(), 1, std::multiplies<size_t>());
-
-  return num_elements;
-}
-
 }  // namespace tnn

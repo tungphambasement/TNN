@@ -7,9 +7,26 @@
 
 #include "nn/layer.hpp"
 
-#include "logging/logger.hpp"
+#include "nn/graph_context.hpp"
 
 namespace tnn {
+
+void Layer::init() {
+  if (!context_) {
+    throw std::runtime_error("Layer " + name_ + " has no context. Cannot initialize.");
+  }
+  auto param_descriptors = this->param_descriptors();
+  for (const auto &descriptor : param_descriptors) {
+    Tensor param = this->context_->get_param(descriptor.shape, param_dtype_);
+    Tensor grad = this->context_->get_grad(descriptor.shape, param_dtype_);
+    *descriptor.data_ptr = param;
+    *descriptor.grad_ptr = grad;
+    params_.push_back(param);
+    grads_.push_back(grad);
+  }
+  init_impl();
+  initialized_ = true;
+}
 
 void Layer::forward(const std::vector<ConstTensor> &inputs, const std::vector<Tensor> &outputs,
                     size_t mb_id) {
@@ -18,7 +35,6 @@ void Layer::forward(const std::vector<ConstTensor> &inputs, const std::vector<Te
               << std::endl;
     return;
   }
-  Clock::time_point start_time = Clock::now();
   if (inputs.empty() || outputs.empty()) {
     throw std::runtime_error("Layer " + name_ + " received empty IO tensors.");
   }
@@ -45,8 +61,6 @@ void Layer::forward(const std::vector<ConstTensor> &inputs, const std::vector<Te
 #ifndef NDEBUG
   this->device().getFlow(this->flow_handle_)->synchronize();
 #endif
-  Clock::time_point end_time = Clock::now();
-  profiler_.add_event(Event{EventType::COMPUTE, start_time, end_time, "forward"});
 }
 
 void Layer::backward(const std::vector<ConstTensor> &gradients,
@@ -56,7 +70,6 @@ void Layer::backward(const std::vector<ConstTensor> &gradients,
               << std::endl;
     return;
   }
-  auto start_time = Clock::now();
   if (gradients.empty() || grad_inputs.empty()) {
     throw std::runtime_error("Layer " + name_ +
                              " received empty gradients or grad_inputs tensors.");
@@ -85,8 +98,6 @@ void Layer::backward(const std::vector<ConstTensor> &gradients,
   this->device().getFlow(this->flow_handle_)->synchronize();
 #endif
   clear_cache(mb_id);
-  Clock::time_point end_time = Clock::now();
-  profiler_.add_event(Event{EventType::COMPUTE, start_time, end_time, "backward"});
 }
 
 Layer &Layer::set_flow_handle(flowHandle_t handle) {
@@ -136,45 +147,6 @@ Layer &Layer::set_training(bool training) {
 
 bool Layer::is_training() const { return is_training_; }
 
-Layer &Layer::enable_profiling(bool enable) {
-  enable_profiling_ = enable;
-  return *this;
-}
-
-bool Layer::is_profiling_enabled() const { return enable_profiling_; }
-
-void Layer::print_profiling() const {
-  const auto &events = profiler_.get_events();
-  std::string header = "Profiling info for Layer: " + name_;
-  std::string format_str = "{:=^80}\n";
-  std::string output = fmt::format(fmt::runtime(format_str), header);
-  output += fmt::format(fmt::runtime("{:<30}{:<30}{:<20}\n"), "Event", "Duration (ms)", "");
-  output += fmt::format(fmt::runtime("{:-^80}\n"), "");
-  for (const auto &event : events) {
-    float duration_ms =
-        Time::duration_cast<Time::microseconds>(event.end_time - event.start_time).count() /
-        1000.0f;
-    output += fmt::format(fmt::runtime("{:<30}{:<30.3f}\n"), event.name, duration_ms);
-  }
-  output += fmt::format(fmt::runtime("{:=^80}"), "");
-  GlobalLogger::info(output);
-}
-
-size_t Layer::cached_memory_bytes() const {
-  size_t total = 0;
-  for (auto &[key, tensor] : cached_tensors_) {
-    if (tensor) {
-      size_t dtype_size = get_dtype_size(tensor->data_type());
-      total += tensor->capacity() * dtype_size;
-    }
-  }
-  return total;
-}
-
-void Layer::reset_profiling() { profiler_.reset(); }
-
-std::string Layer::name() const { return name_; }
-
 void Layer::save_state(std::ofstream &file) {
   auto config = get_config();
   nlohmann::json j = config.to_json();
@@ -182,35 +154,18 @@ void Layer::save_state(std::ofstream &file) {
   size_t j_size = j_str.size();
   file.write(reinterpret_cast<const char *>(&j_size), sizeof(size_t));
   file.write(j_str.c_str(), j_size);
-  auto params = parameters();
+  auto params = this->context_->parameters();
   for (const auto &param : params) {
     param->save(file);
   }
 }
 
-void Layer::register_param(std::vector<size_t> shape) {
-  if (!context_) {
-    throw std::runtime_error("Context is not set");
+void Layer::on_set_context(GraphContext &context) {
+  cached_tensors_.clear();
+  mutable_tensors_.clear();
+  for (const auto &descriptor : param_descriptors()) {
+    this->context_->register_param(descriptor.shape, param_dtype_);
   }
-  context_->register_param(shape, param_dtype_);
-}
-
-Tensor Layer::make_param_tensor(std::vector<size_t> shape) {
-  if (!context_) {
-    throw std::runtime_error("Context is not set");
-  }
-  Tensor param = context_->get_param(shape, param_dtype_);
-  params_.push_back(param);
-  return param;
-}
-
-Tensor Layer::make_grad_tensor(std::vector<size_t> shape) {
-  if (!context_) {
-    throw std::runtime_error("Context is not set");
-  }
-  Tensor grad = context_->get_grad(shape, param_dtype_);
-  grads_.push_back(grad);
-  return grad;
 }
 
 Tensor Layer::make_io_tensor(std::vector<size_t> shape) {

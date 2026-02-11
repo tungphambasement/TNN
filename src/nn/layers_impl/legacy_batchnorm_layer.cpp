@@ -25,39 +25,13 @@ LegacyBatchNormLayer::LegacyBatchNormLayer(size_t num_features, float epsilon, f
       momentum_(momentum),
       affine_(affine) {}
 
-void LegacyBatchNormLayer::init_params() {
-  if (this->initialized_) {
-    return;
+void LegacyBatchNormLayer::init_impl() {
+  if (affine_) {
+    gamma_->fill(1.0f);
+    beta_->fill(0.0f);
   }
-
-  gamma_ = make_param_tensor({num_features_});
-  beta_ = make_param_tensor({num_features_});
-  gamma_->fill(1.0f);
-  beta_->fill(0.0f);
-
-  gamma_gradients_ = make_grad_tensor({num_features_});
-  beta_gradients_ = make_grad_tensor({num_features_});
-  gamma_gradients_->fill(0.0f);
-  beta_gradients_->fill(0.0f);
-
-  running_mean_ = make_param_tensor({num_features_});
-  running_var_ = make_param_tensor({num_features_});
   running_mean_->fill(0.0f);
   running_var_->fill(1.0f);
-
-  dummy_mean_gradients_ = make_grad_tensor({num_features_});
-  dummy_var_gradients_ = make_grad_tensor({num_features_});
-  dummy_mean_gradients_->fill(0.0f);
-  dummy_var_gradients_->fill(0.0f);
-
-  this->initialized_ = true;
-}
-
-void LegacyBatchNormLayer::register_impl() {
-  register_param({num_features_});
-  register_param({num_features_});
-  register_param({num_features_});
-  register_param({num_features_});
 }
 
 void LegacyBatchNormLayer::forward_impl(const ConstTensor &input, const Tensor &output,
@@ -273,36 +247,6 @@ std::unique_ptr<LegacyBatchNormLayer> LegacyBatchNormLayer::create_from_config(
 
   return std::make_unique<LegacyBatchNormLayer>(num_features, epsilon, momentum, affine,
                                                 config.name);
-}
-
-uint64_t LegacyBatchNormLayer::forward_flops(const std::vector<size_t> &input_shape) const {
-  size_t num_elements =
-      std::accumulate(input_shape.begin(), input_shape.end(), 1, std::multiplies<size_t>());
-  size_t batch_size = input_shape[0];
-  size_t spatial_size = num_elements / (batch_size * num_features_);
-
-  uint64_t mean_flops = batch_size * spatial_size * num_features_;
-
-  uint64_t var_flops = 2 * num_elements + mean_flops;
-
-  uint64_t norm_flops = 3 * num_elements;
-
-  uint64_t affine_flops = affine_ ? (2 * num_elements) : 0;
-
-  return mean_flops + var_flops + norm_flops + affine_flops;
-}
-
-uint64_t LegacyBatchNormLayer::backward_flops(const std::vector<size_t> &input_shape) const {
-  size_t num_elements =
-      std::accumulate(input_shape.begin(), input_shape.end(), 1, std::multiplies<size_t>());
-  size_t batch_size = input_shape[0];
-  size_t spatial_size = num_elements / (batch_size * num_features_);
-
-  uint64_t param_grad_flops = affine_ ? (2 * batch_size * spatial_size * num_features_) : 0;
-
-  uint64_t input_grad_flops = 9 * num_elements;
-
-  return param_grad_flops + input_grad_flops;
 }
 
 }  // namespace tnn

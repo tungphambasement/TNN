@@ -42,33 +42,8 @@ DenseLayer::~DenseLayer() {
 #endif
 }
 
-size_t DenseLayer::get_shape_hash(size_t batch_size) const {
-  size_t seed = 0;
-  auto hash_combine = [&](size_t v) { seed ^= v + 0x9e3779b9 + (seed << 6) + (seed >> 2); };
-  hash_combine(batch_size);
-  hash_combine(input_features_);
-  hash_combine(output_features_);
-  return seed;
-}
-
-void DenseLayer::register_impl() {
-  register_param({output_features_, input_features_});
-  if (use_bias_) {
-    register_param({output_features_});
-  }
-}
-
-void DenseLayer::init_params() {
-  weights_ = make_param_tensor({output_features_, input_features_});
-  weight_gradients_ = make_grad_tensor({output_features_, input_features_});
-  weight_gradients_->fill(0);
-  if (use_bias_) {
-    bias_ = make_param_tensor({output_features_});
-    bias_gradients_ = make_grad_tensor({output_features_});
-    bias_gradients_->fill(0);
-  }
-  // PyTorch default Kaiming Uniform: Uniform(-bound, bound) where bound = 1 / sqrt(fan_in)
-  double bound = 1.0 / std::sqrt(static_cast<double>(input_features_));
+void DenseLayer::init_impl() {
+  float bound = static_cast<float>(1.0 / std::sqrt(static_cast<double>(input_features_)));
 
   if (this->use_seed_) {
     weights_->fill_random_uniform(-bound, bound, this->srand_seed_);
@@ -83,6 +58,15 @@ void DenseLayer::init_params() {
       bias_->fill_random_uniform(-bound, bound);
     }
   }
+}
+
+size_t DenseLayer::get_shape_hash(size_t batch_size) const {
+  size_t seed = 0;
+  auto hash_combine = [&](size_t v) { seed ^= v + 0x9e3779b9 + (seed << 6) + (seed >> 2); };
+  hash_combine(batch_size);
+  hash_combine(input_features_);
+  hash_combine(output_features_);
+  return seed;
 }
 
 void DenseLayer::forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id) {
@@ -304,21 +288,6 @@ std::unique_ptr<DenseLayer> DenseLayer::create_from_config(const LayerConfig &co
   bool use_bias = config.get<bool>("use_bias");
 
   return std::make_unique<DenseLayer>(input_features, output_features, use_bias, config.name);
-}
-
-uint64_t DenseLayer::forward_flops(const std::vector<size_t> &input_shape) const {
-  size_t batch_size = input_shape[0];
-  uint64_t gemm_flops = 2ULL * batch_size * input_features_ * output_features_;
-  uint64_t bias_flops = use_bias_ ? (batch_size * output_features_) : 0;
-  return gemm_flops + bias_flops;
-}
-
-uint64_t DenseLayer::backward_flops(const std::vector<size_t> &input_shape) const {
-  size_t batch_size = input_shape[0];
-  uint64_t weight_grad_flops = 2ULL * input_features_ * batch_size * output_features_;
-  uint64_t bias_grad_flops = use_bias_ ? (batch_size * output_features_) : 0;
-  uint64_t input_grad_flops = 2ULL * batch_size * output_features_ * input_features_;
-  return weight_grad_flops + bias_grad_flops + input_grad_flops;
 }
 
 }  // namespace tnn

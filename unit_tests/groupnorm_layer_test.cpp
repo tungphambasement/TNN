@@ -343,24 +343,6 @@ TEST_F(GroupNormLayerTest, ConfigurationRoundTrip) {
   EXPECT_EQ(restored->type(), "groupnorm");
 }
 
-TEST_F(GroupNormLayerTest, CloneLayer) {
-  size_t num_groups = 2;
-  size_t num_channels = 4;
-  GroupNormLayer original(num_groups, num_channels, 1e-5f, true, "test_clone");
-
-  auto cloned = original.clone();
-  EXPECT_NE(cloned, nullptr);
-  EXPECT_EQ(cloned->type(), "groupnorm");
-
-  LayerConfig original_config = original.get_config();
-  LayerConfig cloned_config = cloned->get_config();
-
-  EXPECT_EQ(cloned_config.get<size_t>("num_groups"), original_config.get<size_t>("num_groups"));
-  EXPECT_EQ(cloned_config.get<size_t>("num_channels"), original_config.get<size_t>("num_channels"));
-  EXPECT_FLOAT_EQ(cloned_config.get<float>("epsilon"), original_config.get<float>("epsilon"));
-  EXPECT_EQ(cloned_config.get<bool>("affine"), original_config.get<bool>("affine"));
-}
-
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

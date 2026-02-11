@@ -40,8 +40,6 @@ private:
   void def_forward(const ConstTensor &input, const Tensor &output, size_t mb_id);
   void def_backward(const ConstTensor &current_gradient, const Tensor &grad_input, size_t mb_id);
 
-  void register_impl() override;
-
 #ifdef USE_CUDNN
   void cudnn_forward(const ConstTensor &input, const Tensor &output, size_t mb_id);
   void cudnn_backward(const ConstTensor &gradient, const Tensor &grad_input, size_t mb_id);
@@ -94,6 +92,27 @@ private:
                                                     const size_t output_w,
                                                     const size_t out_channels, flowHandle_t handle);
 
+  std::vector<ParamDescriptor> param_descriptors() override {
+    std::vector<ParamDescriptor> descriptors;
+    auto weight_desc = ParamDescriptor{
+        {in_channels_, out_channels_, kernel_h_, kernel_w_},
+        &weights_,
+        &weight_gradients_,
+    };
+    descriptors.push_back(weight_desc);
+    if (use_bias_) {
+      auto bias_desc = ParamDescriptor{
+          {out_channels_},
+          &bias_,
+          &bias_gradients_,
+      };
+      descriptors.push_back(bias_desc);
+    }
+    return descriptors;
+  }
+
+  void init_impl() override;
+
 #ifdef USE_CUDNN
   template <typename IO_T, typename Param_T, typename Compute_T>
   std::unique_ptr<Task> cudnn_compute_fwd(const ConstTensor &input, const ConstTensor &weight,
@@ -122,7 +141,6 @@ private:
                                             size_t out_channels, flowHandle_t handle);
 #endif
 
-  void init_params() override;
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
   void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
                      size_t mb_id = 0) override;
@@ -136,18 +154,12 @@ public:
 
   static constexpr const char *TYPE_NAME = "legacy_conv2d";
 
-  uint64_t forward_flops(const std::vector<size_t> &input_shape) const override;
-  uint64_t backward_flops(const std::vector<size_t> &input_shape) const override;
-
   std::string type() const override { return TYPE_NAME; }
   LayerConfig get_config() const override;
-  std::unique_ptr<Layer> clone_impl() const override;
 
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
 
   static std::unique_ptr<LegacyConv2DLayer> create_from_config(const LayerConfig &config);
-
-  size_t cached_memory_bytes() const override;
 };
 
 }  // namespace tnn

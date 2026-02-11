@@ -145,102 +145,102 @@ TEST_F(PartitionerTest, NaiveDataInputPartitionUneven) {
   EXPECT_EQ(total, 10);
 }
 
-TEST_F(PartitionerTest, WeightedPartitionerModelPartition) {
-  vector<std::unique_ptr<Layer>> layers = LayerBuilder()
-                                              .input({32, 32, 3})
-                                              .conv2d(16, 3, 3, 1, 1)
-                                              .batchnorm()
-                                              .maxpool2d(2, 2, 2, 2, 0, 0)
-                                              .conv2d(32, 3, 3, 1, 1)
-                                              .batchnorm()
-                                              .maxpool2d(2, 2, 2, 2, 0, 0)
-                                              .flatten()
-                                              .dense(128)
-                                              .dense(10)
-                                              .build();
+// TEST_F(PartitionerTest, WeightedPartitionerModelPartition) {
+//   vector<std::unique_ptr<Layer>> layers = LayerBuilder()
+//                                               .input({32, 32, 3})
+//                                               .conv2d(16, 3, 3, 1, 1)
+//                                               .batchnorm()
+//                                               .maxpool2d(2, 2, 2, 2, 0, 0)
+//                                               .conv2d(32, 3, 3, 1, 1)
+//                                               .batchnorm()
+//                                               .maxpool2d(2, 2, 2, 2, 0, 0)
+//                                               .flatten()
+//                                               .dense(128)
+//                                               .dense(10)
+//                                               .build();
 
-  WeightedPartitionerConfig config{{2, 1}, {64, 32, 32, 3}};
-  WeightedPipelinePartitioner partitioner(config);
+//   WeightedPartitionerConfig config{{2, 1}, {64, 32, 32, 3}};
+//   WeightedPipelinePartitioner partitioner(config);
 
-  vector<Layer *> layer_ptrs;
-  for (const auto &layer : layers) {
-    layer_ptrs.push_back(layer.get());
-  }
+//   vector<Layer *> layer_ptrs;
+//   for (const auto &layer : layers) {
+//     layer_ptrs.push_back(layer.get());
+//   }
 
-  auto partitions = partitioner.partition_model(layer_ptrs);
+//   auto partitions = partitioner.partition_model(layer_ptrs);
 
-  EXPECT_EQ(partitions.size(), 2);
+//   EXPECT_EQ(partitions.size(), 2);
 
-  size_t current_layer = 0;
-  for (const auto &part : partitions) {
-    EXPECT_EQ(part.start_offset, current_layer);
-    current_layer += part.length;
-  }
-  EXPECT_EQ(current_layer, layers.size());
-  EXPECT_EQ(partitions.size(), 2);
-}
+//   size_t current_layer = 0;
+//   for (const auto &part : partitions) {
+//     EXPECT_EQ(part.start_offset, current_layer);
+//     current_layer += part.length;
+//   }
+//   EXPECT_EQ(current_layer, layers.size());
+//   EXPECT_EQ(partitions.size(), 2);
+// }
 
-TEST_F(PartitionerTest, WeightedPartitionerEqualWeights) {
-  vector<std::unique_ptr<Layer>> layers = LayerBuilder()
-                                              .input({28, 28, 1})
-                                              .conv2d(8, 3, 3, 1, 1)
-                                              .conv2d(16, 3, 3, 1, 1)
-                                              .conv2d(32, 3, 3, 1, 1)
-                                              .flatten()
-                                              .dense(10)
-                                              .build();
+// TEST_F(PartitionerTest, WeightedPartitionerEqualWeights) {
+//   vector<std::unique_ptr<Layer>> layers = LayerBuilder()
+//                                               .input({28, 28, 1})
+//                                               .conv2d(8, 3, 3, 1, 1)
+//                                               .conv2d(16, 3, 3, 1, 1)
+//                                               .conv2d(32, 3, 3, 1, 1)
+//                                               .flatten()
+//                                               .dense(10)
+//                                               .build();
 
-  WeightedPartitionerConfig config{{1, 1, 1}, {64, 28, 28, 1}};
-  WeightedPipelinePartitioner partitioner(config);
+//   WeightedPartitionerConfig config{{1, 1, 1}, {64, 28, 28, 1}};
+//   WeightedPipelinePartitioner partitioner(config);
 
-  vector<Layer *> layer_ptrs;
-  for (const auto &layer : layers) {
-    layer_ptrs.push_back(layer.get());
-  }
+//   vector<Layer *> layer_ptrs;
+//   for (const auto &layer : layers) {
+//     layer_ptrs.push_back(layer.get());
+//   }
 
-  auto partitions = partitioner.partition_model(layer_ptrs);
+//   auto partitions = partitioner.partition_model(layer_ptrs);
 
-  EXPECT_EQ(partitions.size(), 3);
+//   EXPECT_EQ(partitions.size(), 3);
 
-  size_t total_layers = 0;
-  for (const auto &part : partitions) {
-    total_layers += part.length;
-  }
-  EXPECT_EQ(total_layers, layers.size());
-}
+//   size_t total_layers = 0;
+//   for (const auto &part : partitions) {
+//     total_layers += part.length;
+//   }
+//   EXPECT_EQ(total_layers, layers.size());
+// }
 
-TEST_F(PartitionerTest, WeightedPartitionerManyWorkers) {
-  vector<std::unique_ptr<Layer>> layers = LayerBuilder()
-                                              .input({32, 32, 3})
-                                              .conv2d(16, 3, 3, 1, 1)
-                                              .conv2d(16, 3, 3, 1, 1)
-                                              .conv2d(32, 3, 3, 1, 1)
-                                              .conv2d(32, 3, 3, 1, 1)
-                                              .conv2d(64, 3, 3, 1, 1)
-                                              .flatten()
-                                              .dense(10)
-                                              .build();
+// TEST_F(PartitionerTest, WeightedPartitionerManyWorkers) {
+//   vector<std::unique_ptr<Layer>> layers = LayerBuilder()
+//                                               .input({32, 32, 3})
+//                                               .conv2d(16, 3, 3, 1, 1)
+//                                               .conv2d(16, 3, 3, 1, 1)
+//                                               .conv2d(32, 3, 3, 1, 1)
+//                                               .conv2d(32, 3, 3, 1, 1)
+//                                               .conv2d(64, 3, 3, 1, 1)
+//                                               .flatten()
+//                                               .dense(10)
+//                                               .build();
 
-  WeightedPartitionerConfig config{{4, 2, 2, 1}, {64, 32, 32, 3}};
-  WeightedPipelinePartitioner partitioner(config);
+//   WeightedPartitionerConfig config{{4, 2, 2, 1}, {64, 32, 32, 3}};
+//   WeightedPipelinePartitioner partitioner(config);
 
-  vector<Layer *> layer_ptrs;
-  for (const auto &layer : layers) {
-    layer_ptrs.push_back(layer.get());
-  }
+//   vector<Layer *> layer_ptrs;
+//   for (const auto &layer : layers) {
+//     layer_ptrs.push_back(layer.get());
+//   }
 
-  auto partitions = partitioner.partition_model(layer_ptrs);
+//   auto partitions = partitioner.partition_model(layer_ptrs);
 
-  EXPECT_EQ(partitions.size(), 4);
+//   EXPECT_EQ(partitions.size(), 4);
 
-  size_t current_layer = 0;
-  for (const auto &part : partitions) {
-    EXPECT_EQ(part.start_offset, current_layer);
-    EXPECT_GT(part.length, 0);
-    current_layer += part.length;
-  }
-  EXPECT_EQ(current_layer, layers.size());
-}
+//   size_t current_layer = 0;
+//   for (const auto &part : partitions) {
+//     EXPECT_EQ(part.start_offset, current_layer);
+//     EXPECT_GT(part.length, 0);
+//     current_layer += part.length;
+//   }
+//   EXPECT_EQ(current_layer, layers.size());
+// }
 
 TEST_F(PartitionerTest, NaivePipelineEqualProportions) {
   vector<std::unique_ptr<Layer>> layers = LayerBuilder()

@@ -520,16 +520,6 @@ TEST_F(LegacyConv2DLayerTest, GetConfig) {
   EXPECT_EQ(config.get<bool>("use_bias"), true);
 }
 
-TEST_F(LegacyConv2DLayerTest, Clone) {
-  LegacyConv2DLayer original(3, 16, 3, 3, 1, 1, 1, 1, true, "test_conv_clone");
-
-  auto cloned = original.clone();
-
-  EXPECT_NE(cloned, nullptr);
-  EXPECT_EQ(cloned->type(), "legacy_conv2d");
-  EXPECT_EQ(cloned->type(), original.type());
-}
-
 TEST_F(LegacyConv2DLayerTest, EdgeCase1x1Convolution) {
   LegacyConv2DLayer layer(3, 16, 1, 1, 1, 1, 0, 0, true, "test_1x1_conv");
   auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);

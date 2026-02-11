@@ -171,19 +171,6 @@ void AttentionBlock::backward_impl(const ConstTensor &gradient, const Tensor &gr
                     defaultFlowHandle);
 }
 
-uint64_t AttentionBlock::forward_flops(const std::vector<size_t> &input_shape) const { return 0; }
-
-uint64_t AttentionBlock::backward_flops(const std::vector<size_t> &input_shape) const { return 0; }
-
-LayerConfig AttentionBlock::get_config() const {
-  LayerConfig config;
-  config.name = this->name_;
-  config.type = this->type();
-  config.set("embed_dim", embed_dim_);
-  config.set("num_heads", num_heads_);
-  return config;
-}
-
 std::vector<size_t> AttentionBlock::compute_output_shape(
     const std::vector<size_t> &input_shape) const {
   return input_shape;
@@ -386,6 +373,41 @@ std::unique_ptr<Task> AttentionBlock::compute_attention_backward(
     throw std::runtime_error("Unsupported device type for compute_attention_backward.");
   }
   return nullptr;
+}
+
+std::vector<Tensor> AttentionBlock::parameters() {
+  std::vector<Tensor> params;
+  auto q_params = q_proj_->parameters();
+  params.insert(params.end(), q_params.begin(), q_params.end());
+  auto k_params = k_proj_->parameters();
+  params.insert(params.end(), k_params.begin(), k_params.end());
+  auto v_params = v_proj_->parameters();
+  params.insert(params.end(), v_params.begin(), v_params.end());
+  auto out_params = out_proj_->parameters();
+  params.insert(params.end(), out_params.begin(), out_params.end());
+  return params;
+}
+
+std::vector<Tensor> AttentionBlock::gradients() {
+  std::vector<Tensor> grads;
+  auto q_grads = q_proj_->gradients();
+  grads.insert(grads.end(), q_grads.begin(), q_grads.end());
+  auto k_grads = k_proj_->gradients();
+  grads.insert(grads.end(), k_grads.begin(), k_grads.end());
+  auto v_grads = v_proj_->gradients();
+  grads.insert(grads.end(), v_grads.begin(), v_grads.end());
+  auto out_grads = out_proj_->gradients();
+  grads.insert(grads.end(), out_grads.begin(), out_grads.end());
+  return grads;
+}
+
+LayerConfig AttentionBlock::get_config() const {
+  LayerConfig config;
+  config.name = this->name_;
+  config.type = this->type();
+  config.set("embed_dim", embed_dim_);
+  config.set("num_heads", num_heads_);
+  return config;
 }
 
 std::unique_ptr<AttentionBlock> AttentionBlock::create_from_config(const LayerConfig &config) {

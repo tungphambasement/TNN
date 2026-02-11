@@ -485,16 +485,6 @@ TEST_F(LegacyAvgPool2DLayerTest, CreateFromConfig) {
   EXPECT_EQ(layer->type(), "avgpool2d");
 }
 
-TEST_F(LegacyAvgPool2DLayerTest, Clone) {
-  LegacyAvgPool2DLayer original(3, 3, 1, 1, 1, 1, "test_avgpool_clone");
-
-  auto cloned = original.clone();
-
-  EXPECT_NE(cloned, nullptr);
-  EXPECT_EQ(cloned->type(), "avgpool2d");
-  EXPECT_EQ(cloned->type(), original.type());
-}
-
 TEST_F(LegacyAvgPool2DLayerTest, EdgeCaseGlobalAveragePooling) {
   LegacyAvgPool2DLayer layer(4, 4, 1, 1, 0, 0, "test_global_avgpool");
   auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
