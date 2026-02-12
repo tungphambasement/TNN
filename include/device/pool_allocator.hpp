@@ -23,7 +23,7 @@ public:
   PoolAllocator(const Device &device, flowHandle_t flow = defaultFlowHandle)
       : device_(device),
         flow_(flow) {}
-  ~PoolAllocator() = default;
+  ~PoolAllocator() { clear(); }
 
   PoolAllocator(const PoolAllocator &) = delete;
   PoolAllocator &operator=(const PoolAllocator &) = delete;
