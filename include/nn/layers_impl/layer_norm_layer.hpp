@@ -38,9 +38,9 @@ private:
                                            flowHandle_t handle = defaultFlowHandle) const;
 
   template <typename IO_T, typename Param_T, typename Compute_T>
-  std::unique_ptr<Task> layer_norm_backward(const ConstTensor &gradient, const ConstTensor &input,
-                                            const ConstTensor &gamma, const Tensor &grad_input,
-                                            const Tensor &gamma_gradients,
+  std::unique_ptr<Task> layer_norm_backward(const ConstTensor &grad_output,
+                                            const ConstTensor &input, const ConstTensor &gamma,
+                                            const Tensor &grad_input, const Tensor &gamma_gradients,
                                             const Tensor &beta_gradients, size_t batch_size,
                                             size_t channels,
                                             flowHandle_t handle = defaultFlowHandle) const;
@@ -58,13 +58,13 @@ private:
   template <typename IO_T, typename Param_T, typename Compute_T>
   std::unique_ptr<Task> cudnn_layer_norm_backward(
       cuda::cudnn_layer_norm::feHandle_t *fe_handle, LayerNormStats &stats,
-      const ConstTensor &gradient, const ConstTensor &input, const ConstTensor &gamma,
+      const ConstTensor &grad_output, const ConstTensor &input, const ConstTensor &gamma,
       const Tensor &grad_input, const Tensor &gamma_gradients, const Tensor &beta_gradients,
       const ConstTensor &mean, const ConstTensor &inv_variance, const Tensor &workspace,
       size_t batch_size, size_t channels, flowHandle_t handle) const;
 
   void cudnn_forward(const ConstTensor &input, const Tensor &output, size_t mb_id);
-  void cudnn_backward(const ConstTensor &gradient, const Tensor &grad_input, size_t mb_id);
+  void cudnn_backward(const ConstTensor &grad_output, const Tensor &grad_input, size_t mb_id);
 
   std::unordered_map<size_t, cuda::cudnn_layer_norm::feHandle_t *> fe_handle_cache;
 #endif
@@ -72,7 +72,7 @@ private:
   size_t get_shape_hash(size_t n, size_t c) const;
 
   void def_forward(const ConstTensor &input, const Tensor &output, size_t mb_id = 0);
-  void def_backward(const ConstTensor &gradient, const Tensor &grad_input, size_t mb_id = 0);
+  void def_backward(const ConstTensor &grad_output, const Tensor &grad_input, size_t mb_id = 0);
 
   std::vector<ParamDescriptor> param_descriptors() override {
     std::vector<ParamDescriptor> descriptors;
@@ -97,7 +97,7 @@ private:
 
   void init_impl() override;
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
-  void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+  void backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                      size_t mb_id = 0) override;
 
 public:

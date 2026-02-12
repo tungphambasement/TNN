@@ -62,7 +62,7 @@ void LegacyMaxPool2DLayer::forward_impl(const ConstTensor &input, const Tensor &
                            output_w, micro_batch_mask_indices_[mb_id], this->flow_handle_);
 }
 
-void LegacyMaxPool2DLayer::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+void LegacyMaxPool2DLayer::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                                          size_t mb_id) {
   auto it_mask = micro_batch_mask_indices_.find(mb_id);
   auto it_shape = micro_batch_input_shapes_.find(mb_id);
@@ -84,7 +84,7 @@ void LegacyMaxPool2DLayer::backward_impl(const ConstTensor &gradient, const Tens
   const size_t channels = input_shape[1];
   const size_t input_h = input_shape[2];
   const size_t input_w = input_shape[3];
-  const auto &grad_shape = gradient->shape();
+  const auto &grad_shape = grad_output->shape();
   if (grad_shape.size() != 4) {
     throw std::invalid_argument("MaxPool2D: Gradient tensor must be 4-dimensional (NCHW)");
   }
@@ -95,7 +95,7 @@ void LegacyMaxPool2DLayer::backward_impl(const ConstTensor &gradient, const Tens
 
   grad_input->fill(0);
 
-  compute_max_pool_backward(gradient, grad_input, batch_size, channels, output_h, output_w,
+  compute_max_pool_backward(grad_output, grad_input, batch_size, channels, output_h, output_w,
                             mask_indices, this->flow_handle_);
 }
 
@@ -150,7 +150,7 @@ std::unique_ptr<Task> LegacyMaxPool2DLayer::compute_max_pool_backward_impl(
     throw std::runtime_error("LegacyMaxPool2DLayer tensor dtype mismatch with dispatch type");
   }
   if (gradient_data->device_type() != grad_input_data->device_type()) {
-    throw std::runtime_error("Gradient and input gradient tensors must be on the same device");
+    throw std::runtime_error("Gradient and input grad_output tensors must be on the same device");
   }
 
   if (gradient_data->device_type() == DeviceType::CPU) {

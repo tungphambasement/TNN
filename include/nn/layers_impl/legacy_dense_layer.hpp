@@ -34,20 +34,20 @@ private:
 
   template <typename IO_T, typename Param_T, typename Compute_T>
   std::unique_ptr<Task> compute_weight_gradients(const ConstTensor &input,
-                                                 const ConstTensor &gradient,
+                                                 const ConstTensor &grad_output,
                                                  const Tensor &weight_grad, size_t batch_size,
                                                  size_t input_features, size_t output_features,
                                                  flowHandle_t handle) const;
 
   template <typename IO_T, typename Param_T, typename Compute_T>
-  std::unique_ptr<Task> compute_input_gradients(const ConstTensor &gradient,
+  std::unique_ptr<Task> compute_input_gradients(const ConstTensor &grad_output,
                                                 const ConstTensor &weights,
                                                 const Tensor &grad_input, size_t batch_size,
                                                 size_t input_features, size_t output_features,
                                                 flowHandle_t handle) const;
 
   template <typename IO_T, typename Param_T, typename Compute_T>
-  std::unique_ptr<Task> compute_bias_gradients(const ConstTensor &gradient,
+  std::unique_ptr<Task> compute_bias_gradients(const ConstTensor &grad_output,
                                                const Tensor &bias_gradient, size_t batch_size,
                                                size_t output_features, flowHandle_t handle) const;
 
@@ -79,7 +79,7 @@ private:
 
   void init_impl() override;
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
-  void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+  void backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                      size_t mb_id = 0) override;
 
 public:

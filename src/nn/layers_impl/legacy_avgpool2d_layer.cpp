@@ -55,9 +55,9 @@ void LegacyAvgPool2DLayer::forward_impl(const ConstTensor &input, const Tensor &
                            output_w, this->flow_handle_);
 }
 
-void LegacyAvgPool2DLayer::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+void LegacyAvgPool2DLayer::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                                          size_t mb_id) {
-  if (gradient->dims() != 4) {
+  if (grad_output->dims() != 4) {
     throw std::invalid_argument("AvgPool2D: Gradient tensor must be 4-dimensional (NCHW)");
   }
   auto it_shape = micro_batch_input_shapes_.find(mb_id);
@@ -73,15 +73,15 @@ void LegacyAvgPool2DLayer::backward_impl(const ConstTensor &gradient, const Tens
   const size_t channels = input_shape[1];
   const size_t input_h = input_shape[2];
   const size_t input_w = input_shape[3];
-  const auto &grad_shape = gradient->shape();
+  const auto &grad_shape = grad_output->shape();
   const size_t output_h = grad_shape[2];
   const size_t output_w = grad_shape[3];
 
   grad_input->ensure({batch_size, channels, input_h, input_w});
   grad_input->fill(0);
 
-  compute_avg_pool_backward(gradient, grad_input, batch_size, channels, input_h, input_w, output_h,
-                            output_w, this->flow_handle_);
+  compute_avg_pool_backward(grad_output, grad_input, batch_size, channels, input_h, input_w,
+                            output_h, output_w, this->flow_handle_);
 }
 
 template <typename Compute_T>
@@ -134,7 +134,7 @@ std::unique_ptr<Task> LegacyAvgPool2DLayer::compute_avg_pool_backward_impl(
     throw std::runtime_error("LegacyAvgPool2DLayer tensor dtype mismatch with dispatch type");
   }
   if (gradient_data->device_type() != grad_input_data->device_type()) {
-    throw std::runtime_error("Gradient and input gradient tensors must be on the same device");
+    throw std::runtime_error("Gradient and input grad_output tensors must be on the same device");
   }
 
   if (gradient_data->device_type() == DeviceType::CPU) {

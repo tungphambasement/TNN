@@ -42,7 +42,7 @@ private:
 
 #ifdef USE_CUDNN
   void cudnn_forward(const ConstTensor &input, const Tensor &output, size_t mb_id);
-  void cudnn_backward(const ConstTensor &gradient, const Tensor &grad_input, size_t mb_id);
+  void cudnn_backward(const ConstTensor &grad_output, const Tensor &grad_input, size_t mb_id);
 #endif
 
   std::unordered_map<size_t, std::vector<size_t>> micro_batch_input_shapes_;
@@ -120,27 +120,28 @@ private:
                                           const Tensor &cudnn_workspace, flowHandle_t handle);
 
   template <typename IO_T, typename Param_T, typename Compute_T>
-  std::unique_ptr<Task> cudnn_backward_data(const ConstTensor &gradient, const ConstTensor &weight,
-                                            const Tensor &input_grad, size_t batch_size,
-                                            size_t input_h, size_t input_w, size_t output_h,
-                                            size_t output_w, const Tensor &cudnn_workspace,
-                                            flowHandle_t handle);
+  std::unique_ptr<Task> cudnn_backward_data(const ConstTensor &grad_output,
+                                            const ConstTensor &weight, const Tensor &input_grad,
+                                            size_t batch_size, size_t input_h, size_t input_w,
+                                            size_t output_h, size_t output_w,
+                                            const Tensor &cudnn_workspace, flowHandle_t handle);
 
   template <typename IO_T, typename Param_T, typename Compute_T>
-  std::unique_ptr<Task> cudnn_backward_filter(const ConstTensor &input, const ConstTensor &gradient,
+  std::unique_ptr<Task> cudnn_backward_filter(const ConstTensor &input,
+                                              const ConstTensor &grad_output,
                                               const Tensor &weight_grad, size_t batch_size,
                                               size_t input_h, size_t input_w, size_t output_h,
                                               size_t output_w, const Tensor &cudnn_workspace,
                                               flowHandle_t handle);
 
   template <typename IO_T, typename Param_T, typename Compute_T>
-  std::unique_ptr<Task> cudnn_backward_bias(const ConstTensor &gradient, const Tensor &bias_grad,
+  std::unique_ptr<Task> cudnn_backward_bias(const ConstTensor &grad_output, const Tensor &bias_grad,
                                             size_t batch_size, size_t output_h, size_t output_w,
                                             size_t out_channels, flowHandle_t handle);
 #endif
 
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
-  void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+  void backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                      size_t mb_id = 0) override;
 
 public:

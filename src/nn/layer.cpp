@@ -69,7 +69,7 @@ void Layer::backward(const std::vector<ConstTensor> &gradients,
   }
   if (gradients[0]->data_type() != io_dtype_) {
     throw std::runtime_error("Layer " + name_ +
-                             " gradient tensor dtype does not match layer io_dtype.");
+                             " grad_output tensor dtype does not match layer io_dtype.");
   }
   if (grad_inputs[0]->data_type() != io_dtype_) {
     throw std::runtime_error("Layer " + name_ +

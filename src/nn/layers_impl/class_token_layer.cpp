@@ -66,7 +66,7 @@ std::unique_ptr<Task> ClassTokenLayer::forward_task(const ConstTensor &input, co
 }
 
 template <typename IO_T, typename Param_T, typename Compute_T>
-std::unique_ptr<Task> ClassTokenLayer::backward_task(const ConstTensor &gradient,
+std::unique_ptr<Task> ClassTokenLayer::backward_task(const ConstTensor &grad_output,
                                                      const Tensor &grad_input,
                                                      const Tensor &class_token_gradients,
                                                      const ConstTensor &class_token,
@@ -76,7 +76,7 @@ std::unique_ptr<Task> ClassTokenLayer::backward_task(const ConstTensor &gradient
     throw std::runtime_error(
         "ClassTokenLayer mixed dtype dispatch not implemented (io/param/compute must match).");
   }
-  if (gradient->data_type() != dtype_of<IO_T>() || grad_input->data_type() != dtype_of<IO_T>()) {
+  if (grad_output->data_type() != dtype_of<IO_T>() || grad_input->data_type() != dtype_of<IO_T>()) {
     throw std::runtime_error("ClassTokenLayer IO tensor dtype mismatch with dispatch IO_T");
   }
   if (class_token_gradients->data_type() != dtype_of<Param_T>()) {
@@ -86,14 +86,14 @@ std::unique_ptr<Task> ClassTokenLayer::backward_task(const ConstTensor &gradient
 
   if (this->device().device_type() == DeviceType::CPU) {
     return create_cpu_task(handle, cpu::class_token_backward<Compute_T>,
-                           gradient->data_as<Compute_T>(), grad_input->data_as<Compute_T>(),
+                           grad_output->data_as<Compute_T>(), grad_input->data_as<Compute_T>(),
                            class_token_gradients->data_as<Compute_T>(), batch_size, seq_len,
                            embed_dim);
   }
 #ifdef USE_CUDA
   else if (this->device().device_type() == DeviceType::GPU) {
     return create_cuda_task(handle, cuda::class_token_backward<Compute_T>,
-                            gradient->data_as<Compute_T>(), grad_input->data_as<Compute_T>(),
+                            grad_output->data_as<Compute_T>(), grad_input->data_as<Compute_T>(),
                             class_token_gradients->data_as<Compute_T>(), batch_size, seq_len,
                             embed_dim);
   }
@@ -123,20 +123,20 @@ void ClassTokenLayer::forward_impl(const ConstTensor &input, const Tensor &outpu
                                  embed_dim, this->flow_handle_);
 }
 
-void ClassTokenLayer::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+void ClassTokenLayer::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                                     size_t mb_id) {
-  if (gradient->dims() != 3) {
+  if (grad_output->dims() != 3) {
     throw std::runtime_error(
         "ClassTokenLayer: Gradient tensor must have 3 dimensions (Batch, Seq, Embed)");
   }
-  size_t batch_size = gradient->dimension(0);
-  size_t seq_len_plus_1 = gradient->dimension(1);
-  size_t embed_dim = gradient->dimension(2);
+  size_t batch_size = grad_output->dimension(0);
+  size_t seq_len_plus_1 = grad_output->dimension(1);
+  size_t embed_dim = grad_output->dimension(2);
   size_t seq_len = seq_len_plus_1 - 1;
 
   grad_input->ensure({batch_size, seq_len, embed_dim});
 
-  DISPATCH_ON_3_DTYPES_TO_METHOD(backward_task, gradient, grad_input, class_token_gradients_,
+  DISPATCH_ON_3_DTYPES_TO_METHOD(backward_task, grad_output, grad_input, class_token_gradients_,
                                  class_token_, batch_size, seq_len, embed_dim, this->flow_handle_);
 }
 

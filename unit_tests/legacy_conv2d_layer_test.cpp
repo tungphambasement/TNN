@@ -116,7 +116,7 @@ protected:
     }
   }
 
-  void verify_gradient_shape(const ConstTensor &gradient, const ConstTensor &grad_input,
+  void verify_gradient_shape(const ConstTensor &grad_output, const ConstTensor &grad_input,
                              const ConstTensor &original_input) {
     EXPECT_EQ(grad_input->shape(), original_input->shape());
   }
@@ -365,16 +365,16 @@ TEST_F(LegacyConv2DLayerTest, BasicBackwardPass) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
 
   auto params = layer.parameters();
-  verify_backward_result(gradient, grad_input, params[0], 3, 3, 1, 1, 0, 0);
+  verify_backward_result(grad_output, grad_input, params[0], 3, 3, 1, 1, 0, 0);
 }
 
 TEST_F(LegacyConv2DLayerTest, BackwardPassWithPadding) {
@@ -391,13 +391,13 @@ TEST_F(LegacyConv2DLayerTest, BackwardPassWithPadding) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
   EXPECT_EQ(grad_input->shape(), input->shape());
 }
 
@@ -415,13 +415,13 @@ TEST_F(LegacyConv2DLayerTest, BackwardPassMultiChannel) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
   auto grad_input_shape = grad_input->shape();
   EXPECT_EQ(grad_input_shape[1], 3);
 }
@@ -440,13 +440,13 @@ TEST_F(LegacyConv2DLayerTest, BackwardPassMultiBatch) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
   auto grad_input_shape = grad_input->shape();
   EXPECT_EQ(grad_input_shape[0], 4);
 }
@@ -468,16 +468,16 @@ TEST_F(LegacyConv2DLayerTest, BackwardPassVariableGradient) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  float *grad_data = gradient->data_as<float>();
-  for (size_t i = 0; i < gradient->size(); ++i) {
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  float *grad_data = grad_output->data_as<float>();
+  for (size_t i = 0; i < grad_output->size(); ++i) {
     grad_data[i] = static_cast<float>(i + 1);
   }
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
   EXPECT_EQ(grad_input->shape(), input->shape());
 }
 
@@ -554,11 +554,11 @@ TEST_F(LegacyConv2DLayerTest, EdgeCaseZeroGradient) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(0.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(0.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
 }
@@ -633,13 +633,13 @@ TEST_F(LegacyConv2DLayerTest, BackwardNumericalStability) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1e-6f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1e-6f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
 }
 
 TEST_F(LegacyConv2DLayerTest, ParameterCollectionWithBias) {
@@ -715,13 +715,13 @@ TEST_F(LegacyConv2DLayerTest, ResNet1x1ChannelIncrease) {
   auto params = layer.parameters();
   verify_forward_result(input, output, params[0], nullptr, 1, 1, 1, 1, 0, 0);
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
-  verify_backward_result(gradient, grad_input, params[0], 1, 1, 1, 1, 0, 0);
+  verify_backward_result(grad_output, grad_input, params[0], 1, 1, 1, 1, 0, 0);
 }
 
 TEST_F(LegacyConv2DLayerTest, ResNet1x1ChannelDecrease) {
@@ -750,13 +750,13 @@ TEST_F(LegacyConv2DLayerTest, ResNet1x1ChannelDecrease) {
   auto params = layer.parameters();
   verify_forward_result(input, output, params[0], nullptr, 1, 1, 1, 1, 0, 0);
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
-  verify_backward_result(gradient, grad_input, params[0], 1, 1, 1, 1, 0, 0);
+  verify_backward_result(grad_output, grad_input, params[0], 1, 1, 1, 1, 0, 0);
 }
 
 TEST_F(LegacyConv2DLayerTest, ResNetStridedDownsample) {
@@ -785,13 +785,13 @@ TEST_F(LegacyConv2DLayerTest, ResNetStridedDownsample) {
   auto params = layer.parameters();
   verify_forward_result(input, output, params[0], nullptr, 3, 3, 2, 2, 0, 0);
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
-  verify_backward_result(gradient, grad_input, params[0], 3, 3, 2, 2, 0, 0);
+  verify_backward_result(grad_output, grad_input, params[0], 3, 3, 2, 2, 0, 0);
 }
 
 TEST_F(LegacyConv2DLayerTest, ResNetStridedWithPadding) {
@@ -820,13 +820,13 @@ TEST_F(LegacyConv2DLayerTest, ResNetStridedWithPadding) {
   auto params = layer.parameters();
   verify_forward_result(input, output, params[0], nullptr, 3, 3, 2, 2, 1, 1);
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
-  verify_backward_result(gradient, grad_input, params[0], 3, 3, 2, 2, 1, 1);
+  verify_backward_result(grad_output, grad_input, params[0], 3, 3, 2, 2, 1, 1);
 }
 
 TEST_F(LegacyConv2DLayerTest, ResNet1x1StridedDownsample) {
@@ -855,13 +855,13 @@ TEST_F(LegacyConv2DLayerTest, ResNet1x1StridedDownsample) {
   auto params = layer.parameters();
   verify_forward_result(input, output, params[0], nullptr, 1, 1, 2, 2, 0, 0);
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
-  verify_backward_result(gradient, grad_input, params[0], 1, 1, 2, 2, 0, 0);
+  verify_backward_result(grad_output, grad_input, params[0], 1, 1, 2, 2, 0, 0);
 }
 
 TEST_F(LegacyConv2DLayerTest, ResNetBottleneck3x3) {
@@ -890,13 +890,13 @@ TEST_F(LegacyConv2DLayerTest, ResNetBottleneck3x3) {
   auto params = layer.parameters();
   verify_forward_result(input, output, params[0], nullptr, 3, 3, 1, 1, 1, 1);
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
-  verify_backward_result(gradient, grad_input, params[0], 3, 3, 1, 1, 1, 1);
+  verify_backward_result(grad_output, grad_input, params[0], 3, 3, 1, 1, 1, 1);
 }
 
 TEST_F(LegacyConv2DLayerTest, ResNetFirstConv7x7) {
@@ -926,13 +926,13 @@ TEST_F(LegacyConv2DLayerTest, ResNetFirstConv7x7) {
   verify_forward_result(input, output, params[0], params.size() > 1 ? params[1] : nullptr, 7, 7, 2,
                         2, 3, 3);
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(0.01f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(0.01f);
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
-  verify_backward_result(gradient, grad_input, params[0], 7, 7, 2, 2, 3, 3);
+  verify_backward_result(grad_output, grad_input, params[0], 7, 7, 2, 2, 3, 3);
 }
 
 TEST_F(LegacyConv2DLayerTest, ResNetAsymmetricStride) {
@@ -961,13 +961,13 @@ TEST_F(LegacyConv2DLayerTest, ResNetAsymmetricStride) {
   auto params = layer.parameters();
   verify_forward_result(input, output, params[0], nullptr, 3, 3, 2, 1, 1, 1);
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
-  verify_backward_result(gradient, grad_input, params[0], 3, 3, 2, 1, 1, 1);
+  verify_backward_result(grad_output, grad_input, params[0], 3, 3, 2, 1, 1, 1);
 }
 
 TEST_F(LegacyConv2DLayerTest, ResNetSmallFeatureMap) {
@@ -996,13 +996,13 @@ TEST_F(LegacyConv2DLayerTest, ResNetSmallFeatureMap) {
   auto params = layer.parameters();
   verify_forward_result(input, output, params[0], nullptr, 3, 3, 2, 2, 1, 1);
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
-  verify_backward_result(gradient, grad_input, params[0], 3, 3, 2, 2, 1, 1);
+  verify_backward_result(grad_output, grad_input, params[0], 3, 3, 2, 2, 1, 1);
 }
 
 int main(int argc, char **argv) {

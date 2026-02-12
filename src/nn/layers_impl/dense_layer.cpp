@@ -96,14 +96,14 @@ void DenseLayer::forward_impl(const ConstTensor &input, const Tensor &output, si
 #endif
 }
 
-void DenseLayer::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+void DenseLayer::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                                size_t mb_id) {
-  if (gradient->shape().back() != output_features_) {
+  if (grad_output->shape().back() != output_features_) {
     throw std::invalid_argument("Gradient feature size mismatch in DenseLayer");
   }
 #ifdef USE_CUDNN
   if (this->device().device_type() == DeviceType::GPU) {
-    cudnn_backward(gradient, grad_input, mb_id);
+    cudnn_backward(grad_output, grad_input, mb_id);
     return;
   }
 #endif
@@ -157,7 +157,7 @@ void DenseLayer::cudnn_forward(const ConstTensor &input, const Tensor &output, s
   }
 }
 
-void DenseLayer::cudnn_backward(const ConstTensor &gradient, const Tensor &grad_input,
+void DenseLayer::cudnn_backward(const ConstTensor &grad_output, const Tensor &grad_input,
                                 size_t mb_id) {
   ConstTensor &input = this->get_cached_tensor(mb_id, "input");
   if (!input) {
@@ -185,29 +185,30 @@ void DenseLayer::cudnn_backward(const ConstTensor &gradient, const Tensor &grad_
 
   // Compute weight gradients
   create_cuda_task(this->flow_handle_, cuda::cudnn_gemm::run_wgrad, handle, stats, input->data(),
-                   gradient->data(), weight_gradients_->data(), cudnn_workspace->data());
+                   grad_output->data(), weight_gradients_->data(), cudnn_workspace->data());
 
   if (use_bias_) {
-    DISPATCH_ON_3_DTYPES_TO_METHOD(compute_bias_gradients, gradient, bias_gradients_, batch_size,
+    DISPATCH_ON_3_DTYPES_TO_METHOD(compute_bias_gradients, grad_output, bias_gradients_, batch_size,
                                    output_features_, this->flow_handle_);
   }
 
   // Compute input gradients
-  create_cuda_task(this->flow_handle_, cuda::cudnn_gemm::run_dgrad, handle, stats, gradient->data(),
-                   weights_->data(), grad_input->data(), cudnn_workspace->data());
+  create_cuda_task(this->flow_handle_, cuda::cudnn_gemm::run_dgrad, handle, stats,
+                   grad_output->data(), weights_->data(), grad_input->data(),
+                   cudnn_workspace->data());
 }
 #endif
 
 template <typename IO_T, typename Param_T, typename Compute_T>
-std::unique_ptr<Task> DenseLayer::compute_bias_gradients(const ConstTensor &gradient,
+std::unique_ptr<Task> DenseLayer::compute_bias_gradients(const ConstTensor &grad_output,
                                                          const Tensor &bias_gradient,
                                                          size_t batch_size, size_t output_features,
                                                          flowHandle_t handle) const {
-  if (gradient->data_type() != dtype_of<IO_T>()) {
-    throw std::runtime_error("DenseLayer gradient dtype mismatch with dispatch IO_T");
+  if (grad_output->data_type() != dtype_of<IO_T>()) {
+    throw std::runtime_error("DenseLayer grad_output dtype mismatch with dispatch IO_T");
   }
   if (bias_gradient->data_type() != dtype_of<Param_T>()) {
-    throw std::runtime_error("DenseLayer bias gradient dtype mismatch with dispatch Param_T");
+    throw std::runtime_error("DenseLayer bias grad_output dtype mismatch with dispatch Param_T");
   }
   if (this->device().device_type() == DeviceType::CPU) {
     if constexpr (!std::is_same_v<IO_T, Compute_T> || !std::is_same_v<Param_T, Compute_T>) {
@@ -215,14 +216,15 @@ std::unique_ptr<Task> DenseLayer::compute_bias_gradients(const ConstTensor &grad
           "DenseLayer mixed dtype dispatch not implemented for CPU (io/param/compute must match).");
     }
     return create_cpu_task(handle, cpu::legacy_dense::compute_bias_gradients<IO_T>,
-                           gradient->data_as<IO_T>(), bias_gradient->data_as<IO_T>(), batch_size,
+                           grad_output->data_as<IO_T>(), bias_gradient->data_as<IO_T>(), batch_size,
                            output_features);
   }
 #ifdef USE_CUDA
   else if (this->device().device_type() == DeviceType::GPU) {
-    return create_cuda_task(
-        handle, cuda::legacy_dense::compute_bias_gradients_ex<IO_T, Param_T, Compute_T>,
-        gradient->data_as<IO_T>(), bias_gradient->data_as<Param_T>(), batch_size, output_features);
+    return create_cuda_task(handle,
+                            cuda::legacy_dense::compute_bias_gradients_ex<IO_T, Param_T, Compute_T>,
+                            grad_output->data_as<IO_T>(), bias_gradient->data_as<Param_T>(),
+                            batch_size, output_features);
   }
 #endif
   else {

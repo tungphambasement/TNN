@@ -23,7 +23,7 @@ using namespace tnn;
 /**
  * Test fixture for ResidualBlock validation tests.
  * These tests verify the mathematical correctness of residual block operations
- * including forward pass (skip connection addition) and backward pass (gradient distribution).
+ * including forward pass (skip connection addition) and backward pass (grad_output distribution).
  */
 class ResidualBlockTest : public ::testing::Test {
 protected:
@@ -359,18 +359,18 @@ TEST_F(ResidualBlockTest, IdentityShortcutBackward) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   residual.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>({1, 1, 2, 2}, getCPU());
-  float *grad_data = gradient->data_as<float>();
+  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  float *grad_data = grad_output->data_as<float>();
   for (int i = 0; i < 4; ++i) {
     grad_data[i] = 1.0f;
   }
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  residual.backward({gradient}, {grad_input});
+  residual.backward({grad_output}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
 
-  // Gradient through linear path + gradient through shortcut
+  // Gradient through linear path + grad_output through shortcut
   // Both contribute equally in identity shortcut: grad = grad_main + grad_shortcut
   const float *grad_input_data = grad_input->data_as<float>();
   for (size_t i = 0; i < grad_input->size(); ++i) {
@@ -443,11 +443,11 @@ TEST_F(ResidualBlockTest, EdgeCaseZeroGradient) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   residual.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>({1, 1, 2, 2}, getCPU());
-  gradient->fill(0.0f);
+  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  grad_output->fill(0.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  residual.backward({gradient}, {grad_input});
+  residual.backward({grad_output}, {grad_input});
 
   for (size_t i = 0; i < grad_input->size(); ++i) {
     EXPECT_NEAR(grad_input->data_as<float>()[i], 0.0f, 1e-5f);
@@ -560,11 +560,11 @@ TEST_F(ResidualBlockTest, NumericalStabilityBackward) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   residual.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>({1, 1, 2, 2}, getCPU());
-  gradient->fill(1e-6f);
+  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  grad_output->fill(1e-6f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  residual.backward({gradient}, {grad_input});
+  residual.backward({grad_output}, {grad_input});
 
   // grad_main (1.0 * 1e-6) + grad_shortcut (1e-6) = 2e-6
   const float *grad_input_data = grad_input->data_as<float>();
@@ -629,11 +629,11 @@ TEST_F(ResidualBlockTest, MultiLayerMainPathBackward) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   residual.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>({1, 1, 2, 2}, getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  grad_output->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  residual.backward({gradient}, {grad_input});
+  residual.backward({grad_output}, {grad_input});
 
   // grad_main = 2.0 * 0.5 * 1.0 = 1.0
   // grad_shortcut = 1.0
@@ -695,13 +695,13 @@ TEST_F(ResidualBlockTest, ReLUNegativeInputSuppressionBackward) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   residual.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>({1, 1, 2, 2}, getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  grad_output->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  residual.backward({gradient}, {grad_input});
+  residual.backward({grad_output}, {grad_input});
 
-  // ReLU blocks gradient when output is negative
+  // ReLU blocks grad_output when output is negative
   const float *grad_input_data = grad_input->data_as<float>();
   for (size_t i = 0; i < grad_input->size(); ++i) {
     EXPECT_NEAR(grad_input_data[i], 0.0f, 1e-5f);

@@ -28,14 +28,14 @@ void ActivationLayer::forward_impl(const ConstTensor &input, const Tensor &outpu
   activation_->apply(input, output);
 }
 
-void ActivationLayer::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+void ActivationLayer::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                                     size_t mb_id) {
   ConstTensor &input = this->get_cached_tensor(mb_id, "input");
   if (!input) {
     throw std::runtime_error("No cached input found for backward pass in ActivationLayer");
   }
   grad_input->ensure(input->shape());
-  activation_->compute_gradient(input, gradient, grad_input);
+  activation_->compute_gradient(input, grad_output, grad_input);
 }
 
 LayerConfig ActivationLayer::get_config() const {

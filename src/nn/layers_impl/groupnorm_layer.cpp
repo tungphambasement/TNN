@@ -74,7 +74,7 @@ void GroupNormLayer::forward_impl(const ConstTensor &input, const Tensor &output
   }
 }
 
-void GroupNormLayer::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+void GroupNormLayer::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                                    size_t mb_id) {
   Tensor &normalized = this->get_mutable_tensor(mb_id, "norm");
   Tensor &inv_std = this->get_mutable_tensor(mb_id, "inv_std");
@@ -90,7 +90,7 @@ void GroupNormLayer::backward_impl(const ConstTensor &gradient, const Tensor &gr
 
   grad_input->ensure(input->shape());
 
-  DISPATCH_ON_3_DTYPES_TO_METHOD(run_backward_fused, gradient, normalized, inv_std, gamma_,
+  DISPATCH_ON_3_DTYPES_TO_METHOD(run_backward_fused, grad_output, normalized, inv_std, gamma_,
                                  gamma_gradients_, beta_gradients_, grad_input, batch_size,
                                  channels, spatial_size, this->flow_handle_);
 }

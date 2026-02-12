@@ -74,7 +74,7 @@ void AttentionBlock::forward_impl(const ConstTensor &input, const Tensor &output
   out_proj_->forward({attn_out}, {output}, mb_id);
 }
 
-void AttentionBlock::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+void AttentionBlock::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                                    size_t mb_id) {
   ConstTensor &input = this->get_cached_tensor(mb_id, "input");
   if (!input) {
@@ -92,8 +92,8 @@ void AttentionBlock::backward_impl(const ConstTensor &gradient, const Tensor &gr
   k_proj_->forward({input}, {k}, mb_id);
   v_proj_->forward({input}, {v}, mb_id);
 
-  Tensor d_attn_out = this->get_buffer(gradient->shape(), io_dtype_);
-  out_proj_->backward({gradient}, {d_attn_out}, mb_id);
+  Tensor d_attn_out = this->get_buffer(grad_output->shape(), io_dtype_);
+  out_proj_->backward({grad_output}, {d_attn_out}, mb_id);
 
   Tensor dq = this->get_buffer(q->shape(), io_dtype_);
   Tensor dk = this->get_buffer(k->shape(), io_dtype_);

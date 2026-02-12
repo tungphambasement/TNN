@@ -326,11 +326,11 @@ TEST_F(LegacyBatchNormLayerTest, BasicBackwardPass) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
 }
@@ -353,14 +353,14 @@ TEST_F(LegacyBatchNormLayerTest, BackwardPassWithAffine) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  float *grad_data = gradient->data_as<float>();
-  for (size_t i = 0; i < gradient->size(); ++i) {
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  float *grad_data = grad_output->data_as<float>();
+  for (size_t i = 0; i < grad_output->size(); ++i) {
     grad_data[i] = static_cast<float>(i % 5) / 5.0f;
   }
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
 
@@ -383,11 +383,11 @@ TEST_F(LegacyBatchNormLayerTest, BackwardPassMultiBatch) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
   auto grad_input_shape = grad_input->shape();
   EXPECT_EQ(grad_input_shape[0], 8);
@@ -409,11 +409,11 @@ TEST_F(LegacyBatchNormLayerTest, BackwardPassZeroGradient) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(0.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(0.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
 

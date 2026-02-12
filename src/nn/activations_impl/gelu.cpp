@@ -31,7 +31,7 @@ std::unique_ptr<Task> GELU::compute_gradient(const ConstTensor &input,
                                              const ConstTensor &grad_output,
                                              const Tensor &grad_input) const {
   assert(grad_output->shape() == grad_input->shape() &&
-         "Shapes must match for in-place gradient computation");
+         "Shapes must match for in-place grad_output computation");
   if (grad_output->device() != grad_input->device()) {
     throw std::runtime_error("Tensors must be on the same device for GELU");
   }

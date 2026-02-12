@@ -93,7 +93,7 @@ void ResidualBlock::forward_impl(const ConstTensor &input, const Tensor &output,
   }
 }
 
-void ResidualBlock::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+void ResidualBlock::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                                   size_t mb_id) {
   const Tensor &pre_act = this->get_mutable_tensor(mb_id, "pre_activation");
   if (final_activation_ && !pre_act) {
@@ -101,11 +101,11 @@ void ResidualBlock::backward_impl(const ConstTensor &gradient, const Tensor &gra
                              std::to_string(mb_id));
   }
 
-  ConstTensor grad_to_propagate = gradient;
+  ConstTensor grad_to_propagate = grad_output;
 
   if (final_activation_) {
     Tensor dpre_act = this->get_buffer(pre_act->shape(), pre_act->data_type());
-    final_activation_->compute_gradient(pre_act, gradient, dpre_act);
+    final_activation_->compute_gradient(pre_act, grad_output, dpre_act);
     grad_to_propagate = dpre_act;
   }
 
@@ -116,14 +116,14 @@ void ResidualBlock::backward_impl(const ConstTensor &gradient, const Tensor &gra
   }
 
   size_t main_path_max_size =
-      compute_path_max_size(main_path_, it_input_shape->second, gradient->data_type());
+      compute_path_max_size(main_path_, it_input_shape->second, grad_output->data_type());
   size_t shortcut_path_max_size =
-      compute_path_max_size(shortcut_path_, it_input_shape->second, gradient->data_type());
+      compute_path_max_size(shortcut_path_, it_input_shape->second, grad_output->data_type());
 
   // little trick to avoid const correctness issue
   ConstTensor main_grad = grad_to_propagate;
   for (int i = static_cast<int>(main_path_.size()) - 1; i >= 0; --i) {
-    Tensor temp_grad = this->get_buffer({main_path_max_size}, gradient->data_type());
+    Tensor temp_grad = this->get_buffer({main_path_max_size}, grad_output->data_type());
     main_path_[i]->backward({main_grad}, {temp_grad}, mb_id);
     main_grad = temp_grad;
   }
@@ -131,7 +131,7 @@ void ResidualBlock::backward_impl(const ConstTensor &gradient, const Tensor &gra
   ConstTensor shortcut_grad = grad_to_propagate;  // same here
   if (!shortcut_path_.empty()) {
     for (int i = static_cast<int>(shortcut_path_.size()) - 1; i >= 0; --i) {
-      Tensor temp_grad = this->get_buffer({shortcut_path_max_size}, gradient->data_type());
+      Tensor temp_grad = this->get_buffer({shortcut_path_max_size}, grad_output->data_type());
       shortcut_path_[i]->backward({shortcut_grad}, {temp_grad}, mb_id);
       shortcut_grad = temp_grad;
     }

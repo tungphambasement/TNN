@@ -6,20 +6,20 @@
  */
 #include "nn/layers_impl/conv2d_layer.hpp"
 
-#include <type_traits>
-
-#include "device/cuda/cuda_context.hpp"
 #include "device/device_type.hpp"
 #include "device/task.hpp"
-#include "nn/layers_impl/common/conv2d.hpp"
+#include "nn/layers_impl/cpu/conv2d_nhwc_ops.hpp"
 #ifdef USE_CUDNN
+#include <type_traits>
+
 #include "cuda/cudnn/common.hpp"
+#include "device/cuda/cuda_context.hpp"
+#include "nn/layers_impl/common/conv2d.hpp"
 #include "nn/layers_impl/cuda/cudnn_conv2d_ops.hpp"
 #endif
 #include <cmath>
 #include <cstring>
 #include <iostream>
-#include <memory>
 #include <stdexcept>
 #include <string>
 
@@ -72,18 +72,6 @@ void Conv2DLayer::init_impl() {
   }
 }
 
-size_t Conv2DLayer::get_shape_hash(size_t n, size_t c, size_t h, size_t w) const {
-  size_t seed = 0;
-  auto hash_combine = [&](size_t v) {
-    seed ^= std::hash<size_t>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-  };
-  hash_combine(n);
-  hash_combine(c);
-  hash_combine(h);
-  hash_combine(w);
-  return seed;
-}
-
 /**
  * @brief Perform convolution 2d forward on input and save it to output->
  * ! Only support GPU device with cuDNN backend. CPU implementation is to be added.
@@ -106,32 +94,46 @@ void Conv2DLayer::forward_impl(const ConstTensor &input, const Tensor &output, s
     throw std::invalid_argument("Input channel size mismatch in Conv2DLayer");
   }
 
+  const size_t batch_size = input->dimension(0);
+  const size_t input_h = input->dimension(1);
+  const size_t input_w = input->dimension(2);
+
+  const size_t output_h = (input_h + 2 * pad_h_ - kernel_h_) / stride_h_ + 1;
+  const size_t output_w = (input_w + 2 * pad_w_ - kernel_w_) / stride_w_ + 1;
+
+  output->ensure({batch_size, output_h, output_w, out_channels_});
+
+  if (this->is_training_) {
+    ConstTensor &cached_input = this->get_cached_tensor(mb_id, "input");
+    cached_input = input;
+  }
+
 #ifdef USE_CUDNN
   if (this->device().device_type() == DeviceType::GPU) {
     cudnn_forward(input, output, mb_id);
-  } else
-#endif
-  {
-    throw std::runtime_error("CPU implementation for Conv2DLayer not implemented");
+    return;
   }
+#endif
+
+  def_forward(input, output, mb_id);
 }
 
 /**
- * @brief Perform convolution 2d backward on gradient and save it to grad_input.
+ * @brief Perform convolution 2d backward on grad_output and save it to grad_input.
  * ! Only support GPU device with cuDNN backend. CPU implementation is to be added.
  * @tparam T
- * @param gradient upstream gradient tensor in NHWC format
- * @param grad_input output gradient tensor in NHWC format
+ * @param grad_output upstream grad_output tensor in NHWC format
+ * @param grad_input output grad_output tensor in NHWC format
  * @param mb_id micro batch id for caching input
  */
 
-void Conv2DLayer::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+void Conv2DLayer::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                                 size_t mb_id) {
-  if (gradient->dims() != 4) {
+  if (grad_output->dims() != 4) {
     throw std::invalid_argument("Conv2D: Input tensor must be 4-dimensional (NHWC)");
   }
 
-  size_t channels = gradient->dimension(3);
+  size_t channels = grad_output->dimension(3);
 
   if (channels != out_channels_) {
     std::cerr << "Gradient shape: " << channels << " channels, expected: " << out_channels_
@@ -139,17 +141,82 @@ void Conv2DLayer::backward_impl(const ConstTensor &gradient, const Tensor &grad_
     throw std::invalid_argument("Gradient channel size mismatch in Conv2DLayer");
   }
 
+  ConstTensor &input = this->get_cached_tensor(mb_id, "input");
+  if (!input) {
+    throw std::runtime_error("No cached input found for micro-batch ID: " + std::to_string(mb_id));
+  }
+
+  const auto &input_shape = input->shape();
+  grad_input->ensure(input_shape);
+
 #ifdef USE_CUDNN
   if (this->device().device_type() == DeviceType::GPU) {
-    cudnn_backward(gradient, grad_input, mb_id);
+    cudnn_backward(grad_output, grad_input, mb_id);
+    return;
   }
 #endif
-  else {
-    throw std::runtime_error("CPU implementation for Conv2DLayer not implemented");
+
+  def_backward(grad_output, grad_input, mb_id);
+}
+
+void Conv2DLayer::def_forward(const ConstTensor &input, const Tensor &output, size_t mb_id) {
+  if (this->device().device_type() == DeviceType::CPU) {
+    DISPATCH_DTYPE(io_dtype_, T, {
+      create_cpu_task(this->flow_handle_, cpu::conv2d_nhwc::forward<T>, input->data_as<T>(),
+                      weights_->data_as<T>(), use_bias_ ? bias_->data_as<T>() : nullptr,
+                      output->data_as<T>(), input->dimension(0), input->dimension(1),
+                      input->dimension(2), in_channels_, out_channels_, kernel_h_, kernel_w_,
+                      stride_h_, stride_w_, pad_h_, pad_w_, output->dimension(1),
+                      output->dimension(2), use_bias_);
+    });
+  } else {
+    throw std::runtime_error("Conv2DLayer only supports CPU device in def_forward");
+  }
+}
+
+void Conv2DLayer::def_backward(const ConstTensor &grad_output, const Tensor &grad_input,
+                               size_t mb_id) {
+  ConstTensor &input = this->get_cached_tensor(mb_id, "input");
+
+  if (this->device().device_type() == DeviceType::CPU) {
+    DISPATCH_DTYPE(io_dtype_, T, {
+      create_cpu_task(this->flow_handle_, cpu::conv2d_nhwc::backward_data<T>,
+                      grad_output->data_as<T>(), weights_->data_as<T>(), grad_input->data_as<T>(),
+                      grad_output->dimension(0), grad_output->dimension(1),
+                      grad_output->dimension(2), in_channels_, out_channels_, kernel_h_, kernel_w_,
+                      stride_h_, stride_w_, pad_h_, pad_w_, grad_output->dimension(1),
+                      grad_output->dimension(2));
+
+      create_cpu_task(this->flow_handle_, cpu::conv2d_nhwc::backward_weights<T>,
+                      input->data_as<T>(), grad_output->data_as<T>(),
+                      weight_gradients_->data_as<T>(), grad_output->dimension(0),
+                      input->dimension(1), input->dimension(2), in_channels_, out_channels_,
+                      kernel_h_, kernel_w_, stride_h_, stride_w_, pad_h_, pad_w_,
+                      grad_output->dimension(1), grad_output->dimension(2));
+
+      if (use_bias_) {
+        create_cpu_task(this->flow_handle_, cpu::conv2d_nhwc::backward_bias<T>,
+                        grad_output->data_as<T>(), bias_gradients_->data_as<T>(),
+                        grad_output->dimension(0), grad_output->dimension(1),
+                        grad_output->dimension(2), out_channels_);
+      }
+    });
   }
 }
 
 #ifdef USE_CUDNN
+size_t Conv2DLayer::get_shape_hash(size_t n, size_t c, size_t h, size_t w) const {
+  size_t seed = 0;
+  auto hash_combine = [&](size_t v) {
+    seed ^= std::hash<size_t>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+  };
+  hash_combine(n);
+  hash_combine(c);
+  hash_combine(h);
+  hash_combine(w);
+  return seed;
+}
+
 template <typename IO_T, typename Param_T, typename Compute_T>
 std::unique_ptr<Task> Conv2DLayer::conv2d_forward_task(
     cuda::cudnn_conv2d::feHandle_t *fe_handle, ConvolutionStats &stats, const ConstTensor &input,
@@ -170,36 +237,37 @@ std::unique_ptr<Task> Conv2DLayer::conv2d_forward_task(
 
 template <typename IO_T, typename Param_T, typename Compute_T>
 std::unique_ptr<Task> Conv2DLayer::conv2d_backward_data_task(
-    cuda::cudnn_conv2d::feHandle_t *fe_handle, ConvolutionStats &stats, const ConstTensor &gradient,
-    const ConstTensor &weights, const Tensor &grad_input, const Tensor &workspace,
-    size_t batch_size, size_t input_h, size_t input_w, size_t output_h, size_t output_w,
-    flowHandle_t handle) const {
-  if (!std::is_same_v<IO_T, Param_T>) {
-    throw std::runtime_error("Conv2DLayer IO_T and Param_T must be the same type");
-  }
-  if (gradient->data_type() != dtype_of<IO_T>() || grad_input->data_type() != dtype_of<IO_T>()) {
-    throw std::runtime_error("Conv2DLayer IO tensor dtype mismatch with dispatch IO_T");
-  }
-
-  return create_cuda_task(handle, cuda::cudnn_conv2d::run_backward_data, fe_handle, stats,
-                          gradient->data(), weights->data(), grad_input->data(), workspace->data());
-}
-
-template <typename IO_T, typename Param_T, typename Compute_T>
-std::unique_ptr<Task> Conv2DLayer::conv2d_backward_weights_and_bias_task(
-    cuda::cudnn_conv2d::feHandle_t *fe_handle, ConvolutionStats &stats, const ConstTensor &input,
-    const ConstTensor &gradient, const Tensor &weight_gradients, const Tensor &bias_gradients,
+    cuda::cudnn_conv2d::feHandle_t *fe_handle, ConvolutionStats &stats,
+    const ConstTensor &grad_output, const ConstTensor &weights, const Tensor &grad_input,
     const Tensor &workspace, size_t batch_size, size_t input_h, size_t input_w, size_t output_h,
     size_t output_w, flowHandle_t handle) const {
   if (!std::is_same_v<IO_T, Param_T>) {
     throw std::runtime_error("Conv2DLayer IO_T and Param_T must be the same type");
   }
-  if (input->data_type() != dtype_of<IO_T>() || gradient->data_type() != dtype_of<IO_T>()) {
-    throw std::runtime_error("Conv2DLayer input/gradient dtype mismatch with dispatch IO_T");
+  if (grad_output->data_type() != dtype_of<IO_T>() || grad_input->data_type() != dtype_of<IO_T>()) {
+    throw std::runtime_error("Conv2DLayer IO tensor dtype mismatch with dispatch IO_T");
+  }
+
+  return create_cuda_task(handle, cuda::cudnn_conv2d::run_backward_data, fe_handle, stats,
+                          grad_output->data(), weights->data(), grad_input->data(),
+                          workspace->data());
+}
+
+template <typename IO_T, typename Param_T, typename Compute_T>
+std::unique_ptr<Task> Conv2DLayer::conv2d_backward_weights_and_bias_task(
+    cuda::cudnn_conv2d::feHandle_t *fe_handle, ConvolutionStats &stats, const ConstTensor &input,
+    const ConstTensor &grad_output, const Tensor &weight_gradients, const Tensor &bias_gradients,
+    const Tensor &workspace, size_t batch_size, size_t input_h, size_t input_w, size_t output_h,
+    size_t output_w, flowHandle_t handle) const {
+  if (!std::is_same_v<IO_T, Param_T>) {
+    throw std::runtime_error("Conv2DLayer IO_T and Param_T must be the same type");
+  }
+  if (input->data_type() != dtype_of<IO_T>() || grad_output->data_type() != dtype_of<IO_T>()) {
+    throw std::runtime_error("Conv2DLayer input/grad_output dtype mismatch with dispatch IO_T");
   }
 
   return create_cuda_task(handle, cuda::cudnn_conv2d::run_backward_weights_and_bias, fe_handle,
-                          stats, input->data(), gradient->data(), weight_gradients->data(),
+                          stats, input->data(), grad_output->data(), weight_gradients->data(),
                           use_bias_ ? bias_gradients->data() : nullptr, workspace->data());
 }
 
@@ -254,7 +322,7 @@ void Conv2DLayer::cudnn_forward(const ConstTensor &input, const Tensor &output, 
                                  output_h, output_w, this->flow_handle_);
 }
 
-void Conv2DLayer::cudnn_backward(const ConstTensor &gradient, const Tensor &grad_input,
+void Conv2DLayer::cudnn_backward(const ConstTensor &grad_output, const Tensor &grad_input,
                                  size_t mb_id) {
   ConstTensor &input = this->get_cached_tensor(mb_id, "input");
   if (!input) {
@@ -265,7 +333,7 @@ void Conv2DLayer::cudnn_backward(const ConstTensor &gradient, const Tensor &grad
   const size_t batch_size = input_shape[0];
   const size_t input_h = input_shape[1];
   const size_t input_w = input_shape[2];
-  const auto &grad_shape = gradient->shape();
+  const auto &grad_shape = grad_output->shape();
   const size_t output_h = grad_shape[1];
   const size_t output_w = grad_shape[2];
 
@@ -284,11 +352,11 @@ void Conv2DLayer::cudnn_backward(const ConstTensor &gradient, const Tensor &grad
   Tensor cudnn_workspace = this->get_buffer({workspace_elements});
 
   DISPATCH_ON_3_DTYPES_TO_METHOD(conv2d_backward_weights_and_bias_task, fe_handle, current_stats,
-                                 input, gradient, weight_gradients_, bias_gradients_,
+                                 input, grad_output, weight_gradients_, bias_gradients_,
                                  cudnn_workspace, batch_size, input_h, input_w, output_h, output_w,
                                  this->flow_handle_);
 
-  DISPATCH_ON_3_DTYPES_TO_METHOD(conv2d_backward_data_task, fe_handle, current_stats, gradient,
+  DISPATCH_ON_3_DTYPES_TO_METHOD(conv2d_backward_data_task, fe_handle, current_stats, grad_output,
                                  weights_, grad_input, cudnn_workspace, batch_size, input_h,
                                  input_w, output_h, output_w, this->flow_handle_);
 }

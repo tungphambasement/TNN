@@ -52,14 +52,14 @@ private:
   template <typename IO_T, typename Param_T, typename Compute_T>
   std::unique_ptr<Task> conv2d_backward_weights_and_bias_task(
       cuda::cudnn_conv2d::feHandle_t *fe_handle, ConvolutionStats &stats, const ConstTensor &input,
-      const ConstTensor &gradient, const Tensor &weight_gradients, const Tensor &bias_gradients,
+      const ConstTensor &grad_output, const Tensor &weight_gradients, const Tensor &bias_gradients,
       const Tensor &workspace, size_t batch_size, size_t input_h, size_t input_w, size_t output_h,
       size_t output_w, flowHandle_t handle) const;
 
   template <typename IO_T, typename Param_T, typename Compute_T>
   std::unique_ptr<Task> conv2d_backward_data_task(
       cuda::cudnn_conv2d::feHandle_t *fe_handle, ConvolutionStats &stats,
-      const ConstTensor &gradient, const ConstTensor &weights, const Tensor &grad_input,
+      const ConstTensor &grad_output, const ConstTensor &weights, const Tensor &grad_input,
       const Tensor &workspace, size_t batch_size, size_t input_h, size_t input_w, size_t output_h,
       size_t output_w, flowHandle_t handle) const;
 
@@ -67,9 +67,12 @@ private:
   void cudnn_backward(const ConstTensor &current_gradient, const Tensor &grad_input, size_t mb_id);
 
   std::unordered_map<size_t, cuda::cudnn_conv2d::feHandle_t *> fe_handle_cache;
-#endif
   std::unordered_map<size_t, ConvolutionStats> stats_cache;
   size_t get_shape_hash(size_t n, size_t c, size_t h, size_t w) const;
+#endif
+
+  void def_forward(const ConstTensor &input, const Tensor &output, size_t mb_id);
+  void def_backward(const ConstTensor &grad_output, const Tensor &grad_input, size_t mb_id);
 
   std::vector<ParamDescriptor> param_descriptors() override {
     std::vector<ParamDescriptor> descriptors;
@@ -94,7 +97,7 @@ private:
 
   void init_impl() override;
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
-  void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+  void backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                      size_t mb_id = 0) override;
 
 public:

@@ -67,7 +67,7 @@ private:
 
   template <typename IO_T, typename Param_T, typename Compute_T>
   std::unique_ptr<Task> backward_task(cuda::cudnn_batchnorm::feHandle_t *fe_handle,
-                                      BatchNormStats &stats, const ConstTensor &gradient,
+                                      BatchNormStats &stats, const ConstTensor &grad_output,
                                       const ConstTensor &relu_mask, const ConstTensor &input,
                                       const Tensor &grad_input, const ConstTensor &gamma,
                                       const Tensor &gamma_gradients, const Tensor &beta_gradients,
@@ -75,7 +75,7 @@ private:
                                       const Tensor &workspace, flowHandle_t handle);
 
   void cudnn_forward(const ConstTensor &input, const Tensor &output, size_t mb_id);
-  void cudnn_backward(const ConstTensor &gradient, const Tensor &grad_input, size_t mb_id);
+  void cudnn_backward(const ConstTensor &grad_output, const Tensor &grad_input, size_t mb_id);
 #endif
 
   std::vector<ParamDescriptor> param_descriptors() override {
@@ -115,7 +115,7 @@ private:
 
   void init_impl() override;
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
-  void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+  void backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                      size_t mb_id = 0) override;
 
 public:

@@ -44,11 +44,11 @@ void DropoutLayer::forward_impl(const ConstTensor &input, const Tensor &output, 
   DISPATCH_ON_3_DTYPES_TO_METHOD(compute_dropout_forward, input, output, mask, this->flow_handle_);
 }
 
-void DropoutLayer::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+void DropoutLayer::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                                  size_t mb_id) {
   if (!this->is_training_) {
-    grad_input->ensure(gradient->shape());
-    gradient->copy_to(grad_input);
+    grad_input->ensure(grad_output->shape());
+    grad_output->copy_to(grad_input);
     return;
   }
 
@@ -59,8 +59,8 @@ void DropoutLayer::backward_impl(const ConstTensor &gradient, const Tensor &grad
   }
   const ConstTensor &mask = it_mask->second;
 
-  grad_input->ensure(gradient->shape());
-  gradient->copy_to(grad_input);
+  grad_input->ensure(grad_output->shape());
+  grad_output->copy_to(grad_input);
   grad_input->mul(mask);
 }
 

@@ -28,7 +28,7 @@ private:
                                                  flowHandle_t handle) const;
 
   template <typename IO_T, typename Param_T, typename Compute_T>
-  std::unique_ptr<Task> accumulate_pos_gradients(const ConstTensor &gradient,
+  std::unique_ptr<Task> accumulate_pos_gradients(const ConstTensor &grad_output,
                                                  const Tensor &pos_embedding_gradients,
                                                  flowHandle_t handle) const;
 
@@ -46,7 +46,7 @@ private:
 
   void init_impl() override;
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
-  void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+  void backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                      size_t mb_id = 0) override;
 
 public:

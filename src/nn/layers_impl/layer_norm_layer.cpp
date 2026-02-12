@@ -97,14 +97,14 @@ std::unique_ptr<Task> LayerNormLayer::layer_norm_forward(
 
 template <typename IO_T, typename Param_T, typename Compute_T>
 std::unique_ptr<Task> LayerNormLayer::layer_norm_backward(
-    const ConstTensor &gradient, const ConstTensor &input, const ConstTensor &gamma,
+    const ConstTensor &grad_output, const ConstTensor &input, const ConstTensor &gamma,
     const Tensor &grad_input, const Tensor &gamma_gradients, const Tensor &beta_gradients,
     size_t batch_size, size_t channels, flowHandle_t handle) const {
   if constexpr (!std::is_same_v<IO_T, Compute_T> || !std::is_same_v<Param_T, Compute_T>) {
     throw std::runtime_error(
         "LayerNormLayer mixed dtype dispatch not implemented (io/param/compute must match).");
   }
-  if (gradient->data_type() != dtype_of<IO_T>() || grad_input->data_type() != dtype_of<IO_T>()) {
+  if (grad_output->data_type() != dtype_of<IO_T>() || grad_input->data_type() != dtype_of<IO_T>()) {
     throw std::runtime_error("LayerNormLayer IO tensor dtype mismatch with dispatch IO_T");
   }
   if (gamma && gamma->data_type() != dtype_of<Param_T>()) {
@@ -113,7 +113,7 @@ std::unique_ptr<Task> LayerNormLayer::layer_norm_backward(
 
   if (this->device().device_type() == DeviceType::CPU) {
     return create_cpu_task(this->flow_handle_, cpu::layer_norm::layer_norm_backward<Compute_T>,
-                           gradient->data_as<Compute_T>(), input->data_as<Compute_T>(),
+                           grad_output->data_as<Compute_T>(), input->data_as<Compute_T>(),
                            gamma ? gamma->data_as<Compute_T>() : nullptr,
                            grad_input->data_as<Compute_T>(),
                            gamma_gradients ? gamma_gradients->data_as<Compute_T>() : nullptr,
@@ -123,7 +123,7 @@ std::unique_ptr<Task> LayerNormLayer::layer_norm_backward(
 #ifdef USE_CUDA
   else if (this->device().device_type() == DeviceType::GPU) {
     return create_cuda_task(this->flow_handle_, cuda::layer_norm::layer_norm_backward<Compute_T>,
-                            gradient->data_as<Compute_T>(), input->data_as<Compute_T>(),
+                            grad_output->data_as<Compute_T>(), input->data_as<Compute_T>(),
                             gamma ? gamma->data_as<Compute_T>() : nullptr,
                             grad_input->data_as<Compute_T>(),
                             gamma_gradients ? gamma_gradients->data_as<Compute_T>() : nullptr,
@@ -159,19 +159,19 @@ std::unique_ptr<Task> LayerNormLayer::cudnn_layer_norm_forward(
 template <typename IO_T, typename Param_T, typename Compute_T>
 std::unique_ptr<Task> LayerNormLayer::cudnn_layer_norm_backward(
     cuda::cudnn_layer_norm::feHandle_t *fe_handle, LayerNormStats &stats,
-    const ConstTensor &gradient, const ConstTensor &input, const ConstTensor &gamma,
+    const ConstTensor &grad_output, const ConstTensor &input, const ConstTensor &gamma,
     const Tensor &grad_input, const Tensor &gamma_gradients, const Tensor &beta_gradients,
     const ConstTensor &mean, const ConstTensor &inv_variance, const Tensor &workspace,
     size_t batch_size, size_t channels, flowHandle_t handle) const {
   if (!std::is_same_v<IO_T, Param_T>) {
     throw std::runtime_error("LayerNormLayer IO_T and Param_T must be the same type");
   }
-  if (gradient->data_type() != dtype_of<IO_T>() || grad_input->data_type() != dtype_of<IO_T>()) {
+  if (grad_output->data_type() != dtype_of<IO_T>() || grad_input->data_type() != dtype_of<IO_T>()) {
     throw std::runtime_error("LayerNormLayer IO tensor dtype mismatch with dispatch IO_T");
   }
 
   return create_cuda_task(handle, cuda::cudnn_layer_norm::run_backward, fe_handle, stats,
-                          gradient->data(), input->data(), gamma ? gamma->data() : nullptr,
+                          grad_output->data(), input->data(), gamma ? gamma->data() : nullptr,
                           mean->data(), inv_variance->data(), grad_input->data(),
                           gamma_gradients ? gamma_gradients->data() : nullptr,
                           beta_gradients ? beta_gradients->data() : nullptr, workspace->data());
@@ -237,7 +237,7 @@ void LayerNormLayer::cudnn_forward(const ConstTensor &input, const Tensor &outpu
                                  batch_size, channels, this->flow_handle_);
 }
 
-void LayerNormLayer::cudnn_backward(const ConstTensor &gradient, const Tensor &grad_input,
+void LayerNormLayer::cudnn_backward(const ConstTensor &grad_output, const Tensor &grad_input,
                                     size_t mb_id) {
   ConstTensor &input = this->get_cached_tensor(mb_id, "input");
   if (!input) {
@@ -273,7 +273,7 @@ void LayerNormLayer::cudnn_backward(const ConstTensor &gradient, const Tensor &g
         std::to_string(mb_id));
   }
 
-  DISPATCH_ON_3_DTYPES_TO_METHOD(cudnn_layer_norm_backward, fe_handle, current_stats, gradient,
+  DISPATCH_ON_3_DTYPES_TO_METHOD(cudnn_layer_norm_backward, fe_handle, current_stats, grad_output,
                                  input, gamma_, grad_input, gamma_gradients_, beta_gradients_,
                                  batch_mean, batch_invar, cudnn_workspace, batch_size, channels,
                                  this->flow_handle_);
@@ -295,7 +295,7 @@ void LayerNormLayer::def_forward(const ConstTensor &input, const Tensor &output,
                                  channels, this->flow_handle_);
 }
 
-void LayerNormLayer::def_backward(const ConstTensor &gradient, const Tensor &grad_input,
+void LayerNormLayer::def_backward(const ConstTensor &grad_output, const Tensor &grad_input,
                                   size_t mb_id) {
   ConstTensor &input = this->get_cached_tensor(mb_id, "input");
   if (!input) {
@@ -312,7 +312,7 @@ void LayerNormLayer::def_backward(const ConstTensor &gradient, const Tensor &gra
     batch_size *= shape[i];
   }
 
-  DISPATCH_ON_3_DTYPES_TO_METHOD(layer_norm_backward, gradient, input, gamma_, grad_input,
+  DISPATCH_ON_3_DTYPES_TO_METHOD(layer_norm_backward, grad_output, input, gamma_, grad_input,
                                  gamma_gradients_, beta_gradients_, batch_size, channels,
                                  this->flow_handle_);
 }
@@ -333,15 +333,15 @@ void LayerNormLayer::forward_impl(const ConstTensor &input, const Tensor &output
   }
 }
 
-void LayerNormLayer::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+void LayerNormLayer::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                                    size_t mb_id) {
 #ifdef USE_CUDNN
   if (this->device().device_type() == DeviceType::GPU) {
-    cudnn_backward(gradient, grad_input, mb_id);
+    cudnn_backward(grad_output, grad_input, mb_id);
   } else
 #endif
   {
-    def_backward(gradient, grad_input, mb_id);
+    def_backward(grad_output, grad_input, mb_id);
   }
 }
 

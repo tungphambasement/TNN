@@ -61,7 +61,7 @@ void MaxPool2DLayer::forward_impl(const ConstTensor &input, const Tensor &output
                            output_w, micro_batch_mask_indices_[mb_id], this->flow_handle_);
 }
 
-void MaxPool2DLayer::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+void MaxPool2DLayer::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                                    size_t mb_id) {
   auto it_mask = micro_batch_mask_indices_.find(mb_id);
   auto it_shape = micro_batch_input_shapes_.find(mb_id);
@@ -80,9 +80,9 @@ void MaxPool2DLayer::backward_impl(const ConstTensor &gradient, const Tensor &gr
   const size_t input_h = input_shape[1];
   const size_t input_w = input_shape[2];
   const size_t channels = input_shape[3];
-  const auto &grad_shape = gradient->shape();
+  const auto &grad_shape = grad_output->shape();
   if (grad_shape.size() != 4) {
-    throw std::runtime_error("MaxPool2DLayer: gradient must be 4D (NHWC format)");
+    throw std::runtime_error("MaxPool2DLayer: grad_output must be 4D (NHWC format)");
   }
   const size_t output_h = grad_shape[1];
   const size_t output_w = grad_shape[2];
@@ -91,7 +91,7 @@ void MaxPool2DLayer::backward_impl(const ConstTensor &gradient, const Tensor &gr
 
   grad_input->fill(0);
 
-  compute_max_pool_backward(gradient, grad_input, batch_size, channels, output_h, output_w,
+  compute_max_pool_backward(grad_output, grad_input, batch_size, channels, output_h, output_w,
                             mask_indices, this->flow_handle_);
 }
 

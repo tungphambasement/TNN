@@ -100,13 +100,13 @@ protected:
     }
   }
 
-  void verify_backward_result(const ConstTensor &gradient, const ConstTensor &grad_input,
+  void verify_backward_result(const ConstTensor &grad_output, const ConstTensor &grad_input,
                               size_t pool_h, size_t pool_w, size_t stride_h, size_t stride_w,
                               size_t pad_h, size_t pad_w, float tolerance = 1e-5f) {
-    const float *grad_data = gradient->data_as<float>();
+    const float *grad_data = grad_output->data_as<float>();
     const float *grad_input_data = grad_input->data_as<float>();
 
-    auto gradient_shape = gradient->shape();
+    auto gradient_shape = grad_output->shape();
     auto grad_input_shape = grad_input->shape();
     size_t batch_size = gradient_shape[0];
     size_t channels = gradient_shape[1];
@@ -323,16 +323,16 @@ TEST_F(LegacyAvgPool2DLayerTest, BasicBackwardPass) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>({1, 1, 2, 2}, getCPU());
-  float *grad_data = gradient->data_as<float>();
+  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  float *grad_data = grad_output->data_as<float>();
   for (int i = 0; i < 4; ++i) {
     grad_data[i] = 1.0f;
   }
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_backward_result(gradient, grad_input, 2, 2, 2, 2, 0, 0);
+  verify_backward_result(grad_output, grad_input, 2, 2, 2, 2, 0, 0);
 
   const float *grad_input_data = grad_input->data_as<float>();
   for (size_t i = 0; i < grad_input->size(); ++i) {
@@ -357,16 +357,16 @@ TEST_F(LegacyAvgPool2DLayerTest, BackwardPassWithPadding) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  float *grad_data = gradient->data_as<float>();
-  for (size_t i = 0; i < gradient->size(); ++i) {
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  float *grad_data = grad_output->data_as<float>();
+  for (size_t i = 0; i < grad_output->size(); ++i) {
     grad_data[i] = 1.0f;
   }
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_backward_result(gradient, grad_input, 3, 3, 1, 1, 1, 1);
+  verify_backward_result(grad_output, grad_input, 3, 3, 1, 1, 1, 1);
 
   EXPECT_EQ(grad_input->shape(), input->shape());
 }
@@ -388,16 +388,16 @@ TEST_F(LegacyAvgPool2DLayerTest, BackwardPassMultiChannel) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  float *grad_data = gradient->data_as<float>();
-  for (size_t i = 0; i < gradient->size(); ++i) {
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  float *grad_data = grad_output->data_as<float>();
+  for (size_t i = 0; i < grad_output->size(); ++i) {
     grad_data[i] = 1.0f;
   }
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_backward_result(gradient, grad_input, 2, 2, 2, 2, 0, 0);
+  verify_backward_result(grad_output, grad_input, 2, 2, 2, 2, 0, 0);
 
   EXPECT_EQ(grad_input->shape(), input->shape());
 }
@@ -419,16 +419,16 @@ TEST_F(LegacyAvgPool2DLayerTest, BackwardPassVariableGradient) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  float *grad_data = gradient->data_as<float>();
-  for (size_t i = 0; i < gradient->size(); ++i) {
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  float *grad_data = grad_output->data_as<float>();
+  for (size_t i = 0; i < grad_output->size(); ++i) {
     grad_data[i] = static_cast<float>(i + 1);
   }
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_backward_result(gradient, grad_input, 2, 2, 1, 1, 0, 0);
+  verify_backward_result(grad_output, grad_input, 2, 2, 1, 1, 0, 0);
 
   EXPECT_EQ(grad_input->shape(), input->shape());
 }
@@ -525,13 +525,13 @@ TEST_F(LegacyAvgPool2DLayerTest, EdgeCaseZeroGradient) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>({1, 1, 2, 2}, getCPU());
-  gradient->fill(0.0f);
+  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  grad_output->fill(0.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_backward_result(gradient, grad_input, 2, 2, 2, 2, 0, 0);
+  verify_backward_result(grad_output, grad_input, 2, 2, 2, 2, 0, 0);
 
   for (size_t i = 0; i < grad_input->size(); ++i) {
     EXPECT_NEAR(grad_input->data_as<float>()[i], 0.0f, 1e-5f);
@@ -625,16 +625,16 @@ TEST_F(LegacyAvgPool2DLayerTest, BackwardNumericalStability) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>({1, 1, 2, 2}, getCPU());
-  float *grad_data = gradient->data_as<float>();
-  for (size_t i = 0; i < gradient->size(); ++i) {
+  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  float *grad_data = grad_output->data_as<float>();
+  for (size_t i = 0; i < grad_output->size(); ++i) {
     grad_data[i] = 1e-6f;
   }
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_backward_result(gradient, grad_input, 2, 2, 2, 2, 0, 0);
+  verify_backward_result(grad_output, grad_input, 2, 2, 2, 2, 0, 0);
 }
 
 int main(int argc, char **argv) {

@@ -13,7 +13,9 @@
 #include "device/task.hpp"
 #include "nn/layer.hpp"
 #include "nn/layers_impl/cpu/batchnorm_nchw_ops.hpp"
+#ifdef USE_CUDA
 #include "nn/layers_impl/cuda/batchnorm_nchw_ops.hpp"
+#endif
 
 namespace tnn {
 
@@ -46,9 +48,9 @@ void LegacyBatchNormLayer::forward_impl(const ConstTensor &input, const Tensor &
   def_forward(input, output, mb_id);
 }
 
-void LegacyBatchNormLayer::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+void LegacyBatchNormLayer::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                                          size_t mb_id) {
-  def_backward(gradient, grad_input, mb_id);
+  def_backward(grad_output, grad_input, mb_id);
 }
 
 void LegacyBatchNormLayer::def_forward(const ConstTensor &input, const Tensor &output,
@@ -93,7 +95,7 @@ void LegacyBatchNormLayer::def_forward(const ConstTensor &input, const Tensor &o
   }
 }
 
-void LegacyBatchNormLayer::def_backward(const ConstTensor &gradient, const Tensor &grad_input,
+void LegacyBatchNormLayer::def_backward(const ConstTensor &grad_output, const Tensor &grad_input,
                                         size_t mb_id) {
   const Tensor &norm = this->get_mutable_tensor(mb_id, "norm");
   const Tensor &inv_std = this->get_mutable_tensor(mb_id, "inv_std");
@@ -103,12 +105,12 @@ void LegacyBatchNormLayer::def_backward(const ConstTensor &gradient, const Tenso
     throw std::runtime_error("Missing cached tensors for backward pass in LegacyBatchNormLayer");
   }
 
-  const size_t batch_size = gradient->dimension(0);
-  const size_t channels = gradient->dimension(1);
-  const size_t spatial_size = gradient->stride(1);
+  const size_t batch_size = grad_output->dimension(0);
+  const size_t channels = grad_output->dimension(1);
+  const size_t spatial_size = grad_output->stride(1);
 
-  grad_input->ensure(gradient->shape());
-  DISPATCH_ON_3_DTYPES_TO_METHOD(run_backward_fused, gradient, norm, inv_std, gamma_,
+  grad_input->ensure(grad_output->shape());
+  DISPATCH_ON_3_DTYPES_TO_METHOD(run_backward_fused, grad_output, norm, inv_std, gamma_,
                                  gamma_gradients_, beta_gradients_, grad_input, batch_size,
                                  channels, spatial_size, this->flow_handle_);
 }

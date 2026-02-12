@@ -87,7 +87,7 @@ protected:
     }
   }
 
-  void verify_gradient_shape(const ConstTensor &gradient, const ConstTensor &grad_input,
+  void verify_gradient_shape(const ConstTensor &grad_output, const ConstTensor &grad_input,
                              const ConstTensor &original_input) {
     EXPECT_EQ(grad_input->shape(), original_input->shape());
   }
@@ -281,18 +281,18 @@ TEST_F(LegacyLegacyDenseLayerTest, BasicBackwardPass) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
   auto grad_input_shape = grad_input->shape();
   EXPECT_EQ(grad_input_shape[1], 10);
 
   auto params = layer.parameters();
-  verify_backward_result(gradient, grad_input, params[0]);
+  verify_backward_result(grad_output, grad_input, params[0]);
 }
 
 TEST_F(LegacyLegacyDenseLayerTest, BackwardPassSingleBatch) {
@@ -309,13 +309,13 @@ TEST_F(LegacyLegacyDenseLayerTest, BackwardPassSingleBatch) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
   auto grad_input_shape = grad_input->shape();
   EXPECT_EQ(grad_input_shape[0], 1);
 }
@@ -334,13 +334,13 @@ TEST_F(LegacyLegacyDenseLayerTest, BackwardPassMultiBatch) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
   auto grad_input_shape = grad_input->shape();
   EXPECT_EQ(grad_input_shape[0], 4);
 }
@@ -362,16 +362,16 @@ TEST_F(LegacyLegacyDenseLayerTest, BackwardPassVariableGradient) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  float *grad_data = gradient->data_as<float>();
-  for (size_t i = 0; i < gradient->size(); ++i) {
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  float *grad_data = grad_output->data_as<float>();
+  for (size_t i = 0; i < grad_output->size(); ++i) {
     grad_data[i] = static_cast<float>(i + 1);
   }
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
   EXPECT_EQ(grad_input->shape(), input->shape());
 }
 
@@ -389,13 +389,13 @@ TEST_F(LegacyLegacyDenseLayerTest, BackwardPassWithBias) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
 }
 
 TEST_F(LegacyLegacyDenseLayerTest, BackwardPassWithoutBias) {
@@ -412,13 +412,13 @@ TEST_F(LegacyLegacyDenseLayerTest, BackwardPassWithoutBias) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
 }
 
 TEST_F(LegacyLegacyDenseLayerTest, ComputeOutputShape) {
@@ -489,13 +489,13 @@ TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseZeroGradient) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(0.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(0.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
 }
 
 TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseLargeValues) {
@@ -585,13 +585,13 @@ TEST_F(LegacyLegacyDenseLayerTest, BackwardNumericalStability) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1e-6f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1e-6f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
 }
 
 TEST_F(LegacyLegacyDenseLayerTest, NumericalStabilityMixedValues) {

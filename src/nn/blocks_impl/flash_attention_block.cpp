@@ -206,9 +206,9 @@ void FlashAttentionBlock::cudnn_forward(const ConstTensor &input, const Tensor &
   out_proj_->forward({attn_out}, {output}, mb_id);
 }
 
-void FlashAttentionBlock::cudnn_backward(const ConstTensor &gradient, const Tensor &grad_input,
+void FlashAttentionBlock::cudnn_backward(const ConstTensor &grad_output, const Tensor &grad_input,
                                          size_t mb_id) {
-  const auto &grad_shape = gradient->shape();
+  const auto &grad_shape = grad_output->shape();
   size_t batch_size = grad_shape[0];
   size_t seq_len = grad_shape[1];
 
@@ -224,7 +224,7 @@ void FlashAttentionBlock::cudnn_backward(const ConstTensor &gradient, const Tens
 
   // Backprop through out_proj
   Tensor grad_attn_out = this->get_buffer({batch_size, seq_len, embed_dim_}, io_dtype_);
-  out_proj_->backward({gradient}, {grad_attn_out}, mb_id);
+  out_proj_->backward({grad_output}, {grad_attn_out}, mb_id);
 
   // Recompute Q, K, V from cached input (trading compute for memory)
   Tensor q = this->get_buffer({batch_size, seq_len, embed_dim_}, io_dtype_);
@@ -260,7 +260,7 @@ void FlashAttentionBlock::cudnn_backward(const ConstTensor &gradient, const Tens
                      attn_heads->data_as<fp16>(), batch_size, seq_len, num_heads_, head_dim_);
   });
 
-  // Allocate gradient tensors for Q, K, V heads
+  // Allocate grad_output tensors for Q, K, V heads
   Tensor grad_q_heads =
       this->get_buffer({batch_size, num_heads_, seq_len, head_dim_}, DType_t::FP16);
   Tensor grad_k_heads =
@@ -314,11 +314,11 @@ void FlashAttentionBlock::cudnn_backward(const ConstTensor &gradient, const Tens
 }
 #endif
 
-void FlashAttentionBlock::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+void FlashAttentionBlock::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                                         size_t mb_id) {
 #ifdef USE_CUDNN
   if (this->device().device_type() == DeviceType::GPU) {
-    cudnn_backward(gradient, grad_input, mb_id);
+    cudnn_backward(grad_output, grad_input, mb_id);
   } else
 #endif
   {

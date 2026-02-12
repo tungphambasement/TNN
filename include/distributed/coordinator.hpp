@@ -119,12 +119,12 @@ public:
   }
 
   /**
-   * @brief Sends the backward gradient to the last stage.
-   * @param gradient The gradient tensor to be backpropagated.
+   * @brief Sends the backward grad_output to the last stage.
+   * @param grad_output The grad_output tensor to be backpropagated.
    * @param microbatch_id The ID of the microbatch (0 to num_microbatches - 1).
    */
-  void backward(Tensor &&gradient, size_t microbatch_id) {
-    Job job(std::move(gradient), microbatch_id);
+  void backward(Tensor &&grad_output, size_t microbatch_id) {
+    Job job(std::move(grad_output), microbatch_id);
     Message backward_msg(CommandType::BACKWARD_JOB, std::move(job));
     this->comm_->send_message(std::move(backward_msg), worker_endpoints_.back());
   }
@@ -203,12 +203,12 @@ public:
           total_corrects += compute_class_corrects(predictions, device_targets);
 
           total_loss += loss;
-          Tensor gradient =
+          Tensor grad_output =
               make_tensor(PoolAllocator::instance(predictions->device(), defaultFlowHandle),
                           predictions->data_type(), predictions->shape());
-          criterion->compute_gradient(predictions, device_targets, gradient);
-          gradient->mul_scalar(1.0 / num_microbatches);
-          this->backward(std::move(gradient), job.mb_id);
+          criterion->compute_gradient(predictions, device_targets, grad_output);
+          grad_output->mul_scalar(1.0 / num_microbatches);
+          this->backward(std::move(grad_output), job.mb_id);
         } else {
           throw std::runtime_error("Unexpected message type in FORWARD_JOB");
         }

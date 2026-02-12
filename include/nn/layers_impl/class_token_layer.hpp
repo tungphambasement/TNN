@@ -27,7 +27,7 @@ private:
                                      size_t seq_len, size_t embed_dim, flowHandle_t handle) const;
 
   template <typename IO_T, typename Param_T, typename Compute_T>
-  std::unique_ptr<Task> backward_task(const ConstTensor &gradient, const Tensor &grad_input,
+  std::unique_ptr<Task> backward_task(const ConstTensor &grad_output, const Tensor &grad_input,
                                       const Tensor &class_token_gradients,
                                       const ConstTensor &class_token, size_t batch_size,
                                       size_t seq_len, size_t embed_dim, flowHandle_t handle) const;
@@ -46,7 +46,7 @@ private:
 
   void init_impl() override;
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
-  void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+  void backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                      size_t mb_id = 0) override;
 
 public:

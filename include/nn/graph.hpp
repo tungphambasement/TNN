@@ -239,7 +239,7 @@ private:
   }
 
   void backward(OpNode& node) {
-    // gather upstream gradient
+    // gather upstream grad_output
     Vec<IONode*>& output_nodes = graph_.outs_[&node];
     Vec<ConstTensor> gradients;
     for (auto& output_node : output_nodes) {
@@ -247,7 +247,7 @@ private:
       gradients.push_back(grad);
     }
 
-    // gather downstream gradient
+    // gather downstream grad_output
     Vec<IONode*>& input_nodes = graph_.ins_[&node];
     Vec<Tensor> grad_inputs;
     for (auto& input_node : input_nodes) {

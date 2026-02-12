@@ -14,7 +14,7 @@ using namespace tnn;
 using namespace tnn::legacy;
 
 signed main() {
-  ExampleModels::register_defaults();
+  legacy::ExampleModels::register_defaults();
 
   TrainingConfig train_config;
   train_config.load_from_env();
@@ -35,7 +35,7 @@ signed main() {
     throw std::runtime_error("DATASET_NAME environment variable is not set!");
   }
   string dataset_path = Env::get<std::string>("DATASET_PATH", "data");
-  auto [train_loader, val_loader] = DataLoaderFactory::create(dataset_name, dataset_path);
+  auto [train_loader, val_loader] = legacy::DataLoaderFactory::create(dataset_name, dataset_path);
   if (!train_loader || !val_loader) {
     cerr << "Failed to create data loaders for model: " << model_name << endl;
     return 1;
@@ -53,14 +53,14 @@ signed main() {
   } else {
     cout << "Creating model: " << model_name << endl;
     try {
-      Sequential temp_model = ExampleModels::create(model_name);
+      Sequential temp_model = legacy::ExampleModels::create(model_name);
       graph.add_layer(temp_model);
       graph.compile();
       model = std::make_unique<Sequential>(std::move(temp_model));
     } catch (const std::exception &e) {
       cerr << "Error creating model: " << e.what() << endl;
       cout << "Available models are: ";
-      for (const auto &name : ExampleModels::available_models()) {
+      for (const auto &name : legacy::ExampleModels::available_models()) {
         cout << name << "\n";
       }
       cout << endl;
@@ -75,16 +75,6 @@ signed main() {
   auto optimizer = OptimizerFactory::create_adam(lr_initial, 0.9f, 0.999f, 1e-5f, 1e-4f, false);
   auto scheduler = SchedulerFactory::create_step_lr(
       optimizer.get(), 5 * train_loader->size() / train_config.batch_size, 0.1f);
-
-  if (train_loader->get_data_shape().size() == 3) {
-    auto train_aug = AugmentationBuilder()
-                         .horizontal_flip(0.5f)
-                         .brightness(0.5, 0.2f)
-                         .gaussian_noise(0.4f, 0.05f)
-                         .build();
-
-    train_loader->set_augmentation(std::move(train_aug));
-  }
 
   try {
     train_model(model, graph.context(), train_loader, val_loader, optimizer, criterion, scheduler,

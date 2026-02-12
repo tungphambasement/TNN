@@ -65,18 +65,18 @@ void Sequential::forward_impl(const ConstTensor &input, const Tensor &output, si
   this->device().getFlow(this->flow_handle_)->synchronize();
 }
 
-void Sequential::backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+void Sequential::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                                size_t mb_id) {
   if (layers_.empty()) {
     throw std::runtime_error("Cannot backward through empty sequential model");
   }
-  ConstTensor current_gradient = gradient;
+  ConstTensor current_gradient = grad_output;
   Tensor current_grad_input;
   for (int i = static_cast<int>(layers_.size()) - 1; i >= 0; --i) {
     try {
       // no need to renew buffer since backward doesn't cache inputs
       if (i > 0) {
-        current_grad_input = this->get_buffer({max_size_}, gradient->data_type());
+        current_grad_input = this->get_buffer({max_size_}, grad_output->data_type());
         layers_[i]->backward({current_gradient}, {current_grad_input}, mb_id);
         current_gradient = current_grad_input;
       } else {

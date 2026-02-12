@@ -23,7 +23,7 @@ struct ParamDescriptor {
   DType_t dtype;  // data type of the parameter
   std::vector<size_t> shape;
   Tensor *data_ptr;  // pointer to the actual param
-  Tensor *grad_ptr;  // pointer to the actual gradient
+  Tensor *grad_ptr;  // pointer to the actual grad_output
 };
 
 // Single input/output layer interface. For multi-input/output, use a Block to wrap multiple Layers.
@@ -82,7 +82,7 @@ protected:
 
   // all assuming single input, single output. Can easily be modified later.
   virtual void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) = 0;
-  virtual void backward_impl(const ConstTensor &gradient, const Tensor &grad_input,
+  virtual void backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
                              size_t mb_id = 0) = 0;
   virtual Vec<size_t> compute_output_shape(const Vec<size_t> &input_shape) const = 0;
 

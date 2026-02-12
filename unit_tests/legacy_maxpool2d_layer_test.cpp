@@ -67,8 +67,8 @@ protected:
     EXPECT_EQ(output_shape[3], expected_w);
   }
 
-  // Verify backward pass gradient shape
-  void verify_gradient_shape(const ConstTensor &gradient, const ConstTensor &grad_input,
+  // Verify backward pass grad_output shape
+  void verify_gradient_shape(const ConstTensor &grad_output, const ConstTensor &grad_input,
                              const ConstTensor &original_input) {
     auto grad_input_shape = grad_input->shape();
     auto original_input_shape = original_input->shape();
@@ -98,7 +98,7 @@ protected:
 
     std::vector<float> expected_grad_input(grad_input->size(), 0.0f);
 
-    // For each output position, route gradient to the max input position
+    // For each output position, route grad_output to the max input position
     for (size_t n = 0; n < batch_size; ++n) {
       for (size_t c = 0; c < channels; ++c) {
         for (size_t oh = 0; oh < output_h; ++oh) {
@@ -124,7 +124,7 @@ protected:
               }
             }
 
-            // Route gradient to max position
+            // Route grad_output to max position
             if (max_ih >= 0 && max_iw >= 0) {
               size_t max_input_idx = ((n * channels + c) * input_h + max_ih) * input_w + max_iw;
               size_t grad_output_idx = ((n * channels + c) * output_h + oh) * output_w + ow;
@@ -382,17 +382,17 @@ TEST_F(LegacyMaxPool2DLayerTest, BasicBackwardPass) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>({1, 1, 2, 2}, getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  grad_output->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
   EXPECT_EQ(grad_input->shape(), input->shape());
 
   // Verify numerical correctness
-  verify_backward_result(input, gradient, grad_input, 2, 2, 2, 2, 0, 0);
+  verify_backward_result(input, grad_output, grad_input, 2, 2, 2, 2, 0, 0);
 }
 
 TEST_F(LegacyMaxPool2DLayerTest, BackwardPassWithPadding) {
@@ -414,13 +414,13 @@ TEST_F(LegacyMaxPool2DLayerTest, BackwardPassWithPadding) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
   EXPECT_EQ(grad_input->shape(), input->shape());
 }
 
@@ -443,13 +443,13 @@ TEST_F(LegacyMaxPool2DLayerTest, BackwardPassMultiChannel) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
   auto grad_input_shape = grad_input->shape();
   EXPECT_EQ(grad_input_shape[1], 2);
 }
@@ -473,13 +473,13 @@ TEST_F(LegacyMaxPool2DLayerTest, BackwardPassMultiBatch) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
   auto grad_input_shape = grad_input->shape();
   EXPECT_EQ(grad_input_shape[0], 2);
 }
@@ -503,16 +503,16 @@ TEST_F(LegacyMaxPool2DLayerTest, BackwardPassVariableGradient) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  float *grad_data = gradient->data_as<float>();
-  for (size_t i = 0; i < gradient->size(); ++i) {
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  float *grad_data = grad_output->data_as<float>();
+  for (size_t i = 0; i < grad_output->size(); ++i) {
     grad_data[i] = static_cast<float>(i + 1);
   }
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
   EXPECT_EQ(grad_input->shape(), input->shape());
 }
 
@@ -535,31 +535,31 @@ TEST_F(LegacyMaxPool2DLayerTest, BackwardPassGradientRouting) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>({1, 1, 2, 2}, getCPU());
-  float *grad_data = gradient->data_as<float>();
+  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  float *grad_data = grad_output->data_as<float>();
   grad_data[0] = 1.0f;
   grad_data[1] = 2.0f;
   grad_data[2] = 3.0f;
   grad_data[3] = 4.0f;
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
 
   // Verify that gradients are routed to max positions only
   const float *grad_input_data = grad_input->data_as<float>();
 
-  // Position 5 (value 6) should get gradient 1.0
+  // Position 5 (value 6) should get grad_output 1.0
   EXPECT_NEAR(grad_input_data[5], 1.0f, 1e-5f);
 
-  // Position 7 (value 8) should get gradient 2.0
+  // Position 7 (value 8) should get grad_output 2.0
   EXPECT_NEAR(grad_input_data[7], 2.0f, 1e-5f);
 
-  // Position 13 (value 14) should get gradient 3.0
+  // Position 13 (value 14) should get grad_output 3.0
   EXPECT_NEAR(grad_input_data[13], 3.0f, 1e-5f);
 
-  // Position 15 (value 16) should get gradient 4.0
+  // Position 15 (value 16) should get grad_output 4.0
   EXPECT_NEAR(grad_input_data[15], 4.0f, 1e-5f);
 }
 
@@ -659,13 +659,13 @@ TEST_F(LegacyMaxPool2DLayerTest, EdgeCaseZeroGradient) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(0.0f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(0.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
 
   const float *grad_input_data = grad_input->data_as<float>();
   for (size_t i = 0; i < grad_input->size(); ++i) {
@@ -792,13 +792,13 @@ TEST_F(LegacyMaxPool2DLayerTest, BackwardNumericalStability) {
   Tensor output = make_tensor<float>(output_shape, getCPU());
   layer.forward({input}, {output});
 
-  Tensor gradient = make_tensor<float>(output->shape(), getCPU());
-  gradient->fill(1e-6f);
+  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  grad_output->fill(1e-6f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
-  layer.backward({gradient}, {grad_input});
+  layer.backward({grad_output}, {grad_input});
 
-  verify_gradient_shape(gradient, grad_input, input);
+  verify_gradient_shape(grad_output, grad_input, input);
 }
 
 TEST_F(LegacyMaxPool2DLayerTest, NumericalStabilityExtremeValues) {
