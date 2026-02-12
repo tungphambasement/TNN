@@ -48,10 +48,6 @@ private:
   std::unordered_map<size_t, std::vector<size_t>> micro_batch_input_shapes_;
   std::unordered_map<size_t, Tensor> micro_batch_col_buffers_;
 
-  Tensor temp_output_buffer_;
-  Tensor temp_gradient_buffer_;
-  Tensor temp_col_grad_matrix_buffer_;
-
   ConvolutionStats stats_;
 #ifdef USE_CUDNN
   cuda::cudnn_conv2d::ConvolutionHandle *convolution_handle_ = nullptr;
