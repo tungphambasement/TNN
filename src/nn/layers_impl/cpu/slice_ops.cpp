@@ -6,6 +6,7 @@
  */
 #include "nn/layers_impl/cpu/slice_ops.hpp"
 
+#include <algorithm>
 #include <cstring>
 #include <numeric>
 
@@ -50,7 +51,7 @@ void slice_backward(const T *gradient, T *grad_input, const std::vector<size_t> 
                     size_t axis, size_t start, size_t length) {
   size_t total_elements =
       std::accumulate(input_shape.begin(), input_shape.end(), 1, std::multiplies<size_t>());
-  std::memset(grad_input, 0, total_elements * sizeof(T));
+  std::fill(grad_input, grad_input + total_elements, T(0));
 
   size_t outer_size = 1;
   for (size_t i = 0; i < axis; ++i) {

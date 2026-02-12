@@ -6,8 +6,8 @@
 #include <cuda_bf16.h>  // IWYU pragma: export
 #include <cuda_fp16.h>  // IWYU pragma: export
 #else
-#include "type/bf16.hpp"
-#include "type/fp16.hpp"
+#include "type/bf16.hpp"  // IWYU pragma: export
+#include "type/fp16.hpp"  // IWYU pragma: export
 #endif
 #include <vector>
 
