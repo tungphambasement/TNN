@@ -29,6 +29,8 @@ set(TEST_FILES
     partitioner_test.cpp
     vbuffer_serializer_test.cpp
     archiver_test.cpp
+    bf16_test.cpp
+    fp16_test.cpp
 )
 
 foreach(test_file IN LISTS TEST_FILES)

@@ -1,15 +1,15 @@
 #pragma once
 
-#include <cudnn_graph.h>
-
-#include "device/flow.hpp"
 #ifdef USE_CUDA
+
+#include <cudnn_graph.h>
 
 #include <cstddef>
 #include <memory>
 #include <unordered_map>
 
 #include "device/context.hpp"
+#include "device/flow.hpp"
 
 #ifdef USE_CUDNN
 #include <cudnn.h>

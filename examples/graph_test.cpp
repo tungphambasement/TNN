@@ -56,7 +56,7 @@ signed main() {
   train_loader->set_seed(123456);
 
   // Tensor input = make_tensor<float>({64, 28, 28, 1});
-  Tensor input, output, label, doutput, dinput;
+  Tensor input, output, label, grad_output, grad_input;
   train_loader->get_batch(64, input, label);
   auto criterion = LossFactory::create_logsoftmax_crossentropy();
   auto optimizer =
@@ -78,12 +78,12 @@ signed main() {
     std::cout << "Loss: " << loss
               << ", Accuracy: " << (static_cast<float>(class_corrects) / 256) * 100.0f << "%"
               << std::endl;
-    criterion->compute_gradient(output, label, doutput);
+    criterion->compute_gradient(output, label, grad_output);
     InputPack grad_outputs = {
-        {nodes["dense"], doutput},
+        {nodes["dense"], grad_output},
     };
     OutputPack grad_inputs = {
-        {nodes["image"], dinput},
+        {nodes["image"], grad_input},
     };
     executor.backward(grad_outputs, grad_inputs);
 

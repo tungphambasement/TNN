@@ -1,14 +1,13 @@
-#include "device/cuda/cuda_context.hpp"
-
-#include "device/flow.hpp"
-
 #ifdef USE_CUDA
+#include "device/cuda/cuda_context.hpp"
 
 #include <cuda_runtime.h>
 
 #include <iostream>
 #include <stdexcept>
 #include <string>
+
+#include "device/flow.hpp"
 
 namespace tnn {
 

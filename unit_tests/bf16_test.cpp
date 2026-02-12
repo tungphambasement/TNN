@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <gtest/gtest.h>
 
 #include "device/device_manager.hpp"
 #include "nn/blocks_impl/attention_block.hpp"
@@ -12,7 +13,14 @@
 using namespace std;
 using namespace tnn;
 
-void test_dense() {
+class BF16Test : public ::testing::Test {
+protected:
+    void SetUp() override {
+        ExampleModels::register_defaults();
+    }
+};
+
+TEST_F(BF16Test, Dense) {
   constexpr size_t batch_size = 8;
   constexpr size_t input_dim = 32;
   constexpr size_t output_dim = 16;
@@ -41,7 +49,7 @@ void test_dense() {
   Tensor fp32_input = make_tensor(DType_t::FP32, {batch_size, input_dim}, getCPU());
 
   bf16 *input_data = bf16_input->data_as<bf16>();
-  fp32 *input_data_fp32 = fp32_input->data_as<float>();
+  float *input_data_fp32 = fp32_input->data_as<float>();
   for (size_t i = 0; i < bf16_input->size(); ++i) {
     input_data_fp32[i] = static_cast<float>(input_data[i]);
   }
@@ -61,21 +69,12 @@ void test_dense() {
 
   float *output_data_fp32 = cpu_output_fp32->data_as<float>();
   bf16 *output_data_bf16 = cpu_output_bf16->data_as<bf16>();
-  double max_diff = 0.0;
   constexpr double tolerance = 2e-3;
   for (size_t i = 0; i < cpu_output_fp32->size(); ++i) {
-    double val_fp32 = static_cast<double>(output_data_fp32[i]);
-    double val_bf16 = static_cast<double>(output_data_bf16[i]);
-    double diff = std::abs(val_fp32 - val_bf16);
-    if (diff > tolerance) {
-      if (diff > max_diff) {
-        max_diff = diff;
-      }
-      std::cout << "At index " << i << ": FP32 value = " << val_fp32
-                << ", BF16 value = " << val_bf16 << ", diff = " << diff << std::endl;
-    }
+    EXPECT_NEAR(static_cast<double>(output_data_fp32[i]), 
+                static_cast<double>(output_data_bf16[i]), 
+                tolerance) << "At index " << i;
   }
-  cout << "Max diff: " << max_diff << endl;
 
   Tensor target_fp32 = make_tensor(DType_t::FP32, {batch_size, output_dim});
   Tensor target_bf16 = make_tensor(DType_t::BF16, {batch_size, output_dim});
@@ -108,23 +107,14 @@ void test_dense() {
   Tensor cpu_grad_input_bf16 = grad_input_bf16->to_host();
   float *grad_input_data_fp32 = cpu_grad_input_fp32->data_as<float>();
   bf16 *grad_input_data_bf16 = cpu_grad_input_bf16->data_as<bf16>();
-  max_diff = 0.0;
   for (size_t i = 0; i < cpu_grad_input_fp32->size(); ++i) {
-    double val_fp32 = static_cast<double>(grad_input_data_fp32[i]);
-    double val_bf16 = static_cast<double>(grad_input_data_bf16[i]);
-    double diff = std::abs(val_fp32 - val_bf16);
-    if (diff > tolerance) {
-      if (diff > max_diff) {
-        max_diff = diff;
-      }
-      std::cout << "At index " << i << ": FP32 grad value = " << val_fp32
-                << ", BF16 grad value = " << val_bf16 << ", diff = " << diff << std::endl;
-    }
+    EXPECT_NEAR(static_cast<double>(grad_input_data_fp32[i]), 
+                static_cast<double>(grad_input_data_bf16[i]), 
+                tolerance) << "At index " << i;
   }
-  cout << "Max grad diff: " << max_diff << endl;
 }
 
-void test_attention() {
+TEST_F(BF16Test, Attention) {
   constexpr size_t batch_size = 8;
   constexpr size_t seq_len = 16;
   constexpr size_t embed_dim = 16;
@@ -161,7 +151,7 @@ void test_attention() {
   Tensor fp32_input = make_tensor(DType_t::FP32, {batch_size, seq_len, embed_dim}, getCPU());
 
   bf16 *input_data = bf16_input->data_as<bf16>();
-  fp32 *input_data_fp32 = fp32_input->data_as<float>();
+  float *input_data_fp32 = fp32_input->data_as<float>();
   for (size_t i = 0; i < bf16_input->size(); ++i) {
     input_data_fp32[i] = static_cast<float>(input_data[i]);
   }
@@ -181,21 +171,12 @@ void test_attention() {
 
   float *output_data_fp32 = cpu_output_fp32->data_as<float>();
   bf16 *output_data_bf16 = cpu_output_bf16->data_as<bf16>();
-  double max_diff = 0.0;
   constexpr double tolerance = 2e-3;
   for (size_t i = 0; i < cpu_output_fp32->size(); ++i) {
-    double val_fp32 = static_cast<double>(output_data_fp32[i]);
-    double val_bf16 = static_cast<double>(output_data_bf16[i]);
-    double diff = std::abs(val_fp32 - val_bf16);
-    if (diff > tolerance) {
-      if (diff > max_diff) {
-        max_diff = diff;
-      }
-      std::cout << "At index " << i << ": FP32 value = " << val_fp32
-                << ", BF16 value = " << val_bf16 << ", diff = " << diff << std::endl;
-    }
+    EXPECT_NEAR(static_cast<double>(output_data_fp32[i]), 
+                static_cast<double>(output_data_bf16[i]), 
+                tolerance) << "At index " << i;
   }
-  cout << "Max diff: " << max_diff << endl;
 
   Tensor target_fp32 = make_tensor(DType_t::FP32, {batch_size, seq_len, embed_dim});
   Tensor target_bf16 = make_tensor(DType_t::BF16, {batch_size, seq_len, embed_dim});
@@ -228,30 +209,9 @@ void test_attention() {
   Tensor cpu_grad_input_bf16 = grad_input_bf16->to_host();
   float *grad_input_data_fp32 = cpu_grad_input_fp32->data_as<float>();
   bf16 *grad_input_data_bf16 = cpu_grad_input_bf16->data_as<bf16>();
-  max_diff = 0.0;
   for (size_t i = 0; i < cpu_grad_input_fp32->size(); ++i) {
-    double val_fp32 = static_cast<double>(grad_input_data_fp32[i]);
-    double val_bf16 = static_cast<double>(grad_input_data_bf16[i]);
-    double diff = std::abs(val_fp32 - val_bf16);
-    if (diff > tolerance) {
-      if (diff > max_diff) {
-        max_diff = diff;
-      }
-      std::cout << "At index " << i << ": FP32 grad value = " << val_fp32
-                << ", BF16 grad value = " << val_bf16 << ", diff = " << diff << std::endl;
-    }
+    EXPECT_NEAR(static_cast<double>(grad_input_data_fp32[i]), 
+                static_cast<double>(grad_input_data_bf16[i]), 
+                tolerance) << "At index " << i;
   }
-  cout << "Max grad diff: " << max_diff << endl;
-}
-
-signed main() {
-  ExampleModels::register_defaults();
-
-  test_dense();
-
-  std::cout << std::endl;
-
-  test_attention();
-
-  return 0;
 }

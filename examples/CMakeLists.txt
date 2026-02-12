@@ -28,6 +28,4 @@ create_executable(inferencer.cpp LIBS tnn_nn)
 create_executable(gpt2_inference.cpp LIBS tnn_nn)
 
 # Test executables
-create_executable(fp16_test.cpp LIBS tnn_nn)
-create_executable(bf16_test.cpp LIBS tnn_nn)
 create_executable(graph_test.cpp LIBS tnn_nn)
