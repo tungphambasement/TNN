@@ -115,7 +115,6 @@ int main(int argc, char *argv[]) {
     try {
       Sequential temp_model = ExampleModels::create(model_name);
       graph.add_layer(temp_model);
-      graph.compile();
       model = std::make_unique<Sequential>(std::move(temp_model));
     } catch (const std::exception &e) {
       cerr << "Error creating model: " << e.what() << endl;
@@ -126,7 +125,6 @@ int main(int argc, char *argv[]) {
       cout << endl;
       return 1;
     }
-    model->init();
   }
 
   string dataset_name = Env::get<std::string>("DATASET_NAME", "");

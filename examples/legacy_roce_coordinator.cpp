@@ -126,7 +126,6 @@ int main(int argc, char *argv[]) {
     try {
       Sequential temp_model = legacy::ExampleModels::create(model_name);
       graph.add_layer(temp_model);
-      graph.compile();
       model = std::make_unique<Sequential>(std::move(temp_model));
     } catch (const std::exception &e) {
       cerr << "Error creating model: " << e.what() << endl;
@@ -137,7 +136,6 @@ int main(int argc, char *argv[]) {
       cout << endl;
       return 1;
     }
-    model->init();
   }
 
   cout << "Training model on device: " << (device_type == DeviceType::CPU ? "CPU" : "GPU") << endl;

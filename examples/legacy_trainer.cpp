@@ -66,7 +66,6 @@ signed main() {
       cout << endl;
       return 1;
     }
-    model->init();
   }
 
   cout << "Training model on device: " << (device_type == DeviceType::CPU ? "CPU" : "GPU") << endl;
