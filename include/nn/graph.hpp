@@ -161,32 +161,32 @@ public:
     }
   }
 
-  void forward(InputPack inputs, OutputPack outputs) {
+  void forward(const InputPack& inputs, OutputPack& outputs) {
     // set input tensors
-    for (auto& [input_node, tensor] : inputs) {
+    for (const auto& [input_node, tensor] : inputs) {
       node_outputs_[input_node].act = tensor;
-    }
-    // gather output tensors
-    for (auto& [output_node, tensor] : outputs) {
-      node_outputs_[output_node].act = tensor;
     }
     // assuming topologically sorted layers, execute forward pass
     for (auto it = graph_.op_nodes_.begin(); it != graph_.op_nodes_.end(); ++it) {
       forward(*it);
     }
+    // wire output tensors
+    for (auto& [output_node, tensor] : outputs) {
+      tensor = node_outputs_[output_node].act;
+    }
   }
 
-  void backward(InputPack grads, OutputPack grad_inputs) {
+  void backward(const InputPack& grads, OutputPack& grad_inputs) {
     // set upstream gradients
-    for (auto& [output_node, tensor] : grads) {
+    for (const auto& [output_node, tensor] : grads) {
       node_outputs_[output_node].grad = tensor;
-    }
-    // gather downstream gradients
-    for (auto& [input_node, tensor] : grad_inputs) {
-      node_outputs_[input_node].grad = tensor;
     }
     for (auto it = graph_.op_nodes_.rbegin(); it != graph_.op_nodes_.rend(); ++it) {
       backward(*it);
+    }
+    // wire downstream gradients
+    for (auto& [input_node, tensor] : grad_inputs) {
+      tensor = node_outputs_[input_node].grad;
     }
   }
 
@@ -204,8 +204,8 @@ private:
     // gather inputs
     Vec<IONode*>& input_nodes = graph_.ins_[&node];
     Vec<ConstTensor> inputs;
-    for (auto& input_node : input_nodes) {
-      Tensor& act = node_outputs_[input_node].act;
+    for (const auto& input_node : input_nodes) {
+      const ConstTensor& act = node_outputs_[input_node].act;
       if (!act) {
         throw std::runtime_error("Null input while forwarding graph");
       }
@@ -242,15 +242,18 @@ private:
     // gather upstream grad_output
     Vec<IONode*>& output_nodes = graph_.outs_[&node];
     Vec<ConstTensor> gradients;
-    for (auto& output_node : output_nodes) {
+    for (const auto& output_node : output_nodes) {
       Tensor& grad = node_outputs_[output_node].grad;
+      if (!grad) {
+        throw std::runtime_error("Null output gradient while backwarding graph");
+      }
       gradients.push_back(grad);
     }
 
     // gather downstream grad_output
     Vec<IONode*>& input_nodes = graph_.ins_[&node];
     Vec<Tensor> grad_inputs;
-    for (auto& input_node : input_nodes) {
+    for (const auto& input_node : input_nodes) {
       Tensor& grad = node_outputs_[input_node].grad;
       // just use the same shape and dtype as input activation, since we don't have the actual
       // input tensor here

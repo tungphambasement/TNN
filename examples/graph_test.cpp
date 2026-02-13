@@ -34,7 +34,7 @@ signed main() {
                     .conv2d(16, 3, 3, 1, 1, 1, 1, true, "conv1")
                     .batchnorm(16, 1e-5, true, SBool::TRUE, "bn1")
                     .flatten(1, -1, "flatten")
-                    .dense(10, "dense")
+                    .dense(10, true, "dense")
                     .build();
 
   std::unordered_map<std::string, IONode *> nodes;
@@ -55,9 +55,7 @@ signed main() {
   auto [train_loader, val_loader] = DataLoaderFactory::create(dataset_name, dataset_path);
   train_loader->set_seed(123456);
 
-  // Tensor input = make_tensor<float>({64, 28, 28, 1});
-  Tensor input, output, label, grad_output, grad_input;
-  train_loader->get_batch(64, input, label);
+  Tensor input, label;
   auto criterion = LossFactory::create_logsoftmax_crossentropy();
   auto optimizer =
       OptimizerFactory::create_adam(train_config.lr_initial, 0.9f, 0.999f, 10e-4f, 3e-4f, false);
@@ -65,20 +63,25 @@ signed main() {
   optimizer->attach(graph.context());
 
   while (train_loader->get_batch(256, input, label)) {
+    Tensor device_input = input->to_device(graph.context().device());
+    Tensor device_output;
     InputPack inputs = {
-        {nodes["image"], input},
+        {nodes["image"], device_input},
     };
     OutputPack outputs = {
-        {nodes["dense"], output},
+        {nodes["dense"], device_output},
     };
     executor.forward(inputs, outputs);
+    device_output = outputs[nodes["dense"]];
     float loss;
-    criterion->compute_loss(output, label, loss);
-    int class_corrects = compute_class_corrects(output, label);
-    std::cout << "Loss: " << loss
-              << ", Accuracy: " << (static_cast<float>(class_corrects) / 256) * 100.0f << "%"
+    Tensor device_labels = label->to_device(graph.context().device());
+    criterion->compute_loss(device_output, device_labels, loss);
+    int class_corrects = compute_class_corrects(device_output, device_labels);
+    std::cout << "Loss: " << loss << ", Accuracy: "
+              << (static_cast<float>(class_corrects) / device_output->dimension(0)) * 100.0f << "%"
               << std::endl;
-    criterion->compute_gradient(output, label, grad_output);
+    Tensor grad_output = create_like(device_output), grad_input = create_like(device_input);
+    criterion->compute_gradient(device_output, device_labels, grad_output);
     InputPack grad_outputs = {
         {nodes["dense"], grad_output},
     };
@@ -86,6 +89,7 @@ signed main() {
         {nodes["image"], grad_input},
     };
     executor.backward(grad_outputs, grad_inputs);
+    grad_input = grad_inputs[nodes["image"]];
 
     optimizer->update();
     optimizer->clear_gradients();

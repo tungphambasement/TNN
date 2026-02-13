@@ -76,6 +76,10 @@ inline Tensor make_tensor(IAllocator &allocator, DType_t dtype,
   return std::make_shared<TypedTensor>(allocator, dtype, shape);
 }
 
+inline Tensor create_like(const ConstTensor &other) {
+  return make_tensor(other->allocator(), other->data_type(), other->shape());
+}
+
 inline Tensor dtype_cast(const ConstTensor &input, DType_t target_dtype) {
   if (input->data_type() == target_dtype) {
     return input->clone();
