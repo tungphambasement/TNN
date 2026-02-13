@@ -12,9 +12,6 @@ create_executable(roce_coordinator.cpp LIBS tnn_lib)
 create_executable(legacy_tcp_coordinator.cpp LIBS tnn_lib)
 create_executable(legacy_roce_coordinator.cpp LIBS tnn_lib)
 
-# Inspection executables
-create_executable(inspect_openwebtext.cpp LIBS tnn_nn)
-
 # Training executables
 create_executable(trainer.cpp LIBS tnn_nn)
 create_executable(fp16_trainer.cpp LIBS tnn_nn)
