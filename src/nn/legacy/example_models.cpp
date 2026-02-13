@@ -19,8 +19,7 @@ namespace legacy {
 std::unordered_map<std::string, std::function<Sequential(DType_t)>> ExampleModels::creators_;
 
 Sequential create_mnist_cnn(DType_t io_dtype_ = DType_t::FP32) {
-  auto layers = LayerBuilder()
-                    .input({1, 28, 28})
+  auto layers = LayerBuilder({1, 28, 28})
                     .dtype(io_dtype_)
                     .legacy_conv2d(8, 5, 5, 1, 1, 0, 0, false, "conv1")
                     .legacy_batchnorm(dtype_eps(io_dtype_), 0.1f, true, "bn1")
@@ -38,8 +37,7 @@ Sequential create_mnist_cnn(DType_t io_dtype_ = DType_t::FP32) {
 }
 
 Sequential create_cifar10_vgg(DType_t io_dtype_ = DType_t::FP32) {
-  auto layers = LayerBuilder()
-                    .input({3, 32, 32})
+  auto layers = LayerBuilder({3, 32, 32})
                     .dtype(io_dtype_)
                     .legacy_conv2d(64, 3, 3, 1, 1, 1, 1, false, "conv0")
                     .legacy_batchnorm(dtype_eps(io_dtype_), 0.1f, true, "bn0")
@@ -74,8 +72,7 @@ Sequential create_cifar10_vgg(DType_t io_dtype_ = DType_t::FP32) {
 }
 
 Sequential create_cifar10_resnet9(DType_t io_dtype_ = DType_t::FP32) {
-  auto layers = LayerBuilder()
-                    .input({3, 32, 32})
+  auto layers = LayerBuilder({3, 32, 32})
                     .dtype(io_dtype_)
                     // Layer 1: 3 -> 64 -> 128 channels, 32x32 -> 16x16
                     .legacy_conv2d(64, 3, 3, 1, 1, 1, 1, false, "conv1")
@@ -106,8 +103,7 @@ Sequential create_cifar10_resnet9(DType_t io_dtype_ = DType_t::FP32) {
 }
 
 Sequential create_cifar100_resnet18(DType_t io_dtype_ = DType_t::FP32) {
-  auto layers = LayerBuilder()
-                    .input({3, 32, 32})
+  auto layers = LayerBuilder({3, 32, 32})
                     .dtype(io_dtype_)
                     .legacy_conv2d(32, 3, 3, 1, 1, 1, 1, false, "conv1")
                     .legacy_batchnorm(dtype_eps(io_dtype_), 0.1f, true, "bn1")
@@ -140,8 +136,7 @@ Sequential create_cifar100_wrn16_8(DType_t io_dtype_ = DType_t::FP32) {
   constexpr size_t c2 = 32 * width_factor;  // 256
   constexpr size_t c3 = 64 * width_factor;  // 512
 
-  auto layers = LayerBuilder()
-                    .input({3, 32, 32})
+  auto layers = LayerBuilder({3, 32, 32})
                     .dtype(io_dtype_)
                     .legacy_conv2d(16, 3, 3, 1, 1, 1, 1, true, "conv1")
                     // Group 1: 16 -> 128 channels (2 blocks, stride 1)
@@ -165,8 +160,7 @@ Sequential create_cifar100_wrn16_8(DType_t io_dtype_ = DType_t::FP32) {
 }
 
 Sequential create_tiny_imagenet_resnet18(DType_t io_dtype_ = DType_t::FP32) {
-  auto layers = LayerBuilder()
-                    .input({3, 64, 64})
+  auto layers = LayerBuilder({3, 64, 64})
                     .dtype(io_dtype_)
                     .legacy_conv2d(32, 3, 3, 1, 1, 1, 1, false, "conv1")
                     .legacy_batchnorm(dtype_eps(io_dtype_), 0.1f, true, "bn1")
@@ -199,8 +193,7 @@ Sequential create_tiny_imagenet_wrn16_8(DType_t io_dtype_ = DType_t::FP32) {
   constexpr size_t c2 = 32 * width_factor;  // 256
   constexpr size_t c3 = 64 * width_factor;  // 512
 
-  auto layers = LayerBuilder()
-                    .input({3, 64, 64})
+  auto layers = LayerBuilder({3, 64, 64})
                     .dtype(io_dtype_)
                     .legacy_conv2d(16, 3, 3, 1, 1, 1, 1, true, "conv1")
                     // Group 1: 16 -> 128 channels (2 blocks, stride 1)
@@ -224,8 +217,7 @@ Sequential create_tiny_imagenet_wrn16_8(DType_t io_dtype_ = DType_t::FP32) {
 }
 
 Sequential create_tiny_imagenet_resnet50(DType_t io_dtype_ = DType_t::FP32) {
-  auto layers = LayerBuilder()
-                    .input({3, 64, 64})
+  auto layers = LayerBuilder({3, 64, 64})
                     .dtype(io_dtype_)
                     .legacy_conv2d(64, 3, 3, 1, 1, 1, 1, true, "conv1")
                     .legacy_batchnorm(dtype_eps(io_dtype_), 0.1f, true, "bn1")
@@ -259,8 +251,7 @@ Sequential create_tiny_imagenet_resnet50(DType_t io_dtype_ = DType_t::FP32) {
 }
 
 Sequential create_resnet50_imagenet(DType_t io_dtype_ = DType_t::FP32) {
-  auto layers = LayerBuilder()
-                    .input({3, 224, 224})
+  auto layers = LayerBuilder({3, 224, 224})
                     .dtype(io_dtype_)
                     .legacy_conv2d(64, 7, 7, 2, 2, 3, 3, true, "conv1")
                     .legacy_batchnorm(dtype_eps(io_dtype_), 0.1f, true, "bn1")
@@ -303,9 +294,8 @@ Sequential create_tiny_imagenet_vit(DType_t io_dtype_ = DType_t::FP32) {
   constexpr size_t num_patches = (64 / patch_size) * (64 / patch_size);
   constexpr size_t seq_len = num_patches + 1;
 
-  LayerBuilder builder;
-  builder.input({3, 64, 64})
-      .dtype(io_dtype_)
+  LayerBuilder builder({3, 64, 64});
+  builder.dtype(io_dtype_)
       .legacy_conv2d(embed_dim, patch_size, patch_size, patch_size, patch_size, 0, 0, true,
                      "patch_embed")
       .flatten(1, 2, "flatten_patches")  // Flatten dims 1-2 (H, W), keep dim 3 (C)
@@ -314,8 +304,7 @@ Sequential create_tiny_imagenet_vit(DType_t io_dtype_ = DType_t::FP32) {
       .dropout(0.1f);
 
   for (size_t i = 0; i < depth; ++i) {
-    builder.residual_block(LayerBuilder()
-                               .input({seq_len, embed_dim})
+    builder.residual_block(LayerBuilder({seq_len, embed_dim})
                                .dtype(io_dtype_)
                                .layernorm(dtype_eps(io_dtype_), true, "ln_attn")
                                .attention(embed_dim, num_heads, false, "attn")
@@ -323,8 +312,7 @@ Sequential create_tiny_imagenet_vit(DType_t io_dtype_ = DType_t::FP32) {
                                .build(),
                            {}, "linear", "encoder_" + std::to_string(i) + "_attn");
 
-    builder.residual_block(LayerBuilder()
-                               .input({seq_len, embed_dim})
+    builder.residual_block(LayerBuilder({seq_len, embed_dim})
                                .dtype(io_dtype_)
                                .layernorm(dtype_eps(io_dtype_), true, "ln_mlp")
                                .legacy_dense(embed_dim * mlp_ratio, false, "fc1")
@@ -355,9 +343,8 @@ Sequential create_gpt2_small(DType_t io_dtype_ = DType_t::FP32) {
   constexpr size_t num_layers = 12;
   constexpr float dropout = 0.1f;
 
-  LayerBuilder builder;
-  builder.input({seq_len})
-      .dtype(io_dtype_)
+  LayerBuilder builder({seq_len});
+  builder.dtype(io_dtype_)
       .embedding(vocab_size, embed_dim, "token_embed")
       .positional_embedding(embed_dim, seq_len, "pos_embed")
       .dropout(dropout);
@@ -380,9 +367,8 @@ Sequential create_flash_gpt2_small(DType_t io_dtype_ = DType_t::FP32) {
   constexpr size_t num_layers = 12;
   constexpr float dropout = 0.1f;
 
-  LayerBuilder builder;
-  builder.input({seq_len})
-      .dtype(io_dtype_)
+  LayerBuilder builder({seq_len});
+  builder.dtype(io_dtype_)
       .embedding(vocab_size, embed_dim, "token_embed")
       .positional_embedding(embed_dim, seq_len, "pos_embed")
       .dropout(dropout);
@@ -405,9 +391,8 @@ Sequential create_gpt2_medium(DType_t io_dtype_ = DType_t::FP32) {
   constexpr size_t num_layers = 24;
   constexpr float dropout = 0.1f;
 
-  LayerBuilder builder;
-  builder.input({seq_len})
-      .dtype(io_dtype_)
+  LayerBuilder builder({seq_len});
+  builder.dtype(io_dtype_)
       .embedding(vocab_size, embed_dim, "token_embed")
       .positional_embedding(embed_dim, seq_len, "pos_embed")
       .dropout(dropout);
@@ -430,9 +415,8 @@ Sequential create_flash_gpt2_medium(DType_t io_dtype_ = DType_t::FP32) {
   constexpr size_t num_layers = 24;
   constexpr float dropout = 0.1f;
 
-  LayerBuilder builder;
-  builder.input({seq_len})
-      .dtype(io_dtype_)
+  LayerBuilder builder({seq_len});
+  builder.dtype(io_dtype_)
       .embedding(vocab_size, embed_dim, "token_embed")
       .positional_embedding(embed_dim, seq_len, "pos_embed")
       .dropout(dropout);
@@ -455,9 +439,8 @@ Sequential create_gpt2_large(DType_t io_dtype_ = DType_t::FP32) {
   constexpr size_t num_layers = 36;
   constexpr float dropout = 0.1f;
 
-  LayerBuilder builder;
-  builder.input({seq_len})
-      .dtype(io_dtype_)
+  LayerBuilder builder({seq_len});
+  builder.dtype(io_dtype_)
       .embedding(vocab_size, embed_dim, "token_embed")
       .positional_embedding(embed_dim, seq_len, "pos_embed")
       .dropout(dropout);
@@ -480,9 +463,8 @@ Sequential create_flash_gpt2_large(DType_t io_dtype_ = DType_t::FP32) {
   constexpr size_t num_layers = 36;
   constexpr float dropout = 0.1f;
 
-  LayerBuilder builder;
-  builder.input({seq_len})
-      .dtype(io_dtype_)
+  LayerBuilder builder({seq_len});
+  builder.dtype(io_dtype_)
       .embedding(vocab_size, embed_dim, "token_embed")
       .positional_embedding(embed_dim, seq_len, "pos_embed")
       .dropout(dropout);

@@ -42,8 +42,8 @@ TEST(AttentionBlockTest, ForwardPassCPU) {
 }
 
 TEST(AttentionBlockTest, BuilderTest) {
-  LayerBuilder builder;
-  builder.input({10, 64}).attention(64, 4);
+  LayerBuilder builder({10, 64});
+  builder.attention(64, 4);
 
   auto layers = builder.build();
   EXPECT_EQ(layers.size(), 1);

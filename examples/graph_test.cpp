@@ -29,8 +29,7 @@ signed main() {
   auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
   Graph graph(allocator);
 
-  auto layers = LayerBuilder()
-                    .input({28, 28, 1})
+  auto layers = LayerBuilder({28, 28, 1})
                     .conv2d(16, 3, 3, 1, 1, 1, 1, true, "conv1")
                     .batchnorm(16, 1e-5, true, SBool::TRUE, "bn1")
                     .flatten(1, -1, "flatten")
