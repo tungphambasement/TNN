@@ -24,6 +24,9 @@ public:
 
   void register_param(std::vector<size_t> shape, DType_t dtype) {
     size_t bytes_size = get_bytes_size(shape, dtype);
+    // round up to 256 bytes for better memory access pattern, can be tuned later
+    bytes_size = (bytes_size + 255) & ~255;
+
     // assuming param and grad have the same shape and dtype for simplicity
     param_bytes += bytes_size;
     grad_bytes += bytes_size;
@@ -45,6 +48,8 @@ public:
       throw std::runtime_error("GraphContext must be initialized before getting parameters.");
     }
     size_t bytes_size = get_bytes_size(shape, dtype);
+    // round up to 256 bytes for better memory access pattern, can be tuned later
+    bytes_size = (bytes_size + 255) & ~255;
     dptr param_data = param_slab_.span(param_offset_, bytes_size);
     param_offset_ += bytes_size;
     Tensor param = make_tensor(allocator_, dtype, std::move(param_data), shape);
@@ -57,6 +62,8 @@ public:
       throw std::runtime_error("GraphContext must be initialized before getting gradients.");
     }
     size_t bytes_size = get_bytes_size(shape, dtype);
+    // round up to 256 bytes for better memory access pattern, can be tuned later
+    bytes_size = (bytes_size + 255) & ~255;
     dptr grad_data = grad_slab_.span(grad_offset_, bytes_size);
     grad_offset_ += bytes_size;
     Tensor grad = make_tensor(allocator_, dtype, std::move(grad_data), shape);
