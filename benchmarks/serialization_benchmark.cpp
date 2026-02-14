@@ -27,7 +27,7 @@ signed main() {
   job.data = tensor->clone();
   Message message(CommandType::FORWARD_JOB, std::move(job));
 
-  auto &device_allocator = DeviceAllocator::instance(getCPU());
+  auto &device_allocator = DeviceAllocator::instance(getHost());
 
   BinarySerializer bserializer(device_allocator);
   IBuffer tbuffer(device_allocator, data_size * sizeof(float) + 1024);  // extra space for metadata

@@ -75,8 +75,8 @@ signed main() {
   std::cout << "Legacy Dense Average time per forward pass: " << duration.count() / passes << " ms"
             << std::endl;
 
-  auto cpu_current_output = current_output->to_device(getCPU());
-  auto cpu_legacy_output = legacy_output->to_device(getCPU());
+  auto cpu_current_output = current_output->to_device(getHost());
+  auto cpu_legacy_output = legacy_output->to_device(getHost());
 
   float *current_data = cpu_current_output->data_as<float>();
   float *legacy_data = cpu_legacy_output->data_as<float>();
@@ -136,8 +136,8 @@ signed main() {
               << " ms" << std::endl;
   }
 
-  auto cpu_grad_input_current = grad_input_current->to_device(getCPU());
-  auto cpu_grad_input_legacy = grad_input_legacy->to_device(getCPU());
+  auto cpu_grad_input_current = grad_input_current->to_device(getHost());
+  auto cpu_grad_input_legacy = grad_input_legacy->to_device(getHost());
   float *grad_input_current_data = cpu_grad_input_current->data_as<float>();
   float *grad_input_legacy_data = cpu_grad_input_legacy->data_as<float>();
   max_diff = 0.0f;
@@ -158,8 +158,8 @@ signed main() {
   auto grad_weights_current = dense_layer.gradients();
   auto grad_weights_legacy = legacy_dense_layer.gradients();
   for (size_t i = 0; i < grad_weights_current.size(); ++i) {
-    auto cpu_grad_current = grad_weights_current[i]->to_device(getCPU());
-    auto cpu_grad_legacy = grad_weights_legacy[i]->to_device(getCPU());
+    auto cpu_grad_current = grad_weights_current[i]->to_device(getHost());
+    auto cpu_grad_legacy = grad_weights_legacy[i]->to_device(getHost());
     float *grad_current_data = cpu_grad_current->data_as<float>();
     float *grad_legacy_data = cpu_grad_legacy->data_as<float>();
     size_t grad_elements = cpu_grad_current->size();

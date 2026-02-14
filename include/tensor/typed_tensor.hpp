@@ -453,7 +453,7 @@ public:
   double min() const override {
     double result = 0.0;
     DISPATCH_DTYPE(dtype_, T, {
-      auto cpu_tensor = std::dynamic_pointer_cast<TypedTensor>(to_device(getCPU()));
+      auto cpu_tensor = std::dynamic_pointer_cast<TypedTensor>(to_device(getHost()));
       T min_val = cpu_tensor->data_.template get<T>()[0];
       for (size_t i = 1; i < cpu_tensor->data_size_; ++i) {
         if (cpu_tensor->data_.template get<T>()[i] < min_val) {
@@ -468,7 +468,7 @@ public:
   double max() const override {
     double result = 0.0;
     DISPATCH_DTYPE(dtype_, T, {
-      auto cpu_tensor = std::dynamic_pointer_cast<TypedTensor>(to_device(getCPU()));
+      auto cpu_tensor = std::dynamic_pointer_cast<TypedTensor>(to_device(getHost()));
       T max_val = cpu_tensor->data_.template get<T>()[0];
       for (size_t i = 1; i < cpu_tensor->data_size_; ++i) {
         if (cpu_tensor->data_.template get<T>()[i] > max_val) {
@@ -500,7 +500,7 @@ public:
   }
 
   void print_data() const override {
-    Tensor cpu_tensor = to_device(getCPU());
+    Tensor cpu_tensor = to_device(getHost());
     size_t total_elements = cpu_tensor->size();
     std::cout << "TypedTensor data (shape " << cpu_tensor->shape_str() << "):\n";
     DISPATCH_DTYPE(dtype_, T, {
@@ -513,7 +513,7 @@ public:
   }
 
   void head(size_t n = 10) const override {
-    Tensor cpu_tensor = to_device(getCPU());
+    Tensor cpu_tensor = to_device(getHost());
     size_t total_elements = cpu_tensor->size();
     n = std::min(n, total_elements);
     std::cout << "TypedTensor head (first " << n << " elements of shape " << cpu_tensor->shape_str()

@@ -89,7 +89,7 @@ public:
     // setup model, optimizer, criterion
     LayerConfig model_config = config.model_config;
     this->model_ = Sequential::create_from_config(model_config);
-    auto &device = use_gpu_ ? getGPU() : getCPU();
+    auto &device = use_gpu_ ? getGPU() : getHost();
     auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
     Graph graph(allocator);
     graph.add_layer(*model_);

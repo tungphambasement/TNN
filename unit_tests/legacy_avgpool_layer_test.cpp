@@ -154,19 +154,19 @@ protected:
 
 TEST_F(LegacyAvgPool2DLayerTest, BasicForwardPass) {
   LegacyAvgPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_avgpool");
-  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
   Graph graph(allocator);
   graph.add_layer(layer);
   graph.compile();
 
-  Tensor input = make_tensor<float>({1, 1, 4, 4}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 16; ++i) {
     input_data[i] = static_cast<float>(i + 1);
   }
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   layer.forward({input}, {output});
 
   verify_forward_result(input, output, 2, 2, 2, 2, 0, 0);
@@ -180,19 +180,19 @@ TEST_F(LegacyAvgPool2DLayerTest, BasicForwardPass) {
 
 TEST_F(LegacyAvgPool2DLayerTest, ForwardPassWithStride) {
   LegacyAvgPool2DLayer layer(3, 3, 1, 1, 0, 0, "test_avgpool_stride");
-  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
   Graph graph(allocator);
   graph.add_layer(layer);
   graph.compile();
 
-  Tensor input = make_tensor<float>({1, 1, 5, 5}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 5, 5}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 25; ++i) {
     input_data[i] = 1.0f;
   }
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   layer.forward({input}, {output});
 
   verify_forward_result(input, output, 3, 3, 1, 1, 0, 0);
@@ -205,19 +205,19 @@ TEST_F(LegacyAvgPool2DLayerTest, ForwardPassWithStride) {
 
 TEST_F(LegacyAvgPool2DLayerTest, ForwardPassWithPadding) {
   LegacyAvgPool2DLayer layer(3, 3, 1, 1, 1, 1, "test_avgpool_padding");
-  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
   Graph graph(allocator);
   graph.add_layer(layer);
   graph.compile();
 
-  Tensor input = make_tensor<float>({1, 1, 3, 3}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 3, 3}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 9; ++i) {
     input_data[i] = static_cast<float>(i + 1);
   }
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   layer.forward({input}, {output});
 
   auto out_shape = output->shape();
@@ -229,12 +229,12 @@ TEST_F(LegacyAvgPool2DLayerTest, ForwardPassWithPadding) {
 
 TEST_F(LegacyAvgPool2DLayerTest, ForwardPassMultiChannel) {
   LegacyAvgPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_avgpool_multichannel");
-  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
   Graph graph(allocator);
   graph.add_layer(layer);
   graph.compile();
 
-  Tensor input = make_tensor<float>({1, 2, 4, 4}, getCPU());
+  Tensor input = make_tensor<float>({1, 2, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
 
   for (int i = 0; i < 32; ++i) {
@@ -242,7 +242,7 @@ TEST_F(LegacyAvgPool2DLayerTest, ForwardPassMultiChannel) {
   }
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   layer.forward({input}, {output});
 
   verify_forward_result(input, output, 2, 2, 2, 2, 0, 0);
@@ -256,12 +256,12 @@ TEST_F(LegacyAvgPool2DLayerTest, ForwardPassMultiChannel) {
 
 TEST_F(LegacyAvgPool2DLayerTest, ForwardPassMultiBatch) {
   LegacyAvgPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_avgpool_multibatch");
-  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
   Graph graph(allocator);
   graph.add_layer(layer);
   graph.compile();
 
-  Tensor input = make_tensor<float>({2, 1, 4, 4}, getCPU());
+  Tensor input = make_tensor<float>({2, 1, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
 
   for (int i = 0; i < 32; ++i) {
@@ -269,7 +269,7 @@ TEST_F(LegacyAvgPool2DLayerTest, ForwardPassMultiBatch) {
   }
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   layer.forward({input}, {output});
 
   verify_forward_result(input, output, 2, 2, 2, 2, 0, 0);
@@ -283,19 +283,19 @@ TEST_F(LegacyAvgPool2DLayerTest, ForwardPassMultiBatch) {
 
 TEST_F(LegacyAvgPool2DLayerTest, ForwardPassNonSquarePooling) {
   LegacyAvgPool2DLayer layer(3, 2, 2, 2, 0, 0, "test_avgpool_nonsquare");
-  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
   Graph graph(allocator);
   graph.add_layer(layer);
   graph.compile();
 
-  Tensor input = make_tensor<float>({1, 1, 6, 4}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 6, 4}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 24; ++i) {
     input_data[i] = 1.0f;
   }
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   layer.forward({input}, {output});
 
   verify_forward_result(input, output, 3, 2, 2, 2, 0, 0);
@@ -308,28 +308,28 @@ TEST_F(LegacyAvgPool2DLayerTest, ForwardPassNonSquarePooling) {
 
 TEST_F(LegacyAvgPool2DLayerTest, BasicBackwardPass) {
   LegacyAvgPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_avgpool_backward");
-  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
   Graph graph(allocator);
   graph.add_layer(layer);
   graph.compile();
 
-  Tensor input = make_tensor<float>({1, 1, 4, 4}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 16; ++i) {
     input_data[i] = static_cast<float>(i + 1);
   }
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   layer.forward({input}, {output});
 
-  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getHost());
   float *grad_data = grad_output->data_as<float>();
   for (int i = 0; i < 4; ++i) {
     grad_data[i] = 1.0f;
   }
 
-  Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
+  Tensor grad_input = make_tensor<float>(input->shape(), getHost());
   layer.backward({grad_output}, {grad_input});
 
   verify_backward_result(grad_output, grad_input, 2, 2, 2, 2, 0, 0);
@@ -342,28 +342,28 @@ TEST_F(LegacyAvgPool2DLayerTest, BasicBackwardPass) {
 
 TEST_F(LegacyAvgPool2DLayerTest, BackwardPassWithPadding) {
   LegacyAvgPool2DLayer layer(3, 3, 1, 1, 1, 1, "test_avgpool_backward_pad");
-  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
   Graph graph(allocator);
   graph.add_layer(layer);
   graph.compile();
 
-  Tensor input = make_tensor<float>({1, 1, 3, 3}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 3, 3}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 9; ++i) {
     input_data[i] = static_cast<float>(i + 1);
   }
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   layer.forward({input}, {output});
 
-  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  Tensor grad_output = make_tensor<float>(output->shape(), getHost());
   float *grad_data = grad_output->data_as<float>();
   for (size_t i = 0; i < grad_output->size(); ++i) {
     grad_data[i] = 1.0f;
   }
 
-  Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
+  Tensor grad_input = make_tensor<float>(input->shape(), getHost());
   layer.backward({grad_output}, {grad_input});
 
   verify_backward_result(grad_output, grad_input, 3, 3, 1, 1, 1, 1);
@@ -373,28 +373,28 @@ TEST_F(LegacyAvgPool2DLayerTest, BackwardPassWithPadding) {
 
 TEST_F(LegacyAvgPool2DLayerTest, BackwardPassMultiChannel) {
   LegacyAvgPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_avgpool_backward_multichannel");
-  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
   Graph graph(allocator);
   graph.add_layer(layer);
   graph.compile();
 
-  Tensor input = make_tensor<float>({1, 2, 4, 4}, getCPU());
+  Tensor input = make_tensor<float>({1, 2, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 32; ++i) {
     input_data[i] = static_cast<float>(i + 1);
   }
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   layer.forward({input}, {output});
 
-  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  Tensor grad_output = make_tensor<float>(output->shape(), getHost());
   float *grad_data = grad_output->data_as<float>();
   for (size_t i = 0; i < grad_output->size(); ++i) {
     grad_data[i] = 1.0f;
   }
 
-  Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
+  Tensor grad_input = make_tensor<float>(input->shape(), getHost());
   layer.backward({grad_output}, {grad_input});
 
   verify_backward_result(grad_output, grad_input, 2, 2, 2, 2, 0, 0);
@@ -404,28 +404,28 @@ TEST_F(LegacyAvgPool2DLayerTest, BackwardPassMultiChannel) {
 
 TEST_F(LegacyAvgPool2DLayerTest, BackwardPassVariableGradient) {
   LegacyAvgPool2DLayer layer(2, 2, 1, 1, 0, 0, "test_avgpool_backward_var");
-  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
   Graph graph(allocator);
   graph.add_layer(layer);
   graph.compile();
 
-  Tensor input = make_tensor<float>({1, 1, 3, 3}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 3, 3}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 9; ++i) {
     input_data[i] = static_cast<float>(i + 1);
   }
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   layer.forward({input}, {output});
 
-  Tensor grad_output = make_tensor<float>(output->shape(), getCPU());
+  Tensor grad_output = make_tensor<float>(output->shape(), getHost());
   float *grad_data = grad_output->data_as<float>();
   for (size_t i = 0; i < grad_output->size(); ++i) {
     grad_data[i] = static_cast<float>(i + 1);
   }
 
-  Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
+  Tensor grad_input = make_tensor<float>(input->shape(), getHost());
   layer.backward({grad_output}, {grad_input});
 
   verify_backward_result(grad_output, grad_input, 2, 2, 1, 1, 0, 0);
@@ -487,19 +487,19 @@ TEST_F(LegacyAvgPool2DLayerTest, CreateFromConfig) {
 
 TEST_F(LegacyAvgPool2DLayerTest, EdgeCaseGlobalAveragePooling) {
   LegacyAvgPool2DLayer layer(4, 4, 1, 1, 0, 0, "test_global_avgpool");
-  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
   Graph graph(allocator);
   graph.add_layer(layer);
   graph.compile();
 
-  Tensor input = make_tensor<float>({1, 1, 4, 4}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 16; ++i) {
     input_data[i] = 2.0f;
   }
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   layer.forward({input}, {output});
 
   auto out_shape = output->shape();
@@ -510,25 +510,25 @@ TEST_F(LegacyAvgPool2DLayerTest, EdgeCaseGlobalAveragePooling) {
 
 TEST_F(LegacyAvgPool2DLayerTest, EdgeCaseZeroGradient) {
   LegacyAvgPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_zero_gradient");
-  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
   Graph graph(allocator);
   graph.add_layer(layer);
   graph.compile();
 
-  Tensor input = make_tensor<float>({1, 1, 4, 4}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 16; ++i) {
     input_data[i] = 1.0f;
   }
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   layer.forward({input}, {output});
 
-  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getHost());
   grad_output->fill(0.0f);
 
-  Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
+  Tensor grad_input = make_tensor<float>(input->shape(), getHost());
   layer.backward({grad_output}, {grad_input});
 
   verify_backward_result(grad_output, grad_input, 2, 2, 2, 2, 0, 0);
@@ -540,19 +540,19 @@ TEST_F(LegacyAvgPool2DLayerTest, EdgeCaseZeroGradient) {
 
 TEST_F(LegacyAvgPool2DLayerTest, EdgeCaseLargeValues) {
   LegacyAvgPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_large_values");
-  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
   Graph graph(allocator);
   graph.add_layer(layer);
   graph.compile();
 
-  Tensor input = make_tensor<float>({1, 1, 4, 4}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 16; ++i) {
     input_data[i] = 1e6f;
   }
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   layer.forward({input}, {output});
 
   verify_forward_result(input, output, 2, 2, 2, 2, 0, 0);
@@ -564,19 +564,19 @@ TEST_F(LegacyAvgPool2DLayerTest, EdgeCaseLargeValues) {
 
 TEST_F(LegacyAvgPool2DLayerTest, EdgeCaseNegativeValues) {
   LegacyAvgPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_negative_values");
-  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
   Graph graph(allocator);
   graph.add_layer(layer);
   graph.compile();
 
-  Tensor input = make_tensor<float>({1, 1, 4, 4}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 16; ++i) {
     input_data[i] = -static_cast<float>(i + 1);
   }
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   layer.forward({input}, {output});
 
   verify_forward_result(input, output, 2, 2, 2, 2, 0, 0);
@@ -586,19 +586,19 @@ TEST_F(LegacyAvgPool2DLayerTest, EdgeCaseNegativeValues) {
 
 TEST_F(LegacyAvgPool2DLayerTest, NumericalStabilitySmallValues) {
   LegacyAvgPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_small_values");
-  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
   Graph graph(allocator);
   graph.add_layer(layer);
   graph.compile();
 
-  Tensor input = make_tensor<float>({1, 1, 4, 4}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 16; ++i) {
     input_data[i] = 1e-6f;
   }
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   layer.forward({input}, {output});
 
   verify_forward_result(input, output, 2, 2, 2, 2, 0, 0);
@@ -610,28 +610,28 @@ TEST_F(LegacyAvgPool2DLayerTest, NumericalStabilitySmallValues) {
 
 TEST_F(LegacyAvgPool2DLayerTest, BackwardNumericalStability) {
   LegacyAvgPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_backward_stability");
-  auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+  auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
   Graph graph(allocator);
   graph.add_layer(layer);
   graph.compile();
 
-  Tensor input = make_tensor<float>({1, 1, 4, 4}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 16; ++i) {
     input_data[i] = 1e-6f;
   }
 
   std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   layer.forward({input}, {output});
 
-  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getHost());
   float *grad_data = grad_output->data_as<float>();
   for (size_t i = 0; i < grad_output->size(); ++i) {
     grad_data[i] = 1e-6f;
   }
 
-  Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
+  Tensor grad_input = make_tensor<float>(input->shape(), getHost());
   layer.backward({grad_output}, {grad_input});
 
   verify_backward_result(grad_output, grad_input, 2, 2, 2, 2, 0, 0);

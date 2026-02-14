@@ -88,8 +88,8 @@ signed main() {
   std::cout << "Legacy BatchNorm Average time per forward pass: " << duration.count() / passes
             << " ms" << std::endl;
 
-  auto cpu_current_output = output->to_device(getCPU());
-  auto cpu_legacy_output = legacy_relu_output->to_device(getCPU());
+  auto cpu_current_output = output->to_device(getHost());
+  auto cpu_legacy_output = legacy_relu_output->to_device(getHost());
 
   float *current_data = cpu_current_output->data_as<float>();
   float *legacy_data = cpu_legacy_output->data_as<float>();

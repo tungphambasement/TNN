@@ -24,7 +24,7 @@ signed main() {
   std::string model_path = Env::get<std::string>("MODEL_PATH", "");
 
   std::string device_str = Env::get<std::string>("DEVICE_TYPE", "CPU");
-  const auto &device = device_str == "GPU" ? getGPU(0) : getCPU();
+  const auto &device = device_str == "GPU" ? getGPU(0) : getHost();
   auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
   Graph graph(allocator);
 

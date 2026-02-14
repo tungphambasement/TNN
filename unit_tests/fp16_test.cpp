@@ -12,9 +12,7 @@ using namespace tnn;
 
 class FP16Test : public ::testing::Test {
 protected:
-    void SetUp() override {
-        ExampleModels::register_defaults();
-    }
+  void SetUp() override { ExampleModels::register_defaults(); }
 };
 
 TEST_F(FP16Test, Dense) {
@@ -45,9 +43,9 @@ TEST_F(FP16Test, Dense) {
     cpu_fp32_param->copy_to(fp32_params[i]);
   }
 
-  Tensor fp16_input = make_tensor(DType_t::FP16, {32, 128}, getCPU());
+  Tensor fp16_input = make_tensor(DType_t::FP16, {32, 128}, getHost());
   fp16_input->fill_random_uniform(0.0f, 1.0f);
-  Tensor fp32_input = make_tensor(DType_t::FP32, {32, 128}, getCPU());
+  Tensor fp32_input = make_tensor(DType_t::FP32, {32, 128}, getHost());
 
   fp16 *input_data = fp16_input->data_as<fp16>();
   float *input_data_fp32 = fp32_input->data_as<float>();
@@ -72,8 +70,8 @@ TEST_F(FP16Test, Dense) {
   fp16 *output_data_fp16 = cpu_output_fp16->data_as<fp16>();
   constexpr double tolerance = 1e-4;
   for (size_t i = 0; i < cpu_output_fp32->size(); ++i) {
-    EXPECT_NEAR(static_cast<double>(output_data_fp32[i]), 
-                static_cast<double>(output_data_fp16[i]), 
-                tolerance) << "At index " << i;
+    EXPECT_NEAR(static_cast<double>(output_data_fp32[i]), static_cast<double>(output_data_fp16[i]),
+                tolerance)
+        << "At index " << i;
   }
 }

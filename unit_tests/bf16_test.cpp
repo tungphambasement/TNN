@@ -1,5 +1,6 @@
-#include <cstddef>
 #include <gtest/gtest.h>
+
+#include <cstddef>
 
 #include "device/device_manager.hpp"
 #include "nn/blocks_impl/attention_block.hpp"
@@ -15,9 +16,7 @@ using namespace tnn;
 
 class BF16Test : public ::testing::Test {
 protected:
-    void SetUp() override {
-        ExampleModels::register_defaults();
-    }
+  void SetUp() override { ExampleModels::register_defaults(); }
 };
 
 TEST_F(BF16Test, Dense) {
@@ -44,9 +43,9 @@ TEST_F(BF16Test, Dense) {
     bf16_params[i]->copy_to(fp32_params[i]);
   }
 
-  Tensor bf16_input = make_tensor(DType_t::BF16, {batch_size, input_dim}, getCPU());
+  Tensor bf16_input = make_tensor(DType_t::BF16, {batch_size, input_dim}, getHost());
   bf16_input->fill_random_uniform(0.0f, 1.0f);
-  Tensor fp32_input = make_tensor(DType_t::FP32, {batch_size, input_dim}, getCPU());
+  Tensor fp32_input = make_tensor(DType_t::FP32, {batch_size, input_dim}, getHost());
 
   bf16 *input_data = bf16_input->data_as<bf16>();
   float *input_data_fp32 = fp32_input->data_as<float>();
@@ -71,9 +70,9 @@ TEST_F(BF16Test, Dense) {
   bf16 *output_data_bf16 = cpu_output_bf16->data_as<bf16>();
   constexpr double tolerance = 2e-3;
   for (size_t i = 0; i < cpu_output_fp32->size(); ++i) {
-    EXPECT_NEAR(static_cast<double>(output_data_fp32[i]), 
-                static_cast<double>(output_data_bf16[i]), 
-                tolerance) << "At index " << i;
+    EXPECT_NEAR(static_cast<double>(output_data_fp32[i]), static_cast<double>(output_data_bf16[i]),
+                tolerance)
+        << "At index " << i;
   }
 
   Tensor target_fp32 = make_tensor(DType_t::FP32, {batch_size, output_dim});
@@ -108,9 +107,9 @@ TEST_F(BF16Test, Dense) {
   float *grad_input_data_fp32 = cpu_grad_input_fp32->data_as<float>();
   bf16 *grad_input_data_bf16 = cpu_grad_input_bf16->data_as<bf16>();
   for (size_t i = 0; i < cpu_grad_input_fp32->size(); ++i) {
-    EXPECT_NEAR(static_cast<double>(grad_input_data_fp32[i]), 
-                static_cast<double>(grad_input_data_bf16[i]), 
-                tolerance) << "At index " << i;
+    EXPECT_NEAR(static_cast<double>(grad_input_data_fp32[i]),
+                static_cast<double>(grad_input_data_bf16[i]), tolerance)
+        << "At index " << i;
   }
 }
 
@@ -146,9 +145,9 @@ TEST_F(BF16Test, Attention) {
     cpu_fp32_param->copy_to(fp32_params[i]);
   }
 
-  Tensor bf16_input = make_tensor(DType_t::BF16, {batch_size, seq_len, embed_dim}, getCPU());
+  Tensor bf16_input = make_tensor(DType_t::BF16, {batch_size, seq_len, embed_dim}, getHost());
   bf16_input->fill_random_uniform(0.0f, 1.0f);
-  Tensor fp32_input = make_tensor(DType_t::FP32, {batch_size, seq_len, embed_dim}, getCPU());
+  Tensor fp32_input = make_tensor(DType_t::FP32, {batch_size, seq_len, embed_dim}, getHost());
 
   bf16 *input_data = bf16_input->data_as<bf16>();
   float *input_data_fp32 = fp32_input->data_as<float>();
@@ -173,9 +172,9 @@ TEST_F(BF16Test, Attention) {
   bf16 *output_data_bf16 = cpu_output_bf16->data_as<bf16>();
   constexpr double tolerance = 2e-3;
   for (size_t i = 0; i < cpu_output_fp32->size(); ++i) {
-    EXPECT_NEAR(static_cast<double>(output_data_fp32[i]), 
-                static_cast<double>(output_data_bf16[i]), 
-                tolerance) << "At index " << i;
+    EXPECT_NEAR(static_cast<double>(output_data_fp32[i]), static_cast<double>(output_data_bf16[i]),
+                tolerance)
+        << "At index " << i;
   }
 
   Tensor target_fp32 = make_tensor(DType_t::FP32, {batch_size, seq_len, embed_dim});
@@ -210,8 +209,8 @@ TEST_F(BF16Test, Attention) {
   float *grad_input_data_fp32 = cpu_grad_input_fp32->data_as<float>();
   bf16 *grad_input_data_bf16 = cpu_grad_input_bf16->data_as<bf16>();
   for (size_t i = 0; i < cpu_grad_input_fp32->size(); ++i) {
-    EXPECT_NEAR(static_cast<double>(grad_input_data_fp32[i]), 
-                static_cast<double>(grad_input_data_bf16[i]), 
-                tolerance) << "At index " << i;
+    EXPECT_NEAR(static_cast<double>(grad_input_data_fp32[i]),
+                static_cast<double>(grad_input_data_bf16[i]), tolerance)
+        << "At index " << i;
   }
 }

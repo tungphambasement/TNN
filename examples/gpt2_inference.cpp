@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
   cout << "Using device: " << (device_type == DeviceType::GPU ? "GPU" : "CPU") << endl;
 
   // Create model using ExampleModels or load from file
-  const Device &device = device_type == DeviceType::GPU ? getGPU() : getCPU();
+  const Device &device = device_type == DeviceType::GPU ? getGPU() : getHost();
   auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
   Graph graph(allocator);
   std::unique_ptr<Sequential> model;

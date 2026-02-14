@@ -540,7 +540,7 @@ TEST_F(SequentialResidualBlockTest, BasicResidualBlockNumericalStability) {
 
   std::vector<float> scales = {0.01f, 0.1f, 1.0f, 10.0f};
   for (float scale : scales) {
-    Tensor input = make_tensor<float>({1, 8, 8, 16}, getCPU());
+    Tensor input = make_tensor<float>({1, 8, 8, 16}, getHost());
     float *input_data = input->data_as<float>();
     srand(42);
     for (size_t i = 0; i < input->size(); ++i) {
@@ -580,7 +580,7 @@ TEST_F(SequentialResidualBlockTest, BottleneckResidualBlockNumericalStability) {
 
   std::vector<float> scales = {0.01f, 0.1f, 1.0f, 10.0f};
   for (float scale : scales) {
-    Tensor input = make_tensor<float>({1, 8, 8, 32}, getCPU());
+    Tensor input = make_tensor<float>({1, 8, 8, 32}, getHost());
     float *input_data = input->data_as<float>();
     srand(42);
     for (size_t i = 0; i < input->size(); ++i) {
@@ -616,7 +616,7 @@ TEST_F(SequentialResidualBlockTest, BasicResidualBlockGradientFiniteness) {
     graph.compile();
   }
 
-  Tensor input = make_tensor<float>({1, 8, 8, 8}, getCPU());
+  Tensor input = make_tensor<float>({1, 8, 8, 8}, getHost());
   srand(42);
   float *input_data = input->data_as<float>();
   for (size_t i = 0; i < input->size(); ++i) {
@@ -658,7 +658,7 @@ TEST_F(SequentialResidualBlockTest, BottleneckResidualBlockGradientFiniteness) {
     graph.compile();
   }
 
-  Tensor input = make_tensor<float>({1, 8, 8, 16}, getCPU());
+  Tensor input = make_tensor<float>({1, 8, 8, 16}, getHost());
   srand(42);
   float *input_data = input->data_as<float>();
   for (size_t i = 0; i < input->size(); ++i) {

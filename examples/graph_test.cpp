@@ -25,7 +25,7 @@ signed main() {
   train_config.load_from_env();
   train_config.print_config();
 
-  const Device &device = train_config.device_type == DeviceType::GPU ? getGPU() : getCPU();
+  const Device &device = train_config.device_type == DeviceType::GPU ? getGPU() : getHost();
   auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
   Graph graph(allocator);
 

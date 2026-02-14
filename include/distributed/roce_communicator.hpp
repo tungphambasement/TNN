@@ -95,7 +95,7 @@ public:
     gid_index_ = endpoint.get_parameter<int>("gid_index");
     init_rdma();
     print_gid_table();
-    ibv_allocator_ = std::make_unique<IbvAllocator>(getCPU(), pd_, config.master_slab_size);
+    ibv_allocator_ = std::make_unique<IbvAllocator>(getHost(), pd_, config.master_slab_size);
     is_running_ = true;
     asio::co_spawn(io_context_, [this]() { return cq_event_loop(); }, asio::detached);
   }

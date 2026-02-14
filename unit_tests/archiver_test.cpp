@@ -106,7 +106,7 @@ TEST_F(ArchiverTest, TestDptrArchiver) {
   constexpr size_t byte_size = 4 * 1024 * 1024;     // 4 MB
   constexpr size_t header_size = sizeof(uint64_t);  // 8 bytes for the header
   constexpr size_t total_size = byte_size + header_size;
-  auto &allocator = DeviceAllocator::instance(getCPU());
+  auto &allocator = DeviceAllocator::instance(getHost());
   dptr data = allocator.allocate(byte_size);
   ops::set_scalar<float>(data, 0.5, byte_size / 4);
   SizeArchiver size_archiver;
@@ -134,7 +134,7 @@ TEST_F(ArchiverTest, TestTensorArchiver) {
   constexpr size_t E = 768;
   constexpr size_t total_elements = N * S * E;
 
-  Tensor tensor = make_tensor<float>({N, S, E}, getCPU());
+  Tensor tensor = make_tensor<float>({N, S, E}, getHost());
 
   SizeArchiver size_archiver;
   size_archiver &*tensor;

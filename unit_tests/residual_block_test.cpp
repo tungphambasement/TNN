@@ -116,7 +116,7 @@ protected:
     auto layer = std::make_unique<LegacyConv2DLayer>(in_channels, out_channels, 1, 1, 1, 1, 0, 0,
                                                      false, name);
     {
-      auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+      auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
       Graph graph(allocator);
       graph.add_layer(*layer);
       graph.compile();
@@ -147,20 +147,20 @@ TEST_F(ResidualBlockTest, IdentityShortcutForward) {
 
   ResidualBlock residual(std::move(main_path), {}, "none", "identity_residual");
   {
-    auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+    auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
     Graph graph(allocator);
     graph.add_layer(residual);
     graph.compile();
   }
 
-  Tensor input = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 4; ++i) {
     input_data[i] = 1.0f;
   }
 
   std::vector<size_t> output_shape = residual.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   residual.forward({input}, {output});
 
   EXPECT_EQ(output->shape(), input->shape());
@@ -178,20 +178,20 @@ TEST_F(ResidualBlockTest, IdentityShortcutForwardWithReLU) {
 
   ResidualBlock residual(std::move(main_path), {}, "relu", "identity_relu");
   {
-    auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+    auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
     Graph graph(allocator);
     graph.add_layer(residual);
     graph.compile();
   }
 
-  Tensor input = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 4; ++i) {
     input_data[i] = 1.0f;
   }
 
   std::vector<size_t> output_shape = residual.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   residual.forward({input}, {output});
 
   // Expected: relu(F(x) + x) = relu(-2*1 + 1) = relu(-1) = 0
@@ -207,20 +207,20 @@ TEST_F(ResidualBlockTest, IdentityShortcutMultiChannel) {
 
   ResidualBlock residual(std::move(main_path), {}, "none", "identity_multichannel");
   {
-    auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+    auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
     Graph graph(allocator);
     graph.add_layer(residual);
     graph.compile();
   }
 
-  Tensor input = make_tensor<float>({1, 2, 2, 2}, getCPU());
+  Tensor input = make_tensor<float>({1, 2, 2, 2}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 8; ++i) {
     input_data[i] = 2.0f;
   }
 
   std::vector<size_t> output_shape = residual.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   residual.forward({input}, {output});
 
   EXPECT_EQ(output_shape[0], 1);
@@ -243,20 +243,20 @@ TEST_F(ResidualBlockTest, IdentityShortcutMultiBatch) {
 
   ResidualBlock residual(std::move(main_path), {}, "none", "identity_multibatch");
   {
-    auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+    auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
     Graph graph(allocator);
     graph.add_layer(residual);
     graph.compile();
   }
 
-  Tensor input = make_tensor<float>({2, 1, 2, 2}, getCPU());
+  Tensor input = make_tensor<float>({2, 1, 2, 2}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 8; ++i) {
     input_data[i] = static_cast<float>(i + 1);
   }
 
   std::vector<size_t> output_shape = residual.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   residual.forward({input}, {output});
 
   EXPECT_EQ(output_shape[0], 2);
@@ -281,20 +281,20 @@ TEST_F(ResidualBlockTest, ProjectionShortcutForward) {
 
   ResidualBlock residual(std::move(main_path), std::move(shortcut), "none", "projection_residual");
   {
-    auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+    auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
     Graph graph(allocator);
     graph.add_layer(residual);
     graph.compile();
   }
 
-  Tensor input = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 4; ++i) {
     input_data[i] = 4.0f;
   }
 
   std::vector<size_t> output_shape = residual.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   residual.forward({input}, {output});
 
   // Expected: F(x) + shortcut(x) = 0.5*4 + 0.25*4 = 2 + 1 = 3
@@ -312,20 +312,20 @@ TEST_F(ResidualBlockTest, ProjectionShortcutWithReLU) {
 
   ResidualBlock residual(std::move(main_path), std::move(shortcut), "relu", "projection_relu");
   {
-    auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+    auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
     Graph graph(allocator);
     graph.add_layer(residual);
     graph.compile();
   }
 
-  Tensor input = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 4; ++i) {
     input_data[i] = 2.0f;
   }
 
   std::vector<size_t> output_shape = residual.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   residual.forward({input}, {output});
 
   // Expected: relu(F(x) + shortcut(x)) = relu(-1*2 + 0.5*2) = relu(-1) = 0
@@ -343,29 +343,29 @@ TEST_F(ResidualBlockTest, IdentityShortcutBackward) {
 
   ResidualBlock residual(std::move(main_path), {}, "none", "identity_backward");
   {
-    auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+    auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
     Graph graph(allocator);
     graph.add_layer(residual);
     graph.compile();
   }
 
-  Tensor input = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 4; ++i) {
     input_data[i] = 1.0f;
   }
 
   std::vector<size_t> output_shape = residual.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   residual.forward({input}, {output});
 
-  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getHost());
   float *grad_data = grad_output->data_as<float>();
   for (int i = 0; i < 4; ++i) {
     grad_data[i] = 1.0f;
   }
 
-  Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
+  Tensor grad_input = make_tensor<float>(input->shape(), getHost());
   residual.backward({grad_output}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
@@ -430,23 +430,23 @@ TEST_F(ResidualBlockTest, EdgeCaseZeroGradient) {
 
   ResidualBlock residual(std::move(main_path), {}, "none", "zero_gradient");
   {
-    auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+    auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
     Graph graph(allocator);
     graph.add_layer(residual);
     graph.compile();
   }
 
-  Tensor input = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = residual.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   residual.forward({input}, {output});
 
-  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getHost());
   grad_output->fill(0.0f);
 
-  Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
+  Tensor grad_input = make_tensor<float>(input->shape(), getHost());
   residual.backward({grad_output}, {grad_input});
 
   for (size_t i = 0; i < grad_input->size(); ++i) {
@@ -460,20 +460,20 @@ TEST_F(ResidualBlockTest, EdgeCaseLargeValues) {
 
   ResidualBlock residual(std::move(main_path), {}, "none", "large_values");
   {
-    auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+    auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
     Graph graph(allocator);
     graph.add_layer(residual);
     graph.compile();
   }
 
-  Tensor input = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 4; ++i) {
     input_data[i] = 1e6f;
   }
 
   std::vector<size_t> output_shape = residual.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   residual.forward({input}, {output});
 
   // Expected: F(x) + x = 1*1e6 + 1e6 = 2e6
@@ -489,20 +489,20 @@ TEST_F(ResidualBlockTest, EdgeCaseNegativeValues) {
 
   ResidualBlock residual(std::move(main_path), {}, "none", "negative_values");
   {
-    auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+    auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
     Graph graph(allocator);
     graph.add_layer(residual);
     graph.compile();
   }
 
-  Tensor input = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 4; ++i) {
     input_data[i] = -2.0f;
   }
 
   std::vector<size_t> output_shape = residual.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   residual.forward({input}, {output});
 
   // Expected: F(x) + x = -1*(-2) + (-2) = 2 - 2 = 0
@@ -518,20 +518,20 @@ TEST_F(ResidualBlockTest, NumericalStabilitySmallValues) {
 
   ResidualBlock residual(std::move(main_path), {}, "none", "small_values");
   {
-    auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+    auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
     Graph graph(allocator);
     graph.add_layer(residual);
     graph.compile();
   }
 
-  Tensor input = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 4; ++i) {
     input_data[i] = 1e-6f;
   }
 
   std::vector<size_t> output_shape = residual.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   residual.forward({input}, {output});
 
   // Expected: F(x) + x = 1*1e-6 + 1e-6 = 2e-6
@@ -547,23 +547,23 @@ TEST_F(ResidualBlockTest, NumericalStabilityBackward) {
 
   ResidualBlock residual(std::move(main_path), {}, "none", "backward_stability");
   {
-    auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+    auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
     Graph graph(allocator);
     graph.add_layer(residual);
     graph.compile();
   }
 
-  Tensor input = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
   input->fill(1e-6f);
 
   std::vector<size_t> output_shape = residual.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   residual.forward({input}, {output});
 
-  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getHost());
   grad_output->fill(1e-6f);
 
-  Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
+  Tensor grad_input = make_tensor<float>(input->shape(), getHost());
   residual.backward({grad_output}, {grad_input});
 
   // grad_main (1.0 * 1e-6) + grad_shortcut (1e-6) = 2e-6
@@ -584,20 +584,20 @@ TEST_F(ResidualBlockTest, MultiLayerMainPath) {
 
   ResidualBlock residual(std::move(main_path), {}, "none", "multi_layer");
   {
-    auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+    auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
     Graph graph(allocator);
     graph.add_layer(residual);
     graph.compile();
   }
 
-  Tensor input = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 4; ++i) {
     input_data[i] = 2.0f;
   }
 
   std::vector<size_t> output_shape = residual.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   residual.forward({input}, {output});
 
   // Expected: F(x) + x = (2.0 * (0.5 * 2.0)) + 2.0 = (2.0 * 1.0) + 2.0 = 4.0
@@ -616,23 +616,23 @@ TEST_F(ResidualBlockTest, MultiLayerMainPathBackward) {
 
   ResidualBlock residual(std::move(main_path), {}, "none", "multi_layer_backward");
   {
-    auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+    auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
     Graph graph(allocator);
     graph.add_layer(residual);
     graph.compile();
   }
 
-  Tensor input = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
   input->fill(1.0f);
 
   std::vector<size_t> output_shape = residual.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   residual.forward({input}, {output});
 
-  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getHost());
   grad_output->fill(1.0f);
 
-  Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
+  Tensor grad_input = make_tensor<float>(input->shape(), getHost());
   residual.backward({grad_output}, {grad_input});
 
   // grad_main = 2.0 * 0.5 * 1.0 = 1.0
@@ -650,20 +650,20 @@ TEST_F(ResidualBlockTest, ReLUNegativeInputSuppressionForward) {
 
   ResidualBlock residual(std::move(main_path), {}, "relu", "relu_suppression");
   {
-    auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+    auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
     Graph graph(allocator);
     graph.add_layer(residual);
     graph.compile();
   }
 
-  Tensor input = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 4; ++i) {
     input_data[i] = -1.0f;
   }
 
   std::vector<size_t> output_shape = residual.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   residual.forward({input}, {output});
 
   // Expected: relu(F(x) + x) = relu(0 + (-1)) = relu(-1) = 0
@@ -679,26 +679,26 @@ TEST_F(ResidualBlockTest, ReLUNegativeInputSuppressionBackward) {
 
   ResidualBlock residual(std::move(main_path), {}, "relu", "relu_suppression_bwd");
   {
-    auto &allocator = PoolAllocator::instance(getCPU(), defaultFlowHandle);
+    auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
     Graph graph(allocator);
     graph.add_layer(residual);
     graph.compile();
   }
 
-  Tensor input = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
   float *input_data = input->data_as<float>();
   for (int i = 0; i < 4; ++i) {
     input_data[i] = -1.0f;
   }
 
   std::vector<size_t> output_shape = residual.compute_output_shape(input->shape());
-  Tensor output = make_tensor<float>(output_shape, getCPU());
+  Tensor output = make_tensor<float>(output_shape, getHost());
   residual.forward({input}, {output});
 
-  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getCPU());
+  Tensor grad_output = make_tensor<float>({1, 1, 2, 2}, getHost());
   grad_output->fill(1.0f);
 
-  Tensor grad_input = make_tensor<float>(input->shape(), getCPU());
+  Tensor grad_input = make_tensor<float>(input->shape(), getHost());
   residual.backward({grad_output}, {grad_input});
 
   // ReLU blocks grad_output when output is negative

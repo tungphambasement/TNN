@@ -99,7 +99,7 @@ public:
   virtual void ensure(const std::vector<size_t> &new_shape) = 0;
   virtual void copy_to(const Tensor &target) const = 0;
   virtual Tensor to_device(const Device &tardevice) const = 0;
-  Tensor to_host() const { return to_device(getCPU()); }
+  Tensor to_host() const { return to_device(getHost()); }
 
   virtual void add(const ConstTensor &other) = 0;
   virtual void sub(const ConstTensor &other) = 0;

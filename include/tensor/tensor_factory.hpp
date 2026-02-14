@@ -9,40 +9,40 @@
 namespace tnn {
 
 template <typename T>
-inline Tensor make_tensor(std::vector<size_t> shape, const Device &device = getCPU()) {
+inline Tensor make_tensor(std::vector<size_t> shape, const Device &device = getHost()) {
   auto &allocator = DeviceAllocator::instance(device);
   return std::make_shared<TypedTensor>(allocator, dtype_of<T>(), shape);
 }
 
 template <typename T>
 inline Tensor make_tensor(std::vector<size_t> shape, const dptr &data,
-                          const Device &device = getCPU()) {
+                          const Device &device = getHost()) {
   auto &allocator = DeviceAllocator::instance(device);
   return std::make_shared<TypedTensor>(allocator, dtype_of<T>(), shape, data);
 }
 
 template <typename T>
 inline Tensor make_tensor(std::initializer_list<size_t> shape = {},
-                          const Device &device = getCPU()) {
+                          const Device &device = getHost()) {
   auto &allocator = DeviceAllocator::instance(device);
   return std::make_shared<TypedTensor>(allocator, dtype_of<T>(), shape);
 }
 
 template <typename T>
 inline Tensor make_tensor(std::initializer_list<size_t> shape, const dptr &data,
-                          const Device &device = getCPU()) {
+                          const Device &device = getHost()) {
   auto &allocator = DeviceAllocator::instance(device);
   return std::make_shared<TypedTensor>(allocator, dtype_of<T>(), shape, data);
 }
 
 inline Tensor make_tensor(DType_t dtype, std::vector<size_t> shape,
-                          const Device &device = getCPU()) {
+                          const Device &device = getHost()) {
   auto &allocator = DeviceAllocator::instance(device);
   return std::make_shared<TypedTensor>(allocator, dtype, shape);
 }
 
 inline Tensor make_tensor(DType_t dtype, std::initializer_list<size_t> shape = {},
-                          const Device &device = getCPU()) {
+                          const Device &device = getHost()) {
   auto &allocator = DeviceAllocator::instance(device);
   return std::make_shared<TypedTensor>(allocator, dtype, shape);
 }

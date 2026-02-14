@@ -74,6 +74,6 @@ private:
 
 void initializeDefaultDevices();
 const Device &getGPU(size_t gpu_index = 0);
-const Device &getCPU();
+const Device &getHost();
 
 }  // namespace tnn
