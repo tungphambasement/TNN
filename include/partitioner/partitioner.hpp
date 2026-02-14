@@ -37,6 +37,7 @@ inline std::vector<std::vector<std::unique_ptr<Layer>>> split(
     }
 
     auto partition_layers = std::vector<std::unique_ptr<Layer>>();
+    LayerFactory::register_defaults();
     for (size_t i = part.start_offset; i < part.start_offset + part.length; ++i) {
       auto layer_config = layers[i]->get_config();
       partition_layers.push_back(LayerFactory::create(layer_config));

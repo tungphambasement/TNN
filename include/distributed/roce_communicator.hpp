@@ -33,6 +33,7 @@
 #include "device/ibv_allocator.hpp"
 #include "distributed/binary_serializer.hpp"
 #include "distributed/channels.hpp"
+#include "distributed/endian.hpp"
 #include "distributed/ibuffer.hpp"
 #include "distributed/packet.hpp"
 #include "distributed/roce_buffer.hpp"
@@ -49,6 +50,10 @@ struct RoCEChannelInfo {
   uint32_t qpn;
   uint32_t psn;
   union ibv_gid gid;
+
+  static constexpr size_t size() {
+    return sizeof(Endianness) + sizeof(lid) + sizeof(qpn) + sizeof(psn) + sizeof(gid);
+  }
 };
 
 class RoCECommunicator : public Communicator {
@@ -219,10 +224,10 @@ protected:
       channel->endpoint = endpoint;
       channel->qp = create_qp();
       RoCEChannelInfo my_info = get_local_info(channel->qp);
-      IBuffer my_info_buf(out_allocator_, 26);
+      IBuffer my_info_buf(out_allocator_, RoCEChannelInfo::size());
       serialize_info(my_info, my_info_buf);
       asio::write(socket, asio::buffer(my_info_buf.data(), my_info_buf.size()));
-      IBuffer peer_info_buf(out_allocator_, 26);
+      IBuffer peer_info_buf(out_allocator_, RoCEChannelInfo::size());
       asio::read(socket, asio::buffer(peer_info_buf.data(), peer_info_buf.size()));
       RoCEChannelInfo peer_info = deserialize_info(peer_info_buf);
       modify_qp_to_rts(channel->qp, peer_info, my_info.psn);
@@ -266,8 +271,8 @@ protected:
 
 private:
   void serialize_info(const RoCEChannelInfo &info, IBuffer &buffer) {
-    buffer.set_endianess(Endianness::BIG);  // Handshake uses Big Endian (Network Byte Order)
     size_t offset = 0;
+    buffer.write(offset, tnn::sys_endianness);
     buffer.write(offset, info.lid);
     buffer.write(offset, info.qpn);
     buffer.write(offset, info.psn);
@@ -275,9 +280,10 @@ private:
   }
 
   RoCEChannelInfo deserialize_info(const IBuffer &buffer) {
-    RoCEChannelInfo info;
-    buffer.set_endianess(Endianness::BIG);
+    Endianness endianness;
     size_t offset = 0;
+    buffer.read(offset, endianness);
+    RoCEChannelInfo info;
     buffer.read(offset, info.lid);
     buffer.read(offset, info.qpn);
     buffer.read(offset, info.psn);

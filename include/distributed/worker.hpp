@@ -91,17 +91,17 @@ public:
     this->model_ = Sequential::create_from_config(model_config);
     auto &device = use_gpu_ ? getGPU() : getHost();
     auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
-    Graph graph(allocator);
-    graph.add_layer(*model_);
+    this->graph_ = std::make_unique<Graph>(allocator);
+    this->graph_->add_layer(*model_);
     this->model_->set_seed(123456);
-    graph.compile();
+    this->graph_->compile();
 
     auto parsed_config = this->model_->get_config();
     std::cout << parsed_config.to_json().dump(4) << std::endl;
 
     OptimizerConfig optimizer_config = config.optimizer_config;
     this->optimizer_ = OptimizerFactory::create_from_config(optimizer_config);
-    this->optimizer_->attach(graph.context());
+    this->optimizer_->attach(this->graph_->context());
 
     this->scheduler_ =
         SchedulerFactory::create_from_config(config.scheduler_config, this->optimizer_.get());
@@ -302,6 +302,7 @@ protected:
   }
 
   bool use_gpu_;
+  std::unique_ptr<Graph> graph_;
   std::unique_ptr<Sequential> model_;
   std::unique_ptr<Optimizer> optimizer_;
   std::unique_ptr<Scheduler> scheduler_;

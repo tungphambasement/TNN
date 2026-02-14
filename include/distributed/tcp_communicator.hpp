@@ -194,10 +194,10 @@ public:
         }
         IdentityMessage identity;
         identity.listening_port = endpoint_.get_parameter<int>("port");
-        IBuffer identity_buffer(out_allocator_, identity.size());
+        IBuffer identity_buffer(int_allocator_, IdentityMessage::size());
         identity.serialize(identity_buffer);
 
-        asio::write(channel->socket, asio::buffer(identity_buffer.data(), identity_buffer.size()));
+        asio::write(channel->socket, asio::buffer(identity_buffer.data(), IdentityMessage::size()));
 
         init_peer_ctx(endpoint, channel);
 
@@ -232,10 +232,10 @@ public:
 private:
   struct IdentityMessage {
     int32_t listening_port;
-    size_t size() const { return sizeof(listening_port); }
+    static constexpr size_t size() { return sizeof(Endianness) + sizeof(listening_port); }
     void serialize(IBuffer &buffer) const {
       size_t offset = 0;
-      buffer.write(offset, get_system_endianness());
+      buffer.write(offset, tnn::sys_endianness);
       buffer.write(offset, listening_port);
     }
     void deserialize(IBuffer &buffer, size_t &offset) {
@@ -284,10 +284,10 @@ private:
       std::error_code ec;
       auto err = channel->socket.set_option(asio::ip::tcp::no_delay(true), ec);
       if (ec || err) std::cerr << "Failed to set TCP_NODELAY: " << ec.message() << std::endl;
-      IBuffer identity_buffer(out_allocator_, sizeof(int32_t));
-      identity_buffer.resize(sizeof(int32_t));
+      IBuffer identity_buffer(int_allocator_, IdentityMessage::size());
+      identity_buffer.resize(IdentityMessage::size());
       co_await asio::async_read(channel->socket,
-                                asio::buffer(identity_buffer.data(), identity_buffer.size()),
+                                asio::buffer(identity_buffer.data(), IdentityMessage::size()),
                                 asio::use_awaitable);
       IdentityMessage identity;
       size_t offset = 0;
