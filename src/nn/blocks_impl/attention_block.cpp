@@ -39,13 +39,6 @@ AttentionBlock::AttentionBlock(size_t embed_dim, size_t num_heads, bool is_causa
   out_proj_ = std::make_unique<DenseLayer>(embed_dim, embed_dim, true, name + "_out");
 }
 
-void AttentionBlock::init_impl() {
-  q_proj_->init();
-  k_proj_->init();
-  v_proj_->init();
-  out_proj_->init();
-}
-
 void AttentionBlock::forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id) {
   const auto &input_shape = input->shape();
 

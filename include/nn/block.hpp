@@ -17,7 +17,13 @@ public:
   }
 
 protected:
-  void init_impl() override = 0;
+  void init_impl() override {
+    auto layers = this->layers();
+    for (auto &layer : layers) {
+      layer->init();
+    }
+  }
+
   void on_set_allocator(IAllocator &allocator) override {
     auto layers = this->layers();
     for (auto &layer : layers) {

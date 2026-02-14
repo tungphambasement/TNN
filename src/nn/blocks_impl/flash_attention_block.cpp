@@ -55,13 +55,6 @@ FlashAttentionBlock::~FlashAttentionBlock() {
 #endif
 }
 
-void FlashAttentionBlock::init_impl() {
-  q_proj_->init();
-  k_proj_->init();
-  v_proj_->init();
-  out_proj_->init();
-}
-
 size_t FlashAttentionBlock::get_shape_hash(size_t b, size_t h, size_t s, size_t d) const {
   size_t seed = 0;
   auto hash_combine = [&](size_t v) { seed ^= v + 0x9e3779b9 + (seed << 6) + (seed >> 2); };

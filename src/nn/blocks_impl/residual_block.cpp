@@ -34,15 +34,6 @@ ResidualBlock::ResidualBlock(std::vector<std::unique_ptr<Layer>> main_path,
   }
 }
 
-void ResidualBlock::init_impl() {
-  for (auto &layer : main_path_) {
-    layer->init();
-  }
-  for (auto &layer : shortcut_path_) {
-    layer->init();
-  }
-}
-
 static size_t compute_path_max_size(const std::vector<std::unique_ptr<Layer>> &path,
                                     const std::vector<size_t> &input_shape, DType_t dtype) {
   size_t max_size = 0;

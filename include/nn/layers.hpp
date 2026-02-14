@@ -15,7 +15,6 @@
 #include "nn/graph_context.hpp"
 #include "nn/layer.hpp"
 #include "nn/layers_impl/legacy_dense_layer.hpp"
-#include "type/type.hpp"
 
 namespace tnn {
 inline std::unique_ptr<ActivationFunction> create_activation(const std::string &name) {

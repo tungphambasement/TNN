@@ -34,12 +34,6 @@ void Sequential::compute_max_size(const std::vector<size_t> &input_shape, DType_
   max_size_ = current_max;
 }
 
-void Sequential::init_impl() {
-  for (auto &layer : layers_) {
-    layer->init();
-  }
-}
-
 void Sequential::forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id) {
   if (layers_.empty()) {
     throw std::runtime_error("Cannot forward through empty sequential model");
