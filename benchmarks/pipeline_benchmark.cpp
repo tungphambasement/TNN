@@ -10,7 +10,7 @@ using namespace std;
 
 signed main() {
   auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   Conv2DLayer conv_layer(3, 64, 3, 3, 1, 1, 1, 1, true, "conv2d_test");
   BatchNormLayer batchnorm_layer(64, 1e-5f, 0.1, true, true, "batchnorm_test");
   MaxPool2DLayer maxpool_layer(2, 2, 2, 2, 0, 0, "maxpool_test");
@@ -19,7 +19,7 @@ signed main() {
   graph.add_layer(batchnorm_layer);
   graph.add_layer(maxpool_layer);
 
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({128, 224, 224, 3}, getGPU());
   input->fill_random_normal(0.5f, 0.2f, 676767);

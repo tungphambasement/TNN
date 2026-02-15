@@ -188,9 +188,9 @@ protected:
 TEST_F(LegacyConv2DLayerTest, BasicForwardPass) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, true, "test_conv");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getHost());
   input->fill(1.0f);
@@ -212,9 +212,9 @@ TEST_F(LegacyConv2DLayerTest, BasicForwardPass) {
 TEST_F(LegacyConv2DLayerTest, ForwardPassWithStride) {
   LegacyConv2DLayer layer(1, 2, 3, 3, 2, 2, 0, 0, false, "test_conv_stride");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 1, 7, 7}, getHost());
   input->fill(1.0f);
@@ -233,9 +233,9 @@ TEST_F(LegacyConv2DLayerTest, ForwardPassWithStride) {
 TEST_F(LegacyConv2DLayerTest, ForwardPassWithPadding) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 1, 1, true, "test_conv_padding");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getHost());
   input->fill(1.0f);
@@ -253,9 +253,9 @@ TEST_F(LegacyConv2DLayerTest, ForwardPassWithPadding) {
 TEST_F(LegacyConv2DLayerTest, ForwardPassMultiChannel) {
   LegacyConv2DLayer layer(3, 2, 3, 3, 1, 1, 0, 0, true, "test_conv_multichannel");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 3, 5, 5}, getHost());
   float *input_data = input->data_as<float>();
@@ -277,9 +277,9 @@ TEST_F(LegacyConv2DLayerTest, ForwardPassMultiChannel) {
 TEST_F(LegacyConv2DLayerTest, ForwardPassMultiBatch) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, false, "test_conv_multibatch");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({4, 1, 5, 5}, getHost());
   input->fill(1.0f);
@@ -296,9 +296,9 @@ TEST_F(LegacyConv2DLayerTest, ForwardPassMultiBatch) {
 TEST_F(LegacyConv2DLayerTest, ForwardPassNonSquareKernel) {
   LegacyConv2DLayer layer(1, 1, 3, 5, 1, 1, 0, 0, true, "test_conv_nonsquare");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 1, 7, 9}, getHost());
   input->fill(1.0f);
@@ -316,9 +316,9 @@ TEST_F(LegacyConv2DLayerTest, ForwardPassNonSquareKernel) {
 TEST_F(LegacyConv2DLayerTest, ForwardPassWithBias) {
   LegacyConv2DLayer layer(1, 2, 3, 3, 1, 1, 0, 0, true, "test_conv_bias");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getHost());
   input->fill(1.0f);
@@ -335,9 +335,9 @@ TEST_F(LegacyConv2DLayerTest, ForwardPassWithBias) {
 TEST_F(LegacyConv2DLayerTest, ForwardPassWithoutBias) {
   LegacyConv2DLayer layer(1, 2, 3, 3, 1, 1, 0, 0, false, "test_conv_no_bias");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getHost());
   input->fill(1.0f);
@@ -354,9 +354,9 @@ TEST_F(LegacyConv2DLayerTest, ForwardPassWithoutBias) {
 TEST_F(LegacyConv2DLayerTest, BasicBackwardPass) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, true, "test_conv_backward");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getHost());
   input->fill(1.0f);
@@ -380,9 +380,9 @@ TEST_F(LegacyConv2DLayerTest, BasicBackwardPass) {
 TEST_F(LegacyConv2DLayerTest, BackwardPassWithPadding) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 1, 1, true, "test_conv_backward_pad");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getHost());
   input->fill(1.0f);
@@ -404,9 +404,9 @@ TEST_F(LegacyConv2DLayerTest, BackwardPassWithPadding) {
 TEST_F(LegacyConv2DLayerTest, BackwardPassMultiChannel) {
   LegacyConv2DLayer layer(3, 2, 3, 3, 1, 1, 0, 0, true, "test_conv_backward_multichannel");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 3, 5, 5}, getHost());
   input->fill(1.0f);
@@ -429,9 +429,9 @@ TEST_F(LegacyConv2DLayerTest, BackwardPassMultiChannel) {
 TEST_F(LegacyConv2DLayerTest, BackwardPassMultiBatch) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, false, "test_conv_backward_multibatch");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({4, 1, 5, 5}, getHost());
   input->fill(1.0f);
@@ -454,9 +454,9 @@ TEST_F(LegacyConv2DLayerTest, BackwardPassMultiBatch) {
 TEST_F(LegacyConv2DLayerTest, BackwardPassVariableGradient) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, true, "test_conv_backward_var");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getHost());
   float *input_data = input->data_as<float>();
@@ -523,9 +523,9 @@ TEST_F(LegacyConv2DLayerTest, GetConfig) {
 TEST_F(LegacyConv2DLayerTest, EdgeCase1x1Convolution) {
   LegacyConv2DLayer layer(3, 16, 1, 1, 1, 1, 0, 0, true, "test_1x1_conv");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 3, 8, 8}, getHost());
   input->fill(1.0f);
@@ -543,9 +543,9 @@ TEST_F(LegacyConv2DLayerTest, EdgeCase1x1Convolution) {
 TEST_F(LegacyConv2DLayerTest, EdgeCaseZeroGradient) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, true, "test_zero_gradient");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getHost());
   input->fill(1.0f);
@@ -566,9 +566,9 @@ TEST_F(LegacyConv2DLayerTest, EdgeCaseZeroGradient) {
 TEST_F(LegacyConv2DLayerTest, EdgeCaseLargeValues) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, false, "test_large_values");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getHost());
   input->fill(1e6f);
@@ -584,9 +584,9 @@ TEST_F(LegacyConv2DLayerTest, EdgeCaseLargeValues) {
 TEST_F(LegacyConv2DLayerTest, EdgeCaseNegativeValues) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, true, "test_negative_values");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getHost());
   float *input_data = input->data_as<float>();
@@ -604,9 +604,9 @@ TEST_F(LegacyConv2DLayerTest, EdgeCaseNegativeValues) {
 TEST_F(LegacyConv2DLayerTest, NumericalStabilitySmallValues) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, true, "test_small_values");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getHost());
   input->fill(1e-6f);
@@ -622,9 +622,9 @@ TEST_F(LegacyConv2DLayerTest, NumericalStabilitySmallValues) {
 TEST_F(LegacyConv2DLayerTest, BackwardNumericalStability) {
   LegacyConv2DLayer layer(1, 1, 3, 3, 1, 1, 0, 0, false, "test_backward_stability");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getHost());
   input->fill(1e-6f);
@@ -645,9 +645,9 @@ TEST_F(LegacyConv2DLayerTest, BackwardNumericalStability) {
 TEST_F(LegacyConv2DLayerTest, ParameterCollectionWithBias) {
   LegacyConv2DLayer layer(3, 16, 3, 3, 1, 1, 0, 0, true, "test_params_bias");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   std::vector<Tensor> params = layer.parameters();
 
@@ -657,9 +657,9 @@ TEST_F(LegacyConv2DLayerTest, ParameterCollectionWithBias) {
 TEST_F(LegacyConv2DLayerTest, ParameterCollectionWithoutBias) {
   LegacyConv2DLayer layer(3, 16, 3, 3, 1, 1, 0, 0, false, "test_params_no_bias");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   std::vector<Tensor> params = layer.parameters();
   EXPECT_EQ(params.size(), 1);
@@ -668,9 +668,9 @@ TEST_F(LegacyConv2DLayerTest, ParameterCollectionWithoutBias) {
 TEST_F(LegacyConv2DLayerTest, GradientCollectionWithBias) {
   LegacyConv2DLayer layer(3, 16, 3, 3, 1, 1, 0, 0, true, "test_grads_bias");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   std::vector<Tensor> grads = layer.gradients();
 
@@ -680,9 +680,9 @@ TEST_F(LegacyConv2DLayerTest, GradientCollectionWithBias) {
 TEST_F(LegacyConv2DLayerTest, GradientCollectionWithoutBias) {
   LegacyConv2DLayer layer(3, 16, 3, 3, 1, 1, 0, 0, false, "test_grads_no_bias");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   std::vector<Tensor> grads = layer.gradients();
 
@@ -692,9 +692,9 @@ TEST_F(LegacyConv2DLayerTest, GradientCollectionWithoutBias) {
 TEST_F(LegacyConv2DLayerTest, ResNet1x1ChannelIncrease) {
   LegacyConv2DLayer layer(64, 256, 1, 1, 1, 1, 0, 0, false, "resnet_1x1_increase");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 64, 8, 8}, getHost());
   float *input_data = input->data_as<float>();
@@ -727,9 +727,9 @@ TEST_F(LegacyConv2DLayerTest, ResNet1x1ChannelIncrease) {
 TEST_F(LegacyConv2DLayerTest, ResNet1x1ChannelDecrease) {
   LegacyConv2DLayer layer(256, 64, 1, 1, 1, 1, 0, 0, false, "resnet_1x1_decrease");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 256, 8, 8}, getHost());
   float *input_data = input->data_as<float>();
@@ -762,9 +762,9 @@ TEST_F(LegacyConv2DLayerTest, ResNet1x1ChannelDecrease) {
 TEST_F(LegacyConv2DLayerTest, ResNetStridedDownsample) {
   LegacyConv2DLayer layer(64, 128, 3, 3, 2, 2, 0, 0, false, "resnet_strided_downsample");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 64, 9, 9}, getHost());
   float *input_data = input->data_as<float>();
@@ -797,9 +797,9 @@ TEST_F(LegacyConv2DLayerTest, ResNetStridedDownsample) {
 TEST_F(LegacyConv2DLayerTest, ResNetStridedWithPadding) {
   LegacyConv2DLayer layer(64, 128, 3, 3, 2, 2, 1, 1, false, "resnet_strided_padded");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 64, 8, 8}, getHost());
   float *input_data = input->data_as<float>();
@@ -832,9 +832,9 @@ TEST_F(LegacyConv2DLayerTest, ResNetStridedWithPadding) {
 TEST_F(LegacyConv2DLayerTest, ResNet1x1StridedDownsample) {
   LegacyConv2DLayer layer(64, 256, 1, 1, 2, 2, 0, 0, false, "resnet_1x1_strided");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 64, 8, 8}, getHost());
   float *input_data = input->data_as<float>();
@@ -867,9 +867,9 @@ TEST_F(LegacyConv2DLayerTest, ResNet1x1StridedDownsample) {
 TEST_F(LegacyConv2DLayerTest, ResNetBottleneck3x3) {
   LegacyConv2DLayer layer(64, 64, 3, 3, 1, 1, 1, 1, false, "resnet_bottleneck_3x3");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 64, 8, 8}, getHost());
   float *input_data = input->data_as<float>();
@@ -902,9 +902,9 @@ TEST_F(LegacyConv2DLayerTest, ResNetBottleneck3x3) {
 TEST_F(LegacyConv2DLayerTest, ResNetFirstConv7x7) {
   LegacyConv2DLayer layer(3, 64, 7, 7, 2, 2, 3, 3, true, "resnet_first_conv");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 3, 15, 15}, getHost());
   float *input_data = input->data_as<float>();
@@ -938,9 +938,9 @@ TEST_F(LegacyConv2DLayerTest, ResNetFirstConv7x7) {
 TEST_F(LegacyConv2DLayerTest, ResNetAsymmetricStride) {
   LegacyConv2DLayer layer(32, 64, 3, 3, 2, 1, 1, 1, false, "resnet_asymmetric_stride");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 32, 8, 8}, getHost());
   float *input_data = input->data_as<float>();
@@ -973,9 +973,9 @@ TEST_F(LegacyConv2DLayerTest, ResNetAsymmetricStride) {
 TEST_F(LegacyConv2DLayerTest, ResNetSmallFeatureMap) {
   LegacyConv2DLayer layer(64, 64, 3, 3, 2, 2, 1, 1, false, "resnet_small_feature");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 64, 7, 7}, getHost());
   float *input_data = input->data_as<float>();

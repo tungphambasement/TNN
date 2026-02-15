@@ -127,9 +127,9 @@ protected:
 TEST_F(LegacyLegacyDenseLayerTest, BasicForwardPass) {
   LegacyDenseLayer layer(10, 5, true, "test_dense");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 10}, getHost());
   input->fill(1.0f);
@@ -150,9 +150,9 @@ TEST_F(LegacyLegacyDenseLayerTest, BasicForwardPass) {
 TEST_F(LegacyLegacyDenseLayerTest, ForwardPassSingleBatch) {
   LegacyDenseLayer layer(20, 10, true, "test_dense_single");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 20}, getHost());
   float *input_data = input->data_as<float>();
@@ -173,9 +173,9 @@ TEST_F(LegacyLegacyDenseLayerTest, ForwardPassSingleBatch) {
 TEST_F(LegacyLegacyDenseLayerTest, ForwardPassMultiBatch) {
   LegacyDenseLayer layer(15, 8, false, "test_dense_multibatch");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({4, 15}, getHost());
   input->fill(0.5f);
@@ -193,9 +193,9 @@ TEST_F(LegacyLegacyDenseLayerTest, ForwardPassMultiBatch) {
 TEST_F(LegacyLegacyDenseLayerTest, ForwardPassLargeLayer) {
   LegacyDenseLayer layer(128, 64, true, "test_dense_large");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 128}, getHost());
   input->fill(1.0f);
@@ -212,9 +212,9 @@ TEST_F(LegacyLegacyDenseLayerTest, ForwardPassLargeLayer) {
 TEST_F(LegacyLegacyDenseLayerTest, ForwardPassWithBias) {
   LegacyDenseLayer layer(10, 5, true, "test_dense_bias");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 10}, getHost());
   input->fill(1.0f);
@@ -231,9 +231,9 @@ TEST_F(LegacyLegacyDenseLayerTest, ForwardPassWithBias) {
 TEST_F(LegacyLegacyDenseLayerTest, ForwardPassWithoutBias) {
   LegacyDenseLayer layer(10, 5, false, "test_dense_no_bias");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 10}, getHost());
   input->fill(1.0f);
@@ -250,9 +250,9 @@ TEST_F(LegacyLegacyDenseLayerTest, ForwardPassWithoutBias) {
 TEST_F(LegacyLegacyDenseLayerTest, ForwardPassVariableInput) {
   LegacyDenseLayer layer(6, 3, true, "test_dense_variable");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 6}, getHost());
   float *input_data = input->data_as<float>();
@@ -270,9 +270,9 @@ TEST_F(LegacyLegacyDenseLayerTest, ForwardPassVariableInput) {
 TEST_F(LegacyLegacyDenseLayerTest, BasicBackwardPass) {
   LegacyDenseLayer layer(10, 5, true, "test_dense_backward");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 10}, getHost());
   input->fill(1.0f);
@@ -298,9 +298,9 @@ TEST_F(LegacyLegacyDenseLayerTest, BasicBackwardPass) {
 TEST_F(LegacyLegacyDenseLayerTest, BackwardPassSingleBatch) {
   LegacyDenseLayer layer(20, 10, true, "test_dense_backward_single");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 20}, getHost());
   input->fill(1.0f);
@@ -323,9 +323,9 @@ TEST_F(LegacyLegacyDenseLayerTest, BackwardPassSingleBatch) {
 TEST_F(LegacyLegacyDenseLayerTest, BackwardPassMultiBatch) {
   LegacyDenseLayer layer(15, 8, false, "test_dense_backward_multibatch");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({4, 15}, getHost());
   input->fill(1.0f);
@@ -348,9 +348,9 @@ TEST_F(LegacyLegacyDenseLayerTest, BackwardPassMultiBatch) {
 TEST_F(LegacyLegacyDenseLayerTest, BackwardPassVariableGradient) {
   LegacyDenseLayer layer(8, 4, true, "test_dense_backward_var");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 8}, getHost());
   float *input_data = input->data_as<float>();
@@ -378,9 +378,9 @@ TEST_F(LegacyLegacyDenseLayerTest, BackwardPassVariableGradient) {
 TEST_F(LegacyLegacyDenseLayerTest, BackwardPassWithBias) {
   LegacyDenseLayer layer(10, 5, true, "test_dense_backward_bias");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 10}, getHost());
   input->fill(1.0f);
@@ -401,9 +401,9 @@ TEST_F(LegacyLegacyDenseLayerTest, BackwardPassWithBias) {
 TEST_F(LegacyLegacyDenseLayerTest, BackwardPassWithoutBias) {
   LegacyDenseLayer layer(10, 5, false, "test_dense_backward_no_bias");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 10}, getHost());
   input->fill(1.0f);
@@ -459,9 +459,9 @@ TEST_F(LegacyLegacyDenseLayerTest, CreateFromConfig) {
 TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseSmallLayer) {
   LegacyDenseLayer layer(2, 1, true, "test_small_layer");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 2}, getHost());
   input->fill(1.0f);
@@ -478,9 +478,9 @@ TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseSmallLayer) {
 TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseZeroGradient) {
   LegacyDenseLayer layer(10, 5, true, "test_zero_gradient");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 10}, getHost());
   input->fill(1.0f);
@@ -501,9 +501,9 @@ TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseZeroGradient) {
 TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseLargeValues) {
   LegacyDenseLayer layer(10, 5, false, "test_large_values");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 10}, getHost());
   input->fill(1e6f);
@@ -518,9 +518,9 @@ TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseLargeValues) {
 TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseNegativeValues) {
   LegacyDenseLayer layer(8, 4, true, "test_negative_values");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({1, 8}, getHost());
   float *input_data = input->data_as<float>();
@@ -538,9 +538,9 @@ TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseNegativeValues) {
 TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseLargeBatch) {
   LegacyDenseLayer layer(20, 10, true, "test_large_batch");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({32, 20}, getHost());
   input->fill(1.0f);
@@ -557,9 +557,9 @@ TEST_F(LegacyLegacyDenseLayerTest, EdgeCaseLargeBatch) {
 TEST_F(LegacyLegacyDenseLayerTest, NumericalStabilitySmallValues) {
   LegacyDenseLayer layer(10, 5, true, "test_small_values");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 10}, getHost());
   input->fill(1e-6f);
@@ -574,9 +574,9 @@ TEST_F(LegacyLegacyDenseLayerTest, NumericalStabilitySmallValues) {
 TEST_F(LegacyLegacyDenseLayerTest, BackwardNumericalStability) {
   LegacyDenseLayer layer(10, 5, false, "test_backward_stability");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 10}, getHost());
   input->fill(1e-6f);
@@ -597,9 +597,9 @@ TEST_F(LegacyLegacyDenseLayerTest, BackwardNumericalStability) {
 TEST_F(LegacyLegacyDenseLayerTest, NumericalStabilityMixedValues) {
   LegacyDenseLayer layer(10, 5, true, "test_mixed_values");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({2, 10}, getHost());
   float *input_data = input->data_as<float>();
@@ -617,9 +617,9 @@ TEST_F(LegacyLegacyDenseLayerTest, NumericalStabilityMixedValues) {
 TEST_F(LegacyLegacyDenseLayerTest, MultipleForwardBackwardPasses) {
   LegacyDenseLayer layer(10, 5, true, "test_multiple_passes");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input1 = make_tensor<float>({2, 10}, getHost());
   input1->fill(1.0f);

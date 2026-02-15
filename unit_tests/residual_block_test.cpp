@@ -117,9 +117,9 @@ protected:
                                                      false, name);
     {
       auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-      Graph graph(allocator);
+      Graph graph;
       graph.add_layer(*layer);
-      graph.compile();
+      graph.compile(allocator);
     }
 
     // Set weights to scale value
@@ -148,9 +148,9 @@ TEST_F(ResidualBlockTest, IdentityShortcutForward) {
   ResidualBlock residual(std::move(main_path), {}, "none", "identity_residual");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(residual);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
@@ -179,9 +179,9 @@ TEST_F(ResidualBlockTest, IdentityShortcutForwardWithReLU) {
   ResidualBlock residual(std::move(main_path), {}, "relu", "identity_relu");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(residual);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
@@ -208,9 +208,9 @@ TEST_F(ResidualBlockTest, IdentityShortcutMultiChannel) {
   ResidualBlock residual(std::move(main_path), {}, "none", "identity_multichannel");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(residual);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 2, 2, 2}, getHost());
@@ -244,9 +244,9 @@ TEST_F(ResidualBlockTest, IdentityShortcutMultiBatch) {
   ResidualBlock residual(std::move(main_path), {}, "none", "identity_multibatch");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(residual);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({2, 1, 2, 2}, getHost());
@@ -282,9 +282,9 @@ TEST_F(ResidualBlockTest, ProjectionShortcutForward) {
   ResidualBlock residual(std::move(main_path), std::move(shortcut), "none", "projection_residual");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(residual);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
@@ -313,9 +313,9 @@ TEST_F(ResidualBlockTest, ProjectionShortcutWithReLU) {
   ResidualBlock residual(std::move(main_path), std::move(shortcut), "relu", "projection_relu");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(residual);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
@@ -344,9 +344,9 @@ TEST_F(ResidualBlockTest, IdentityShortcutBackward) {
   ResidualBlock residual(std::move(main_path), {}, "none", "identity_backward");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(residual);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
@@ -431,9 +431,9 @@ TEST_F(ResidualBlockTest, EdgeCaseZeroGradient) {
   ResidualBlock residual(std::move(main_path), {}, "none", "zero_gradient");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(residual);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
@@ -461,9 +461,9 @@ TEST_F(ResidualBlockTest, EdgeCaseLargeValues) {
   ResidualBlock residual(std::move(main_path), {}, "none", "large_values");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(residual);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
@@ -490,9 +490,9 @@ TEST_F(ResidualBlockTest, EdgeCaseNegativeValues) {
   ResidualBlock residual(std::move(main_path), {}, "none", "negative_values");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(residual);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
@@ -519,9 +519,9 @@ TEST_F(ResidualBlockTest, NumericalStabilitySmallValues) {
   ResidualBlock residual(std::move(main_path), {}, "none", "small_values");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(residual);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
@@ -548,9 +548,9 @@ TEST_F(ResidualBlockTest, NumericalStabilityBackward) {
   ResidualBlock residual(std::move(main_path), {}, "none", "backward_stability");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(residual);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
@@ -585,9 +585,9 @@ TEST_F(ResidualBlockTest, MultiLayerMainPath) {
   ResidualBlock residual(std::move(main_path), {}, "none", "multi_layer");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(residual);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
@@ -617,9 +617,9 @@ TEST_F(ResidualBlockTest, MultiLayerMainPathBackward) {
   ResidualBlock residual(std::move(main_path), {}, "none", "multi_layer_backward");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(residual);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
@@ -651,9 +651,9 @@ TEST_F(ResidualBlockTest, ReLUNegativeInputSuppressionForward) {
   ResidualBlock residual(std::move(main_path), {}, "relu", "relu_suppression");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(residual);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
@@ -680,9 +680,9 @@ TEST_F(ResidualBlockTest, ReLUNegativeInputSuppressionBackward) {
   ResidualBlock residual(std::move(main_path), {}, "relu", "relu_suppression_bwd");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(residual);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());

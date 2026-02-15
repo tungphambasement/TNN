@@ -144,9 +144,9 @@ protected:
 TEST_F(LegacyBatchNormLayerTest, BasicForwardPassTraining) {
   LegacyBatchNormLayer layer(3, 1e-5f, 0.1f, false, "test_bn");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
   layer.set_training(true);
 
   Tensor input = make_tensor<float>({2, 3, 4, 4}, getHost());
@@ -170,9 +170,9 @@ TEST_F(LegacyBatchNormLayerTest, BasicForwardPassTraining) {
 TEST_F(LegacyBatchNormLayerTest, ForwardPassWithAffineTraining) {
   LegacyBatchNormLayer layer(3, 1e-5f, 0.1f, true, "test_bn_affine");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
   layer.set_training(true);
 
   Tensor input = make_tensor<float>({2, 3, 4, 4}, getHost());
@@ -199,9 +199,9 @@ TEST_F(LegacyBatchNormLayerTest, ForwardPassWithAffineTraining) {
 TEST_F(LegacyBatchNormLayerTest, ForwardPassSingleChannel) {
   LegacyBatchNormLayer layer(1, 1e-5f, 0.1f, false, "test_bn_single");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
   layer.set_training(true);
 
   Tensor input = make_tensor<float>({4, 1, 8, 8}, getHost());
@@ -222,9 +222,9 @@ TEST_F(LegacyBatchNormLayerTest, ForwardPassSingleChannel) {
 TEST_F(LegacyBatchNormLayerTest, ForwardPassMultiBatch) {
   LegacyBatchNormLayer layer(2, 1e-5f, 0.1f, false, "test_bn_multibatch");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
   layer.set_training(true);
 
   Tensor input = make_tensor<float>({8, 2, 4, 4}, getHost());
@@ -244,9 +244,9 @@ TEST_F(LegacyBatchNormLayerTest, ForwardPassMultiBatch) {
 TEST_F(LegacyBatchNormLayerTest, ForwardPassLargeFeatures) {
   LegacyBatchNormLayer layer(64, 1e-5f, 0.1f, true, "test_bn_large");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
   layer.set_training(true);
 
   Tensor input = make_tensor<float>({2, 64, 8, 8}, getHost());
@@ -266,9 +266,9 @@ TEST_F(LegacyBatchNormLayerTest, ForwardPassLargeFeatures) {
 TEST_F(LegacyBatchNormLayerTest, ForwardPassInference) {
   LegacyBatchNormLayer layer(3, 1e-5f, 0.1f, false, "test_bn_inference");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
   layer.set_training(false);
 
   Tensor input = make_tensor<float>({2, 3, 4, 4}, getHost());
@@ -293,9 +293,9 @@ TEST_F(LegacyBatchNormLayerTest, ForwardPassInference) {
 TEST_F(LegacyBatchNormLayerTest, ForwardPassInferenceWithAffine) {
   LegacyBatchNormLayer layer(2, 1e-5f, 0.1f, true, "test_bn_inference_affine");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
   layer.set_training(false);
 
   Tensor input = make_tensor<float>({1, 2, 4, 4}, getHost());
@@ -311,9 +311,9 @@ TEST_F(LegacyBatchNormLayerTest, ForwardPassInferenceWithAffine) {
 TEST_F(LegacyBatchNormLayerTest, BasicBackwardPass) {
   LegacyBatchNormLayer layer(2, 1e-5f, 0.1f, false, "test_bn_backward");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
   layer.set_training(true);
 
   Tensor input = make_tensor<float>({2, 2, 4, 4}, getHost());
@@ -338,9 +338,9 @@ TEST_F(LegacyBatchNormLayerTest, BasicBackwardPass) {
 TEST_F(LegacyBatchNormLayerTest, BackwardPassWithAffine) {
   LegacyBatchNormLayer layer(3, 1e-5f, 0.1f, true, "test_bn_backward_affine");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
   layer.set_training(true);
 
   Tensor input = make_tensor<float>({2, 3, 4, 4}, getHost());
@@ -371,9 +371,9 @@ TEST_F(LegacyBatchNormLayerTest, BackwardPassWithAffine) {
 TEST_F(LegacyBatchNormLayerTest, BackwardPassMultiBatch) {
   LegacyBatchNormLayer layer(2, 1e-5f, 0.1f, false, "test_bn_backward_multibatch");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
   layer.set_training(true);
 
   Tensor input = make_tensor<float>({8, 2, 4, 4}, getHost());
@@ -397,9 +397,9 @@ TEST_F(LegacyBatchNormLayerTest, BackwardPassMultiBatch) {
 TEST_F(LegacyBatchNormLayerTest, BackwardPassZeroGradient) {
   LegacyBatchNormLayer layer(2, 1e-5f, 0.1f, true, "test_bn_backward_zero");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
   layer.set_training(true);
 
   Tensor input = make_tensor<float>({2, 2, 4, 4}, getHost());
@@ -464,9 +464,9 @@ TEST_F(LegacyBatchNormLayerTest, CreateFromConfig) {
 TEST_F(LegacyBatchNormLayerTest, ParameterCollectionWithAffine) {
   LegacyBatchNormLayer layer(16, 1e-5f, 0.1f, true, "test_bn_params_affine");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   std::vector<Tensor> params = layer.parameters();
 
@@ -476,9 +476,9 @@ TEST_F(LegacyBatchNormLayerTest, ParameterCollectionWithAffine) {
 TEST_F(LegacyBatchNormLayerTest, ParameterCollectionWithoutAffine) {
   LegacyBatchNormLayer layer(16, 1e-5f, 0.1f, false, "test_bn_params_no_affine");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   std::vector<Tensor> params = layer.parameters();
 
@@ -488,9 +488,9 @@ TEST_F(LegacyBatchNormLayerTest, ParameterCollectionWithoutAffine) {
 TEST_F(LegacyBatchNormLayerTest, GradientCollectionWithAffine) {
   LegacyBatchNormLayer layer(16, 1e-5f, 0.1f, true, "test_bn_grads_affine");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   std::vector<Tensor> grads = layer.gradients();
 
@@ -500,9 +500,9 @@ TEST_F(LegacyBatchNormLayerTest, GradientCollectionWithAffine) {
 TEST_F(LegacyBatchNormLayerTest, GradientCollectionWithoutAffine) {
   LegacyBatchNormLayer layer(16, 1e-5f, 0.1f, false, "test_bn_grads_no_affine");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
 
   std::vector<Tensor> grads = layer.gradients();
 
@@ -512,9 +512,9 @@ TEST_F(LegacyBatchNormLayerTest, GradientCollectionWithoutAffine) {
 TEST_F(LegacyBatchNormLayerTest, EdgeCaseSmallBatch) {
   LegacyBatchNormLayer layer(3, 1e-5f, 0.1f, false, "test_bn_small_batch");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
   layer.set_training(true);
 
   Tensor input = make_tensor<float>({1, 3, 4, 4}, getHost());
@@ -533,9 +533,9 @@ TEST_F(LegacyBatchNormLayerTest, EdgeCaseSmallBatch) {
 TEST_F(LegacyBatchNormLayerTest, EdgeCaseLargeEpsilon) {
   LegacyBatchNormLayer layer(2, 1e-1f, 0.1f, false, "test_bn_large_epsilon");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
   layer.set_training(true);
 
   Tensor input = make_tensor<float>({2, 2, 4, 4}, getHost());
@@ -551,9 +551,9 @@ TEST_F(LegacyBatchNormLayerTest, EdgeCaseLargeEpsilon) {
 TEST_F(LegacyBatchNormLayerTest, EdgeCaseSmallSpatialSize) {
   LegacyBatchNormLayer layer(4, 1e-5f, 0.1f, true, "test_bn_small_spatial");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
   layer.set_training(true);
 
   Tensor input = make_tensor<float>({4, 4, 1, 1}, getHost());
@@ -574,9 +574,9 @@ TEST_F(LegacyBatchNormLayerTest, EdgeCaseSmallSpatialSize) {
 TEST_F(LegacyBatchNormLayerTest, EdgeCaseLargeValues) {
   LegacyBatchNormLayer layer(2, 1e-5f, 0.1f, false, "test_bn_large_values");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
   layer.set_training(true);
 
   Tensor input = make_tensor<float>({2, 2, 4, 4}, getHost());
@@ -597,9 +597,9 @@ TEST_F(LegacyBatchNormLayerTest, EdgeCaseLargeValues) {
 TEST_F(LegacyBatchNormLayerTest, EdgeCaseNegativeValues) {
   LegacyBatchNormLayer layer(2, 1e-5f, 0.1f, true, "test_bn_negative");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
   layer.set_training(true);
 
   Tensor input = make_tensor<float>({2, 2, 4, 4}, getHost());
@@ -618,9 +618,9 @@ TEST_F(LegacyBatchNormLayerTest, EdgeCaseNegativeValues) {
 TEST_F(LegacyBatchNormLayerTest, NumericalStabilitySmallValues) {
   LegacyBatchNormLayer layer(2, 1e-5f, 0.1f, false, "test_bn_small_values");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
   layer.set_training(true);
 
   Tensor input = make_tensor<float>({2, 2, 4, 4}, getHost());
@@ -636,9 +636,9 @@ TEST_F(LegacyBatchNormLayerTest, NumericalStabilitySmallValues) {
 TEST_F(LegacyBatchNormLayerTest, NumericalStabilityMixedValues) {
   LegacyBatchNormLayer layer(2, 1e-5f, 0.1f, true, "test_bn_mixed");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   graph.add_layer(layer);
-  graph.compile();
+  graph.compile(allocator);
   layer.set_training(true);
 
   Tensor input = make_tensor<float>({2, 2, 4, 4}, getHost());

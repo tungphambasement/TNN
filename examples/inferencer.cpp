@@ -26,7 +26,7 @@ signed main() {
   std::string device_str = Env::get<std::string>("DEVICE_TYPE", "CPU");
   const auto &device = device_str == "GPU" ? getGPU(0) : getHost();
   auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
 
   string dataset_name = Env::get<std::string>("DATASET_NAME", "");
   if (dataset_name.empty()) {
@@ -46,7 +46,7 @@ signed main() {
     if (!file.is_open()) {
       throw std::runtime_error("Failed to open model file");
     }
-    model = load_state<Sequential>(file, graph);
+    model = load_state<Sequential>(file, graph, allocator);
     file.close();
     std::cout << "Loaded model config: " << model->get_config().to_json().dump(2) << std::endl;
   } else {

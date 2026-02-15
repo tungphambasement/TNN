@@ -1,5 +1,6 @@
 #pragma once
 
+#include "device/iallocator.hpp"
 #include "nn/graph_context.hpp"
 #include "nn/layer.hpp"
 #include "nn/node.hpp"
@@ -9,24 +10,20 @@ namespace tnn {
 // Simple op node. 1 Input, 1 Output.
 class OpNode : public INode {
 public:
-  OpNode(GraphContext &context, Layer &layer)
-      : INode(context),
-        layer_(layer) {
+  OpNode(GraphContextDescriptor &context, Layer &layer)
+      : layer_(layer) {
     auto param_descriptors = layer_.param_descriptors();
     for (const auto &desc : param_descriptors) {
-      context_.register_param(desc.shape, desc.dtype);
+      context.register_desc(desc);
     }
-    layer_.set_allocator(context_.allocator());
   }
 
-  void init() {
-    auto param_descriptors = layer_.param_descriptors();
-    for (const auto &desc : param_descriptors) {
-      *desc.data_ptr = context_.get_param(desc.shape, desc.dtype);
-      *desc.grad_ptr = context_.get_grad(desc.shape, desc.dtype);
-    }
+  void init(IAllocator &allocator) {
+    layer_.set_allocator(allocator);
     layer_.init();
   }
+
+  std::vector<ParamDescriptor> param_descriptors() const { return layer_.param_descriptors(); }
 
   void forward(const std::vector<ConstTensor> &inputs, const std::vector<Tensor> &outputs,
                size_t mb_id = 0) {

@@ -111,7 +111,7 @@ public:
     }
   }
 
-  TypedTensor(IAllocator &allocator, DType_t dtype, dptr &&data, const std::vector<size_t> &shape)
+  TypedTensor(IAllocator &allocator, DType_t dtype, const std::vector<size_t> &shape, dptr &&data)
       : dtype_(dtype),
         allocator_(allocator),
         data_(std::move(data)),
@@ -254,7 +254,7 @@ public:
     }
     size_t dtype_size = get_dtype_size(dtype_);
     dptr span_data = data_.span(offset * dtype_size, span_size * dtype_size);
-    return std::make_shared<TypedTensor>(allocator_, dtype_, std::move(span_data), span_sizes);
+    return std::make_shared<TypedTensor>(allocator_, dtype_, span_sizes, std::move(span_data));
   }
 
   std::unique_ptr<Task> fill(double value, flowHandle_t handle) override {

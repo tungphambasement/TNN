@@ -48,13 +48,13 @@ inline Tensor make_tensor(DType_t dtype, std::initializer_list<size_t> shape = {
 }
 
 template <typename T>
-inline Tensor make_tensor(IAllocator &allocator, dptr &&data, std::vector<size_t> shape) {
+inline Tensor make_tensor(IAllocator &allocator, std::vector<size_t> shape, dptr &&data) {
   return std::make_shared<TypedTensor>(allocator, dtype_of<T>(), std::move(data), shape);
 }
 
-inline Tensor make_tensor(IAllocator &allocator, DType_t dtype, dptr &&data,
-                          std::vector<size_t> shape) {
-  return std::make_shared<TypedTensor>(allocator, dtype, std::move(data), shape);
+inline Tensor make_tensor(IAllocator &allocator, DType_t dtype, std::vector<size_t> shape,
+                          dptr &&data) {
+  return std::make_shared<TypedTensor>(allocator, dtype, shape, std::move(data));
 }
 
 template <typename T>
@@ -91,7 +91,7 @@ inline Tensor dtype_cast(const ConstTensor &input, DType_t target_dtype) {
   DISPATCH_ON_ANY_DTYPE(
       input->data_type(), A_T,
       DISPATCH_DTYPE(target_dtype, B_T, ops::cast<A_T, B_T>(input_data, output_data, input_size)));
-  return make_tensor(input->allocator(), target_dtype, std::move(output_data), input->shape());
+  return make_tensor(input->allocator(), target_dtype, input->shape(), std::move(output_data));
 }
 
 inline Tensor load(std::ifstream &in, IAllocator &allocator) {

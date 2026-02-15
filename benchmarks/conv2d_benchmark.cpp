@@ -9,7 +9,7 @@ using namespace std;
 
 signed main() {
   auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
 
   Conv2DLayer conv_layer(16, 128, 3, 3, 1, 1, 0, 0, true, "conv2d_test");
   graph.add_layer(conv_layer);
@@ -17,7 +17,7 @@ signed main() {
   LegacyConv2DLayer legacy_conv_layer(16, 128, 3, 3, 1, 1, 0, 0, true, "legacy_conv2d_test");
   graph.add_layer(legacy_conv_layer);
 
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({128, 224, 224, 16}, getGPU());
   input->fill_random_normal(0.5f, 0.2f, 676767);

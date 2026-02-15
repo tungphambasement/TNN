@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
   // Create model using ExampleModels or load from file
   const Device &device = device_type == DeviceType::GPU ? getGPU() : getHost();
   auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   std::unique_ptr<Sequential> model;
   // Try to load from file, otherwise create from ExampleModels
   try {
@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     if (!file.is_open()) {
       throw std::runtime_error("Failed to open model file");
     }
-    model = load_state<Sequential>(file, graph);
+    model = load_state<Sequential>(file, graph, allocator);
     file.close();
   } catch (const std::exception &e) {
     cerr << "Could not load from file, trying ExampleModels: " << e.what() << endl;

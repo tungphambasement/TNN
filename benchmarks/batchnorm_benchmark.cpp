@@ -20,7 +20,7 @@ constexpr float EPSILON = 2e-2f;
 
 signed main() {
   auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   // fuse relu
   BatchNormLayer batchnorm_layer(NUM_FEATURES, 1e-5f, 0.1f, true, true, "batchnorm_test");
   graph.add_layer(batchnorm_layer);
@@ -30,7 +30,7 @@ signed main() {
   ActivationLayer relu_layer(std::make_unique<ReLU>(), "relu_activation");
   graph.add_layer(legacy_batchnorm_layer);
   graph.add_layer(relu_layer);
-  graph.compile();
+  graph.compile(allocator);
 
   Tensor input = make_tensor<float>({BATCH_SIZE, HEIGHT, WIDTH, NUM_FEATURES}, getGPU());
   input->fill_random_normal(0.5f, 0.2f, 676767);

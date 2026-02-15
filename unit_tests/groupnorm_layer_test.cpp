@@ -160,9 +160,9 @@ TEST_F(GroupNormLayerTest, BasicForwardPass) {
   GroupNormLayer layer(num_groups, num_channels, 1e-5f, false, "test_gn");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
   layer.set_training(true);
 
@@ -189,9 +189,9 @@ TEST_F(GroupNormLayerTest, ForwardPassWithAffine) {
   GroupNormLayer layer(num_groups, num_channels, 1e-5f, true, "test_gn_affine");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
   layer.set_training(true);
 
@@ -223,9 +223,9 @@ TEST_F(GroupNormLayerTest, SingleGroup) {
   GroupNormLayer layer(num_groups, num_channels, 1e-5f, false, "test_gn_single");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
   layer.set_training(true);
 
@@ -252,9 +252,9 @@ TEST_F(GroupNormLayerTest, ChannelsEqualsGroups) {
   GroupNormLayer layer(num_groups, num_channels, 1e-5f, false, "test_gn_instance");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
   layer.set_training(true);
 
@@ -281,9 +281,9 @@ TEST_F(GroupNormLayerTest, BackwardPassGradientFlow) {
   GroupNormLayer layer(num_groups, num_channels, 1e-5f, true, "test_gn_backward");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
   layer.set_training(true);
 

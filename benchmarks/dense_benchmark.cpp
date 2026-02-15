@@ -15,14 +15,14 @@ constexpr float EPSILON = 1e-3f;
 
 signed main() {
   auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   DenseLayer dense_layer(INPUT_FEATURES, OUTPUT_FEATURES, "dense_test");
   graph.add_layer(dense_layer);
 
   LegacyDenseLayer legacy_dense_layer(INPUT_FEATURES, OUTPUT_FEATURES, true, "legacy_dense_test");
   graph.add_layer(legacy_dense_layer);
 
-  graph.compile();
+  graph.compile(allocator);
 
   auto current_params = dense_layer.parameters();
   auto legacy_params = legacy_dense_layer.parameters();

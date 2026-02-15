@@ -1,7 +1,6 @@
 #pragma once
 
 #include "common/config.hpp"
-#include "nn/graph_context.hpp"
 
 namespace tnn {
 
@@ -9,9 +8,6 @@ using NodeConfig = TConfig;
 
 class INode {
 public:
-  INode(GraphContext &ctx)
-      : context_(ctx) {}
-
   virtual ~INode() = default;
 
   /**
@@ -22,8 +18,5 @@ public:
   virtual std::string type() const = 0;
   virtual void save_state(std::ofstream &file) = 0;
   virtual NodeConfig get_config() const = 0;
-
-protected:
-  GraphContext &context_;
 };
 }  // namespace tnn

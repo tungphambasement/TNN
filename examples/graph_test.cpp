@@ -9,6 +9,7 @@
 #include "device/device_type.hpp"
 #include "nn/accuracy.hpp"
 #include "nn/example_models.hpp"
+#include "nn/graph_executor.hpp"
 #include "nn/io_node.hpp"
 #include "nn/layers.hpp"
 #include "nn/train.hpp"
@@ -27,7 +28,7 @@ signed main() {
 
   const Device &device = train_config.device_type == DeviceType::GPU ? getGPU() : getHost();
   auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
 
   auto layers = LayerBuilder({28, 28, 1})
                     .conv2d(16, 3, 3, 1, 1, 1, 1, true, "conv1")
@@ -46,8 +47,8 @@ signed main() {
     current_input = &output;
   }
 
-  graph.compile();
-  GraphExecutor executor(graph);
+  graph.compile(allocator);
+  GraphExecutor executor(graph, allocator);
 
   string dataset_name = Env::get<std::string>("DATASET_NAME", "");
   string dataset_path = Env::get<std::string>("DATASET_PATH", "data");

@@ -195,9 +195,9 @@ TEST_F(LegacyMaxPool2DLayerTest, BasicForwardPass) {
   LegacyMaxPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_maxpool");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
@@ -224,9 +224,9 @@ TEST_F(LegacyMaxPool2DLayerTest, ForwardPassWithStride) {
   LegacyMaxPool2DLayer layer(3, 3, 1, 1, 0, 0, "test_maxpool_stride");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 5, 5}, getHost());
@@ -247,9 +247,9 @@ TEST_F(LegacyMaxPool2DLayerTest, ForwardPassWithPadding) {
   LegacyMaxPool2DLayer layer(3, 3, 1, 1, 1, 1, "test_maxpool_padding");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 3, 3}, getHost());
@@ -271,9 +271,9 @@ TEST_F(LegacyMaxPool2DLayerTest, ForwardPassMultiChannel) {
   LegacyMaxPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_maxpool_multichannel");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 2, 4, 4}, getHost());
@@ -296,9 +296,9 @@ TEST_F(LegacyMaxPool2DLayerTest, ForwardPassMultiBatch) {
   LegacyMaxPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_maxpool_multibatch");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({2, 1, 4, 4}, getHost());
@@ -319,9 +319,9 @@ TEST_F(LegacyMaxPool2DLayerTest, ForwardPassNonSquarePooling) {
   LegacyMaxPool2DLayer layer(3, 2, 2, 2, 0, 0, "test_maxpool_nonsquare");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 6, 4}, getHost());
@@ -341,9 +341,9 @@ TEST_F(LegacyMaxPool2DLayerTest, ForwardPassUniformValues) {
   LegacyMaxPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_maxpool_uniform");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
@@ -367,9 +367,9 @@ TEST_F(LegacyMaxPool2DLayerTest, BasicBackwardPass) {
   LegacyMaxPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_maxpool_backward");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
@@ -399,9 +399,9 @@ TEST_F(LegacyMaxPool2DLayerTest, BackwardPassWithPadding) {
   LegacyMaxPool2DLayer layer(3, 3, 1, 1, 1, 1, "test_maxpool_backward_pad");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 3, 3}, getHost());
@@ -428,9 +428,9 @@ TEST_F(LegacyMaxPool2DLayerTest, BackwardPassMultiChannel) {
   LegacyMaxPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_maxpool_backward_multichannel");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 2, 4, 4}, getHost());
@@ -458,9 +458,9 @@ TEST_F(LegacyMaxPool2DLayerTest, BackwardPassMultiBatch) {
   LegacyMaxPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_maxpool_backward_multibatch");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({2, 1, 4, 4}, getHost());
@@ -488,9 +488,9 @@ TEST_F(LegacyMaxPool2DLayerTest, BackwardPassVariableGradient) {
   LegacyMaxPool2DLayer layer(2, 2, 1, 1, 0, 0, "test_maxpool_backward_var");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 3, 3}, getHost());
@@ -520,9 +520,9 @@ TEST_F(LegacyMaxPool2DLayerTest, BackwardPassGradientRouting) {
   LegacyMaxPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_maxpool_grad_routing");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
@@ -623,9 +623,9 @@ TEST_F(LegacyMaxPool2DLayerTest, EdgeCaseGlobalMaxPooling) {
   LegacyMaxPool2DLayer layer(4, 4, 1, 1, 0, 0, "test_global_maxpool");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
@@ -647,9 +647,9 @@ TEST_F(LegacyMaxPool2DLayerTest, EdgeCaseZeroGradient) {
   LegacyMaxPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_zero_gradient");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
@@ -677,9 +677,9 @@ TEST_F(LegacyMaxPool2DLayerTest, EdgeCaseLargeValues) {
   LegacyMaxPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_large_values");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
@@ -700,9 +700,9 @@ TEST_F(LegacyMaxPool2DLayerTest, EdgeCaseNegativeValues) {
   LegacyMaxPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_negative_values");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
@@ -729,9 +729,9 @@ TEST_F(LegacyMaxPool2DLayerTest, EdgeCaseMixedSignValues) {
   LegacyMaxPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_mixed_values");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
@@ -754,9 +754,9 @@ TEST_F(LegacyMaxPool2DLayerTest, NumericalStabilitySmallValues) {
   LegacyMaxPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_small_values");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
@@ -777,9 +777,9 @@ TEST_F(LegacyMaxPool2DLayerTest, BackwardNumericalStability) {
   LegacyMaxPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_backward_stability");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
@@ -805,9 +805,9 @@ TEST_F(LegacyMaxPool2DLayerTest, NumericalStabilityExtremeValues) {
   LegacyMaxPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_extreme_values");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 1, 4, 4}, getHost());
@@ -832,9 +832,9 @@ TEST_F(LegacyMaxPool2DLayerTest, MultipleForwardBackwardPasses) {
   LegacyMaxPool2DLayer layer(2, 2, 2, 2, 0, 0, "test_multiple_passes");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   // First pass

@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
   DeviceType device_type = (device_str == "GPU") ? DeviceType::GPU : DeviceType::CPU;
   const auto &device = DeviceManager::getInstance().getDevice(device_type);
   auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
 
   string dataset_name = Env::get<std::string>("DATASET_NAME", "");
   if (dataset_name.empty()) {
@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
     if (!file.is_open()) {
       throw std::runtime_error("Failed to open model file");
     }
-    model = load_state<Sequential>(file, graph);
+    model = load_state<Sequential>(file, graph, allocator);
     file.close();
   } else {
     cout << "Creating model: " << model_name << endl;

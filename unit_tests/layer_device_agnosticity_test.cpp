@@ -114,15 +114,15 @@ TEST_F(LayerIntegrationTest, LegacyConv2DLayerForwardBasic) {
 
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(cpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(gpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   *gpu_layer.parameters()[0] = *cpu_layer.parameters()[0]->to_device(getGPU());
@@ -163,15 +163,15 @@ TEST_F(LayerIntegrationTest, LegacyConv2DLayerBackwardBasic) {
 
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(cpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(gpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   *gpu_layer.parameters()[0] = *cpu_layer.parameters()[0]->to_device(getGPU());
@@ -229,15 +229,15 @@ TEST_F(LayerIntegrationTest, LegacyConv2DLayerStridedConvolution) {
 
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(cpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(gpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   *gpu_layer.parameters()[0] = *cpu_layer.parameters()[0]->to_device(getGPU());
@@ -275,15 +275,15 @@ TEST_F(LayerIntegrationTest, DenseLayerForwardBasic) {
 
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(cpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(gpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   *gpu_layer.parameters()[0] = *cpu_layer.parameters()[0]->to_device(getGPU());
@@ -313,15 +313,15 @@ TEST_F(LayerIntegrationTest, DenseLayerBackwardBasic) {
 
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(cpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(gpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   *gpu_layer.parameters()[0] = *cpu_layer.parameters()[0]->to_device(getGPU());
@@ -366,15 +366,15 @@ TEST_F(LayerIntegrationTest, DenseLayerLargeMatrix) {
 
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(cpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(gpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   *gpu_layer.parameters()[0] = *cpu_layer.parameters()[0]->to_device(getGPU());
@@ -417,15 +417,15 @@ TEST_F(LayerIntegrationTest, LegacyMaxPool2DLayerForwardBasic) {
 
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(cpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(gpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({batch_size, channels, input_h, input_w}, getHost());
@@ -457,15 +457,15 @@ TEST_F(LayerIntegrationTest, LegacyMaxPool2DLayerBackwardBasic) {
 
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(cpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(gpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({batch_size, channels, input_h, input_w}, getHost());
@@ -507,15 +507,15 @@ TEST_F(LayerIntegrationTest, LegacyMaxPool2DLayerWithPadding) {
 
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(cpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(gpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({batch_size, channels, input_h, input_w}, getHost());
@@ -559,15 +559,15 @@ TEST_F(LayerIntegrationTest, LegacyMaxPool2DLayerNonSquare) {
 
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(cpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(gpu_layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({batch_size, channels, input_h, input_w}, getHost());
@@ -605,10 +605,10 @@ TEST_F(LayerIntegrationTest, Conv2DMaxPoolPipeline) {
 
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(cpu_conv);
     graph.add_layer(cpu_pool);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   LegacyConv2DLayer gpu_conv(in_channels, out_channels, 3, 3, 1, 1, 1, 1, true, "gpu_conv");
@@ -616,10 +616,10 @@ TEST_F(LayerIntegrationTest, Conv2DMaxPoolPipeline) {
 
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(gpu_conv);
     graph.add_layer(gpu_pool);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   *gpu_conv.parameters()[0] = *cpu_conv.parameters()[0]->to_device(getGPU());
@@ -673,10 +673,10 @@ TEST_F(LayerIntegrationTest, Conv2DDensePipeline) {
 
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(cpu_conv);
     graph.add_layer(cpu_dense);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   LegacyConv2DLayer gpu_conv(in_channels, out_channels, 3, 3, 1, 1, 1, 1, false, "gpu_conv");
@@ -684,10 +684,10 @@ TEST_F(LayerIntegrationTest, Conv2DDensePipeline) {
 
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(gpu_conv);
     graph.add_layer(gpu_dense);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   *gpu_conv.parameters()[0] = *cpu_conv.parameters()[0]->to_device(getGPU());

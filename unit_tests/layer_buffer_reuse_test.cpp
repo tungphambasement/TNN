@@ -30,9 +30,9 @@ TEST(LayerBufferReuseTest, Conv2DConsistentOutput) {
                                                    true, "test_conv");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(*layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({batch_size, in_channels, input_h, input_w}, getHost());
@@ -61,9 +61,9 @@ TEST(LayerBufferReuseTest, DenseConsistentOutput) {
   auto layer = std::make_unique<DenseLayer>(input_features, output_features, true, "test_dense");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(*layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({batch_size, input_features, 1, 1}, getHost());
@@ -94,9 +94,9 @@ TEST(LayerBufferReuseTest, MaxPool2DConsistentOutput) {
   auto layer = std::make_unique<LegacyMaxPool2DLayer>(2, 2, 2, 2, 0, 0, "test_pool");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(*layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({batch_size, channels, input_h, input_w}, getHost());
@@ -129,9 +129,9 @@ TEST(LayerBufferReuseTest, ActivationConsistentOutput) {
   auto layer = std::make_unique<ActivationLayer>(std::move(activation), "test_relu");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(*layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({batch_size, channels, h, w}, getHost());
@@ -161,9 +161,9 @@ TEST(LayerBufferReuseTest, FlattenConsistentOutput) {
   auto layer = std::make_unique<FlattenLayer>(1, -1, "test_flatten");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(*layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({batch_size, channels, h, w}, getHost());
@@ -192,9 +192,9 @@ TEST(LayerBufferReuseTest, DenseMultipleEpochs) {
   auto layer = std::make_unique<DenseLayer>(input_features, output_features, true, "test_dense");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(*layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({batch_size, input_features, 1, 1}, getHost());
@@ -229,9 +229,9 @@ TEST(LayerBufferReuseTest, Conv2DMultipleEpochs) {
                                                    true, "test_conv");
   {
     auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(*layer);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({batch_size, in_channels, input_h, input_w}, getHost());

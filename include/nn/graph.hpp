@@ -3,52 +3,52 @@
 #include <deque>
 #include <stdexcept>
 #include <unordered_map>
-#include <vector>
 
 #include "device/iallocator.hpp"
 #include "graph_context.hpp"
 #include "nn/io_node.hpp"
 #include "nn/layer.hpp"
 #include "nn/op_node.hpp"
-#include "tensor/tensor.hpp"
-#include "tensor/tensor_factory.hpp"
 #include "type/type.hpp"
 
 namespace tnn {
 
 class Graph {
 public:
-  Graph(IAllocator& allocator)
-      : ctx_(allocator) {}
+  Graph()
+      : ctx_desc_{
+            .param_descs = {},
+            .param_bytes = 0,
+            .grad_bytes = 0,
+        } {}
 
   OpNode& add_layer(Layer& layer_node) {
-    OpNode new_node(ctx_, layer_node);
+    OpNode new_node(ctx_desc_, layer_node);
     auto& node = op_nodes_.emplace_back(std::move(new_node));
     return node;
   }
 
   IONode& input() {
-    auto node = IONode(ctx_);
+    auto node = IONode();
     auto& input_node = io_nodes_.emplace_back(std::move(node));
     return input_node;
   }
 
   // Assuming simple op node, 1 input, 1 output.
   IONode& output(OpNode& op_node, IONode& input) {
-    auto new_node = IONode(ctx_);
+    auto new_node = IONode();
     auto& output = io_nodes_.emplace_back(std::move(new_node));
     add_out(op_node, output);
     add_in(op_node, input);
     return output;
   }
 
-  Graph& compile() {
-    ctx_.init();
+  void compile(IAllocator& allocator) {
+    ctx_ = std::make_unique<GraphContext>(ctx_desc_, allocator);
     for (auto& op_node : op_nodes_) {
-      op_node.init();
+      op_node.init(allocator);
     }
     sort();  // hope it works
-    return *this;
   }
 
   // topological sort the graph to determine execution order
@@ -101,11 +101,20 @@ public:
     // TODO: implement graph reduction to eliminate redundant nodes/layers
   }
 
-  GraphContext& context() { return ctx_; }
+  GraphContext& context() {
+    if (!ctx_) throw std::runtime_error("Graph not compiled");
+    return *ctx_;
+  }
+
+  const Device& device() const {
+    if (!ctx_) throw std::runtime_error("Graph not compiled");
+    return ctx_->device();
+  }
 
 private:
   friend class GraphExecutor;
-  GraphContext ctx_;
+  GraphContextDescriptor ctx_desc_;
+  std::unique_ptr<GraphContext> ctx_;
   std::deque<IONode> io_nodes_;
   std::deque<OpNode> op_nodes_;
   std::unordered_map<OpNode*, Vec<IONode*>> ins_;
@@ -145,132 +154,6 @@ private:
       for (auto& ptr : ops) ptr = old_to_new[ptr];
     }
     op_nodes_ = std::move(sorted_nodes);
-  }
-};
-
-using InputPack = std::unordered_map<IONode*, Tensor>;
-using OutputPack = std::unordered_map<IONode*, Tensor>;
-
-class GraphExecutor {
-public:
-  GraphExecutor(Graph& graph)
-      : graph_(graph) {
-    // initialize node outputs
-    for (auto& node : graph_.io_nodes_) {
-      node_outputs_[&node] = Output{nullptr, nullptr};
-    }
-  }
-
-  void forward(const InputPack& inputs, OutputPack& outputs) {
-    // set input tensors
-    for (const auto& [input_node, tensor] : inputs) {
-      node_outputs_[input_node].act = tensor;
-    }
-    // assuming topologically sorted layers, execute forward pass
-    for (auto it = graph_.op_nodes_.begin(); it != graph_.op_nodes_.end(); ++it) {
-      forward(*it);
-    }
-    // wire output tensors
-    for (auto& [output_node, tensor] : outputs) {
-      tensor = node_outputs_[output_node].act;
-    }
-  }
-
-  void backward(const InputPack& grads, OutputPack& grad_inputs) {
-    // set upstream gradients
-    for (const auto& [output_node, tensor] : grads) {
-      node_outputs_[output_node].grad = tensor;
-    }
-    for (auto it = graph_.op_nodes_.rbegin(); it != graph_.op_nodes_.rend(); ++it) {
-      backward(*it);
-    }
-    // wire downstream gradients
-    for (auto& [input_node, tensor] : grad_inputs) {
-      tensor = node_outputs_[input_node].grad;
-    }
-  }
-
-private:
-  Graph& graph_;
-
-  struct Output {
-    Tensor act;
-    Tensor grad;
-  };
-
-  std::unordered_map<IONode*, Output> node_outputs_;
-
-  void forward(OpNode& node) {
-    // gather inputs
-    Vec<IONode*>& input_nodes = graph_.ins_[&node];
-    Vec<ConstTensor> inputs;
-    for (const auto& input_node : input_nodes) {
-      const ConstTensor& act = node_outputs_[input_node].act;
-      if (!act) {
-        throw std::runtime_error("Null input while forwarding graph");
-      }
-      inputs.push_back(act);
-    }
-
-    // gather outputs
-    Vec<IONode*>& output_nodes = graph_.outs_[&node];
-    Vec<Tensor> outputs;
-    auto out_shapes = inputs |
-                      std::views::transform([&](const ConstTensor& t) { return t->shape(); }) |
-                      std::views::transform(
-                          [&](const Vec<size_t>& shape) { return node.output_shape({shape})[0]; });
-    DType_t dtype = inputs[0]->data_type();
-    if (out_shapes.size() != output_nodes.size()) {
-      throw std::runtime_error("Num output shapes does not match num output nodes");
-    }
-    for (size_t i = 0; i < output_nodes.size(); ++i) {
-      IONode* output_node = output_nodes[i];
-      Vec<size_t> out_shape = out_shapes[i];
-      Tensor& act = node_outputs_[output_node].act;
-      if (!act) {
-        act = make_tensor(graph_.context().allocator(), dtype, out_shape);
-      } else {
-        act->ensure(out_shape);
-      }
-      outputs.push_back(act);
-    }
-
-    node.forward(inputs, outputs);
-  }
-
-  void backward(OpNode& node) {
-    // gather upstream grad_output
-    Vec<IONode*>& output_nodes = graph_.outs_[&node];
-    Vec<ConstTensor> gradients;
-    for (const auto& output_node : output_nodes) {
-      Tensor& grad = node_outputs_[output_node].grad;
-      if (!grad) {
-        throw std::runtime_error("Null output gradient while backwarding graph");
-      }
-      gradients.push_back(grad);
-    }
-
-    // gather downstream grad_output
-    Vec<IONode*>& input_nodes = graph_.ins_[&node];
-    Vec<Tensor> grad_inputs;
-    for (const auto& input_node : input_nodes) {
-      Tensor& grad = node_outputs_[input_node].grad;
-      // just use the same shape and dtype as input activation, since we don't have the actual
-      // input tensor here
-      auto& input_act = node_outputs_[input_node].act;
-      if (!input_act) {
-        throw std::runtime_error("Null input activation while backwarding graph");
-      }
-      if (!grad) {
-        grad =
-            make_tensor(graph_.context().allocator(), input_act->data_type(), input_act->shape());
-      } else {
-        grad->ensure(input_act->shape());
-      }
-      grad_inputs.push_back(grad);
-    }
-
-    node.backward(gradients, grad_inputs);
   }
 };
 

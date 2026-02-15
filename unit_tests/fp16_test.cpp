@@ -17,7 +17,7 @@ protected:
 
 TEST_F(FP16Test, Dense) {
   auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
 
   DenseLayer fp32_dense(128, 64, false, "fp32_dense");
   fp32_dense.set_io_dtype(DType_t::FP32);
@@ -28,7 +28,7 @@ TEST_F(FP16Test, Dense) {
   fp16_dense.set_param_dtype(DType_t::FP16);
   graph.add_layer(fp16_dense);
 
-  graph.compile();
+  graph.compile(allocator);
 
   auto fp16_params = fp16_dense.parameters();
   auto fp32_params = fp32_dense.parameters();

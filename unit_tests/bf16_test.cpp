@@ -24,7 +24,7 @@ TEST_F(BF16Test, Dense) {
   constexpr size_t input_dim = 32;
   constexpr size_t output_dim = 16;
   auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
 
   DenseLayer fp32_dense(input_dim, output_dim, false, "fp32_dense");
   fp32_dense.set_io_dtype(DType_t::FP32);
@@ -35,7 +35,7 @@ TEST_F(BF16Test, Dense) {
   bf16_dense.set_param_dtype(DType_t::BF16);
   graph.add_layer(bf16_dense);
 
-  graph.compile();
+  graph.compile(allocator);
 
   auto bf16_params = bf16_dense.parameters();
   auto fp32_params = fp32_dense.parameters();
@@ -119,7 +119,7 @@ TEST_F(BF16Test, Attention) {
   constexpr size_t embed_dim = 16;
   constexpr size_t num_heads = 4;
   auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
 
   AttentionBlock fp32_attention(embed_dim, num_heads, false, "fp32_attention");
   fp32_attention.set_io_dtype(DType_t::FP32);
@@ -130,7 +130,7 @@ TEST_F(BF16Test, Attention) {
   bf16_attention.set_param_dtype(DType_t::BF16);
   graph.add_layer(bf16_attention);
 
-  graph.compile();
+  graph.compile(allocator);
 
   auto bf16_params = bf16_attention.parameters();
   auto fp32_params = fp32_attention.parameters();

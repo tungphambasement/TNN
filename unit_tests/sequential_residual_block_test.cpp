@@ -66,9 +66,9 @@ TEST_F(SequentialResidualBlockTest, BasicResidualBlockIdentityShortcut) {
 
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 32, 32, 64}, getGPU());
@@ -97,9 +97,9 @@ TEST_F(SequentialResidualBlockTest, BasicResidualBlockProjectionShortcut) {
   auto model = Sequential("test_basic_projection", std::move(layers));
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 32, 32, 64}, getGPU());
@@ -129,9 +129,9 @@ TEST_F(SequentialResidualBlockTest, BasicResidualBlockStridedShortcut) {
   auto model = Sequential("test_basic_strided", std::move(layers));
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 32, 32, 64}, getGPU());
@@ -150,9 +150,9 @@ TEST_F(SequentialResidualBlockTest, BasicResidualBlockStridedAndProjection) {
   auto model = Sequential("test_basic_strided_projection", std::move(layers));
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 32, 32, 64}, getGPU());
@@ -170,9 +170,9 @@ TEST_F(SequentialResidualBlockTest, BasicResidualBlockBackward) {
   auto model = Sequential("test_basic_backward", std::move(layers));
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 16, 16, 32}, getGPU());
@@ -213,9 +213,9 @@ TEST_F(SequentialResidualBlockTest, BasicResidualBlockMultipleBlocks) {
   auto model = Sequential("test_basic_multiple", std::move(layers));
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 32, 32, 64}, getGPU());
@@ -233,9 +233,9 @@ TEST_F(SequentialResidualBlockTest, BottleneckResidualBlockIdentityShortcut) {
   auto model = Sequential("test_bottleneck_identity", std::move(layers));
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 32, 32, 256}, getGPU());
@@ -264,9 +264,9 @@ TEST_F(SequentialResidualBlockTest, BottleneckResidualBlockProjectionShortcut) {
   auto model = Sequential("test_bottleneck_projection", std::move(layers));
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 32, 32, 64}, getGPU());
@@ -285,9 +285,9 @@ TEST_F(SequentialResidualBlockTest, BottleneckResidualBlockStridedShortcut) {
   auto model = Sequential("test_bottleneck_strided", std::move(layers));
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 32, 32, 256}, getGPU());
@@ -305,9 +305,9 @@ TEST_F(SequentialResidualBlockTest, BottleneckResidualBlockStridedAndProjection)
   auto model = Sequential("test_bottleneck_strided_projection", std::move(layers));
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 32, 32, 64}, getGPU());
@@ -326,9 +326,9 @@ TEST_F(SequentialResidualBlockTest, BottleneckResidualBlockBackward) {
   auto model = Sequential("test_bottleneck_backward", std::move(layers));
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 16, 16, 64}, getGPU());
@@ -369,9 +369,9 @@ TEST_F(SequentialResidualBlockTest, BottleneckResidualBlockMultipleBlocks) {
   auto model = Sequential("test_bottleneck_multiple", std::move(layers));
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 32, 32, 64}, getGPU());
@@ -394,9 +394,9 @@ TEST_F(SequentialResidualBlockTest, MixedBasicAndBottleneckBlocks) {
   auto model = Sequential("test_mixed_blocks", std::move(layers));
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 32, 32, 64}, getGPU());
@@ -423,9 +423,9 @@ TEST_F(SequentialResidualBlockTest, ResNet18LikeArchitecture) {
   auto model = Sequential("test_resnet18_like", std::move(layers));
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 32, 32, 64}, getGPU());
@@ -453,9 +453,9 @@ TEST_F(SequentialResidualBlockTest, ResNet50LikeArchitecture) {
   auto model = Sequential("test_resnet50_like", std::move(layers));
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 32, 32, 64}, getGPU());
@@ -533,9 +533,9 @@ TEST_F(SequentialResidualBlockTest, BasicResidualBlockNumericalStability) {
   Sequential model("test_basic_numerical", std::move(layers));
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   std::vector<float> scales = {0.01f, 0.1f, 1.0f, 10.0f};
@@ -573,9 +573,9 @@ TEST_F(SequentialResidualBlockTest, BottleneckResidualBlockNumericalStability) {
   Sequential model("test_bottleneck_numerical", std::move(layers));
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   std::vector<float> scales = {0.01f, 0.1f, 1.0f, 10.0f};
@@ -611,9 +611,9 @@ TEST_F(SequentialResidualBlockTest, BasicResidualBlockGradientFiniteness) {
   Sequential model("test_basic_gradient_finite", std::move(layers));
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 8, 8, 8}, getHost());
@@ -653,9 +653,9 @@ TEST_F(SequentialResidualBlockTest, BottleneckResidualBlockGradientFiniteness) {
   Sequential model("test_bottleneck_gradient_finite", std::move(layers));
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 8, 8, 16}, getHost());
@@ -700,9 +700,9 @@ TEST_F(SequentialResidualBlockTest, ResidualBlockGradientMagnitudes) {
   Sequential model("test_gradient_magnitudes", std::move(layers));
   {
     auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-    Graph graph(allocator);
+    Graph graph;
     graph.add_layer(model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   Tensor input = make_tensor<float>({1, 16, 16, 16}, getGPU());

@@ -9,13 +9,13 @@ using namespace std;
 signed main() {
   ExampleModels::register_defaults();
   auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
 
   Sequential temp_model = ExampleModels::create("gpt2_small");
   auto model = std::make_unique<Sequential>(std::move(temp_model));
   model->set_seed(123456);
   graph.add_layer(*model);
-  graph.compile();
+  graph.compile(allocator);
 
   int passes = 10;
   auto start = std::chrono::high_resolution_clock::now();

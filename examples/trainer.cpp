@@ -28,7 +28,7 @@ signed main() {
   DeviceType device_type = (device_str == "GPU") ? DeviceType::GPU : DeviceType::CPU;
   const auto &device = DeviceManager::getInstance().getDevice(device_type);
   auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
 
   string dataset_name = Env::get<std::string>("DATASET_NAME", "");
   if (dataset_name.empty()) {
@@ -49,7 +49,7 @@ signed main() {
     if (!file.is_open()) {
       throw std::runtime_error("Failed to open model file");
     }
-    model = load_state<Sequential>(file, graph);
+    model = load_state<Sequential>(file, graph, allocator);
     file.close();
   } else {
     cout << "Creating model: " << model_name << endl;
@@ -67,7 +67,7 @@ signed main() {
     }
     model->set_seed(123456);
     graph.add_layer(*model);
-    graph.compile();
+    graph.compile(allocator);
   }
 
   cout << "Training model on device: " << (device_type == DeviceType::CPU ? "CPU" : "GPU") << endl;

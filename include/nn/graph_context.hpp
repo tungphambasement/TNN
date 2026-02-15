@@ -4,26 +4,27 @@
 
 #include "device/device.hpp"
 #include "device/iallocator.hpp"
+#include "nn/layer.hpp"
 #include "ops/ops.hpp"
 #include "tensor/tensor.hpp"
 #include "type/type.hpp"
 
 namespace tnn {
-class GraphContext {
-public:
-  GraphContext(IAllocator &allocator)
-      : allocator_(allocator) {}
 
-  ~GraphContext() = default;
+inline size_t get_bytes_size(const std::vector<size_t> &shape, DType_t dtype) {
+  return std::accumulate(shape.begin(), shape.end(), get_dtype_size(dtype),
+                         std::multiplies<size_t>());
+}
 
-  GraphContext(const GraphContext &) = delete;
-  GraphContext &operator=(const GraphContext &) = delete;
+struct GraphContextDescriptor {
+  std::vector<ParamDescriptor> param_descs;
+  size_t param_bytes = 0;
+  size_t grad_bytes = 0;
 
-  GraphContext(GraphContext &&) = default;
-  GraphContext &operator=(GraphContext &&) = delete;
+  void register_desc(const ParamDescriptor &param_desc) {
+    param_descs.push_back(param_desc);
 
-  void register_param(std::vector<size_t> shape, DType_t dtype) {
-    size_t bytes_size = get_bytes_size(shape, dtype);
+    size_t bytes_size = get_bytes_size(param_desc.shape, param_desc.dtype);
     // round up to 256 bytes for better memory access pattern, can be tuned later
     bytes_size = (bytes_size + 255) & ~255;
 
@@ -31,77 +32,51 @@ public:
     param_bytes += bytes_size;
     grad_bytes += bytes_size;
   }
+};
 
-  void init() {
-    if (initialized_) {
-      throw std::runtime_error(
-          "Cannot initalize GraphContext more than once. Possible dangling reference to old "
-          "context can happen.");
+class GraphContext {
+public:
+  GraphContext(GraphContextDescriptor &ctx_desc, IAllocator &allocator)
+      : allocator_(allocator) {
+    param_slab_ = allocator.allocate(ctx_desc.param_bytes);
+    grad_slab_ = allocator.allocate(ctx_desc.grad_bytes);
+    size_t param_offset = 0;
+    size_t grad_offset = 0;
+    for (auto &param_desc : ctx_desc.param_descs) {
+      size_t bytes_size = get_bytes_size(param_desc.shape, param_desc.dtype);
+      // round up to 256 bytes for better memory access pattern, can be tuned later
+      bytes_size = (bytes_size + 255) & ~255;
+      dptr param_buffer = param_slab_.span(param_offset, bytes_size);
+      dptr grad_buffer = grad_slab_.span(grad_offset, bytes_size);
+
+      Tensor param =
+          make_tensor(allocator_, param_desc.dtype, param_desc.shape, std::move(param_buffer));
+      Tensor grad =
+          make_tensor(allocator_, param_desc.dtype, param_desc.shape, std::move(grad_buffer));
+
+      *param_desc.data_ptr = param;
+      *param_desc.grad_ptr = grad;
+
+      params_.push_back(param);
+      grads_.push_back(grad);
+
+      param_offset += bytes_size;
+      grad_offset += bytes_size;
     }
-    initialized_ = true;
-    param_slab_ = allocator_.allocate(param_bytes);
-    grad_slab_ = allocator_.allocate(grad_bytes);
-  }
-
-  Tensor get_param(std::vector<size_t> shape, DType_t dtype) {
-    if (!initialized_) {
-      throw std::runtime_error("GraphContext must be initialized before getting parameters.");
-    }
-    size_t bytes_size = get_bytes_size(shape, dtype);
-    // round up to 256 bytes for better memory access pattern, can be tuned later
-    bytes_size = (bytes_size + 255) & ~255;
-    dptr param_data = param_slab_.span(param_offset_, bytes_size);
-    param_offset_ += bytes_size;
-    Tensor param = make_tensor(allocator_, dtype, std::move(param_data), shape);
-    params_.push_back(param);
-    return param;
-  }
-
-  Tensor get_grad(std::vector<size_t> shape, DType_t dtype) {
-    if (!initialized_) {
-      throw std::runtime_error("GraphContext must be initialized before getting gradients.");
-    }
-    size_t bytes_size = get_bytes_size(shape, dtype);
-    // round up to 256 bytes for better memory access pattern, can be tuned later
-    bytes_size = (bytes_size + 255) & ~255;
-    dptr grad_data = grad_slab_.span(grad_offset_, bytes_size);
-    grad_offset_ += bytes_size;
-    Tensor grad = make_tensor(allocator_, dtype, std::move(grad_data), shape);
-    grads_.push_back(grad);
-    return grad;
-  }
-
-  Tensor get_workspace(std::vector<size_t> shape, DType_t dtype) {
-    // for now, allocate from pool
-    return make_tensor(allocator_, dtype, shape);
   }
 
   std::vector<Tensor> parameters() { return params_; }
   std::vector<Tensor> gradients() { return grads_; }
 
-  void clear_gradients() {
-    if (!initialized_) {
-      throw std::runtime_error("GraphContext must be initialized before clearing gradients.");
-    }
-    ops::set_scalar<uchar>(grad_slab_, 0, grad_bytes);
-  }
+  void clear_gradients() { ops::set_scalar<uchar>(grad_slab_, 0, grad_slab_.capacity()); }
 
   IAllocator &allocator() { return allocator_; }
 
   const Device &device() const { return allocator_.device(); }
 
 private:
-  bool initialized_ = false;
   IAllocator &allocator_;
-  size_t param_bytes = 0;
-  size_t grad_bytes = 0;
   std::vector<Tensor> params_, grads_;
   dptr param_slab_, grad_slab_;
-  size_t param_offset_ = 0, grad_offset_ = 0;
-
-  static size_t get_bytes_size(const std::vector<size_t> &shape, DType_t dtype) {
-    return std::accumulate(shape.begin(), shape.end(), get_dtype_size(dtype),
-                           std::multiplies<size_t>());
-  }
 };
 }  // namespace tnn

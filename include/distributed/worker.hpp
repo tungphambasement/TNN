@@ -91,10 +91,10 @@ public:
     this->model_ = Sequential::create_from_config(model_config);
     auto &device = use_gpu_ ? getGPU() : getHost();
     auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
-    this->graph_ = std::make_unique<Graph>(allocator);
+    this->graph_ = std::make_unique<Graph>();
     this->graph_->add_layer(*model_);
     this->model_->set_seed(123456);
-    this->graph_->compile();
+    this->graph_->compile(allocator);
 
     auto parsed_config = this->model_->get_config();
     std::cout << parsed_config.to_json().dump(4) << std::endl;

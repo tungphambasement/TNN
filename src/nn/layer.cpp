@@ -208,7 +208,7 @@ Tensor Layer::get_buffer(const std::vector<size_t> &shape, DType_t dtype) {
   auto byte_size = std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<size_t>()) *
                    get_dtype_size(dtype);
   dptr buffer = allocator_->allocate(byte_size);
-  return make_tensor(*allocator_, dtype, std::move(buffer), shape);
+  return make_tensor(*allocator_, dtype, shape, std::move(buffer));
 }
 
 void Layer::clear_cache(size_t mb_id) {

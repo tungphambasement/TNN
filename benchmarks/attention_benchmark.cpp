@@ -15,14 +15,14 @@ constexpr size_t EMBED_DIM = 768;
 
 signed main() {
   auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-  Graph graph(allocator);
+  Graph graph;
   AttentionBlock attention_block(EMBED_DIM, 8, true, "attention_test");
   graph.add_layer(attention_block);
 
   FlashAttentionBlock flash_attention_block(EMBED_DIM, 8, true, "flash_attention_test");
   graph.add_layer(flash_attention_block);
 
-  graph.compile();
+  graph.compile(allocator);
 
   auto attn_params = attention_block.parameters();
   auto flash_attn_params = flash_attention_block.parameters();

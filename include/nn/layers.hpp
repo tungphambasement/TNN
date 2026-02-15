@@ -10,6 +10,7 @@
 #include <string>
 
 #include "activations.hpp"
+#include "device/iallocator.hpp"
 #include "nn/blocks_impl/flash_attention_block.hpp"
 #include "nn/graph.hpp"
 #include "nn/graph_context.hpp"
@@ -158,7 +159,8 @@ public:
 };
 
 template <typename LayerType>
-static std::unique_ptr<LayerType> load_state(std::ifstream &file, Graph &graph) {
+static std::unique_ptr<LayerType> load_state(std::ifstream &file, Graph &graph,
+                                             IAllocator &allocator) {
   size_t j_size;
   file.read(reinterpret_cast<char *>(&j_size), sizeof(size_t));
   std::string j_str(j_size, '\0');
@@ -173,13 +175,13 @@ static std::unique_ptr<LayerType> load_state(std::ifstream &file, Graph &graph) 
   }
   std::unique_ptr<LayerType> layer(raw_ptr);
   graph.add_layer(*layer);
-  graph.compile();
+  graph.compile(allocator);
   std::vector<Tensor> params = layer->parameters();
   if (!params.empty()) {
     layer->set_param_dtype(params[0]->data_type());
   }
   for (auto &param : params) {
-    param = load(file, graph.context().allocator());
+    param = load(file, allocator);
   }
   return layer;
 }

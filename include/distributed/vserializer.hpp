@@ -162,7 +162,7 @@ public:
     size_t byte_size =
         dtype_size * std::accumulate(shape.begin(), shape.end(), 1ULL, std::multiplies<size_t>());
     dptr tensor_data = buffer.get(offset).span(0, byte_size);
-    tensor = make_tensor(allocator_, dtype, std::move(tensor_data), shape);
+    tensor = make_tensor(allocator_, dtype, shape, std::move(tensor_data));
   }
 
   void deserialize(VBuffer &buffer, size_t &offset, Job &job) {
