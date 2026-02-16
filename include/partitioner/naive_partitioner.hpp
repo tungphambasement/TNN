@@ -23,7 +23,7 @@ public:
         config_(config) {}
   ~NaivePipelinePartitioner() = default;
 
-  std::vector<SeqPartition> partition_model(const std::vector<Layer *> &layers_) override {
+  std::vector<SeqPartition> partition_model(const std::vector<SISOLayer *> &layers_) override {
     if (this->num_partitions_ == 0) {
       throw std::runtime_error("Number of partitions must be greater than zero");
     }
@@ -78,7 +78,7 @@ public:
         config_(config) {}
   ~NaiveDataPartitioner() = default;
 
-  std::vector<SeqPartition> partition_model(const std::vector<Layer *> &layers) override {
+  std::vector<SeqPartition> partition_model(const std::vector<SISOLayer *> &layers) override {
     // same config for every stage
     std::vector<SeqPartition> partitions;
     partitions.push_back(SeqPartition(0, layers.size()));

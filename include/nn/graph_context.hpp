@@ -40,6 +40,7 @@ public:
       : allocator_(allocator) {
     param_slab_ = allocator.allocate(ctx_desc.param_bytes);
     grad_slab_ = allocator.allocate(ctx_desc.grad_bytes);
+
     size_t param_offset = 0;
     size_t grad_offset = 0;
     for (auto &param_desc : ctx_desc.param_descs) {

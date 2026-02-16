@@ -3,15 +3,15 @@
 #include <string>
 #include <vector>
 
-#include "nn/layer.hpp"
 #include "nn/layers.hpp"
+#include "nn/siso_layer.hpp"
 #include "type/type.hpp"
 
 namespace tnn {
 
 class LayerBuilder {
 private:
-  std::vector<std::unique_ptr<Layer>> layers_;
+  std::vector<std::unique_ptr<SISOLayer>> layers_;
   std::vector<size_t> input_shape_;
   DType_t io_dtype_ = DType_t::FP32;
 
@@ -226,7 +226,7 @@ public:
     auto act = factory.create(activation_name);
     auto layer = std::make_unique<ActivationLayer>(
         std::move(act), name.empty() ? "activation_" + std::to_string(layers_.size()) : name);
-    layers_.push_back(std::unique_ptr<Layer>(std::move(layer)));
+    layers_.push_back(std::move(layer));
     return *this;
   }
 
@@ -301,8 +301,8 @@ public:
     return *this;
   }
 
-  LayerBuilder &residual_block(std::vector<std::unique_ptr<Layer>> main_path,
-                               std::vector<std::unique_ptr<Layer>> shortcut_path,
+  LayerBuilder &residual_block(std::vector<std::unique_ptr<SISOLayer>> main_path,
+                               std::vector<std::unique_ptr<SISOLayer>> shortcut_path,
                                const std::string &activation, const std::string &name = "") {
     auto layer = std::make_unique<ResidualBlock>(
         std::move(main_path), std::move(shortcut_path), activation,
@@ -326,7 +326,7 @@ public:
                          .batchnorm(dtype_eps(io_dtype_), 0.1f, true, SBool::FALSE, "bn0")
                          .build();
 
-    std::vector<std::unique_ptr<Layer>> shortcut;
+    std::vector<std::unique_ptr<SISOLayer>> shortcut;
     if (stride != 1 || in_channels != out_channels) {
       shortcut = LayerBuilder(input_shape)
                      .conv2d(out_channels, 1, 1, stride, stride, 0, 0, false)
@@ -365,7 +365,7 @@ public:
 
     auto main_path = main_builder.build();
 
-    std::vector<std::unique_ptr<Layer>> shortcut;
+    std::vector<std::unique_ptr<SISOLayer>> shortcut;
     if (stride != 1 || in_channels != out_channels) {
       shortcut =
           LayerBuilder(input_shape).conv2d(out_channels, 1, 1, stride, stride, 0, 0, false).build();
@@ -396,7 +396,7 @@ public:
                          .batchnorm(dtype_eps(io_dtype_), 0.1f, true, SBool::TRUE, "bn2")
                          .build();
 
-    std::vector<std::unique_ptr<Layer>> shortcut;
+    std::vector<std::unique_ptr<SISOLayer>> shortcut;
     if (stride != 1 || in_channels != out_channels) {
       shortcut = LayerBuilder(input_shape)
                      .conv2d(out_channels, 1, 1, stride, stride, 0, 0, false)
@@ -426,7 +426,7 @@ public:
                          .legacy_batchnorm(dtype_eps(io_dtype_), 0.1f, true, "bn0")
                          .build();
 
-    std::vector<std::unique_ptr<Layer>> shortcut;
+    std::vector<std::unique_ptr<SISOLayer>> shortcut;
     if (stride != 1 || in_channels != out_channels) {
       shortcut = LayerBuilder(input_shape)
                      .legacy_conv2d(out_channels, 1, 1, stride, stride, 0, 0, false)
@@ -465,7 +465,7 @@ public:
 
     auto main_path = main_builder.build();
 
-    std::vector<std::unique_ptr<Layer>> shortcut;
+    std::vector<std::unique_ptr<SISOLayer>> shortcut;
     if (stride != 1 || in_channels != out_channels) {
       shortcut = LayerBuilder(input_shape)
                      .legacy_conv2d(out_channels, 1, 1, stride, stride, 0, 0, false)
@@ -497,7 +497,7 @@ public:
                          .legacy_batchnorm(dtype_eps(io_dtype_), 0.1f, true, "bn2")
                          .build();
 
-    std::vector<std::unique_ptr<Layer>> shortcut;
+    std::vector<std::unique_ptr<SISOLayer>> shortcut;
     if (stride != 1 || in_channels != out_channels) {
       shortcut = LayerBuilder(input_shape)
                      .legacy_conv2d(out_channels, 1, 1, stride, stride, 0, 0, false)
@@ -530,9 +530,9 @@ public:
                          .dropout(dropout_rate)
                          .build();
 
-    auto attn_res =
-        std::make_unique<ResidualBlock>(std::move(attn_main), std::vector<std::unique_ptr<Layer>>(),
-                                        "linear", valid_name + "_attn");
+    auto attn_res = std::make_unique<ResidualBlock>(std::move(attn_main),
+                                                    std::vector<std::unique_ptr<SISOLayer>>(),
+                                                    "linear", valid_name + "_attn");
     layers_.push_back(std::move(attn_res));
 
     // 2. Feed-Forward Sub-block (Residual)
@@ -544,8 +544,9 @@ public:
                         .dropout(dropout_rate)
                         .build();
 
-    auto ffn_res = std::make_unique<ResidualBlock>(
-        std::move(ffn_main), std::vector<std::unique_ptr<Layer>>(), "linear", valid_name + "_ffn");
+    auto ffn_res = std::make_unique<ResidualBlock>(std::move(ffn_main),
+                                                   std::vector<std::unique_ptr<SISOLayer>>(),
+                                                   "linear", valid_name + "_ffn");
     layers_.push_back(std::move(ffn_res));
 
     return *this;
@@ -571,9 +572,9 @@ public:
                          .dropout(dropout_rate)
                          .build();
 
-    auto attn_res =
-        std::make_unique<ResidualBlock>(std::move(attn_main), std::vector<std::unique_ptr<Layer>>(),
-                                        "linear", valid_name + "_attn");
+    auto attn_res = std::make_unique<ResidualBlock>(std::move(attn_main),
+                                                    std::vector<std::unique_ptr<SISOLayer>>(),
+                                                    "linear", valid_name + "_attn");
     layers_.push_back(std::move(attn_res));
 
     // 2. Feed-Forward Sub-block (Residual)
@@ -585,19 +586,20 @@ public:
                         .dropout(dropout_rate)
                         .build();
 
-    auto ffn_res = std::make_unique<ResidualBlock>(
-        std::move(ffn_main), std::vector<std::unique_ptr<Layer>>(), "linear", valid_name + "_ffn");
+    auto ffn_res = std::make_unique<ResidualBlock>(std::move(ffn_main),
+                                                   std::vector<std::unique_ptr<SISOLayer>>(),
+                                                   "linear", valid_name + "_ffn");
     layers_.push_back(std::move(ffn_res));
 
     return *this;
   }
 
-  LayerBuilder &add_layer(std::unique_ptr<Layer> layer) {
+  LayerBuilder &add_layer(std::unique_ptr<SISOLayer> layer) {
     layers_.push_back(std::move(layer));
     return *this;
   }
 
-  std::vector<std::unique_ptr<Layer>> build() { return std::move(layers_); }
+  std::vector<std::unique_ptr<SISOLayer>> build() { return std::move(layers_); }
 
   const std::vector<size_t> &get_input_shape() const { return input_shape_; }
 };

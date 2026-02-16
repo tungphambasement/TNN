@@ -23,12 +23,12 @@ struct InputPartition {
         length(length) {}
 };
 
-inline std::vector<std::vector<std::unique_ptr<Layer>>> split(
-    std::vector<Layer *> layers, std::vector<SeqPartition> &partitions) {
+inline std::vector<std::vector<std::unique_ptr<SISOLayer>>> split(
+    std::vector<SISOLayer *> layers, std::vector<SeqPartition> &partitions) {
   if (partitions.empty()) {
     throw std::invalid_argument("Partitions vector is empty");
   }
-  std::vector<std::vector<std::unique_ptr<Layer>>> stages;
+  std::vector<std::vector<std::unique_ptr<SISOLayer>>> stages;
   stages.reserve(partitions.size());
   for (const auto &part : partitions) {
     if (part.start_offset >= layers.size() || part.start_offset + part.length > layers.size() ||
@@ -36,7 +36,7 @@ inline std::vector<std::vector<std::unique_ptr<Layer>>> split(
       throw std::out_of_range("Invalid partition range");
     }
 
-    auto partition_layers = std::vector<std::unique_ptr<Layer>>();
+    auto partition_layers = std::vector<std::unique_ptr<SISOLayer>>();
     LayerFactory::register_defaults();
     for (size_t i = part.start_offset; i < part.start_offset + part.length; ++i) {
       auto layer_config = layers[i]->get_config();
@@ -54,7 +54,7 @@ public:
   virtual ~Partitioner() = default;
 
   // splits the sequential model into partitions corresponding to each stage
-  virtual std::vector<SeqPartition> partition_model(const std::vector<Layer *> &layers) = 0;
+  virtual std::vector<SeqPartition> partition_model(const std::vector<SISOLayer *> &layers) = 0;
 
   // splits the input data for each stage.
   virtual std::vector<InputPartition> partition_input(const ConstTensor &input,

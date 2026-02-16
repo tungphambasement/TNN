@@ -15,6 +15,7 @@
 #include "nn/activations_impl/base_activation.hpp"
 #include "nn/block.hpp"
 #include "nn/layer.hpp"
+#include "nn/siso_layer.hpp"
 
 namespace tnn {
 
@@ -26,15 +27,15 @@ namespace tnn {
  */
 class ResidualBlock : public Block {
 private:
-  std::vector<std::unique_ptr<Layer>> main_path_;
-  std::vector<std::unique_ptr<Layer>> shortcut_path_;
+  std::vector<std::unique_ptr<SISOLayer>> main_path_;
+  std::vector<std::unique_ptr<SISOLayer>> shortcut_path_;
   std::unique_ptr<ActivationFunction> final_activation_;
   std::unordered_map<size_t, Tensor> pre_activation_cache_;
   std::unordered_map<size_t, std::vector<size_t>> input_shape_cache_;
   std::string activation_type_;
 
-  std::vector<Layer *> layers() override {
-    std::vector<Layer *> layers;
+  std::vector<SISOLayer *> layers() override {
+    std::vector<SISOLayer *> layers;
     for (auto &layer : main_path_) {
       layers.push_back(layer.get());
     }
@@ -55,8 +56,8 @@ public:
    * @param final_activation Activation applied after addition (e.g., "relu")
    * @param name Layer name
    */
-  ResidualBlock(std::vector<std::unique_ptr<Layer>> main_path,
-                std::vector<std::unique_ptr<Layer>> shortcut_path,
+  ResidualBlock(std::vector<std::unique_ptr<SISOLayer>> main_path,
+                std::vector<std::unique_ptr<SISOLayer>> shortcut_path,
                 const std::string &final_activation = "relu",
                 const std::string &name = "residual_block");
 

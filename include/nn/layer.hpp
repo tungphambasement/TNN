@@ -26,7 +26,8 @@ struct ParamDescriptor {
   Tensor *grad_ptr;  // pointer to the actual grad_output
 };
 
-// Single input/output layer interface. For multi-input/output, use a Block to wrap multiple Layers.
+// Single input/output layer interface. Can be easily extended to multiple inputs/outputs later if
+// needed.
 class Layer {
 public:
   Layer() = default;
@@ -34,10 +35,10 @@ public:
   virtual ~Layer() = default;
 
   void init();
-  void forward(const std::vector<ConstTensor> &inputs, const std::vector<Tensor> &outputs,
-               size_t mb_id = 0);
-  void backward(const std::vector<ConstTensor> &gradients, const std::vector<Tensor> &grad_inputs,
-                size_t mb_id = 0);
+  virtual void forward(const std::vector<ConstTensor> &inputs, const std::vector<Tensor> &outputs,
+                       size_t mb_id = 0) = 0;
+  virtual void backward(const std::vector<ConstTensor> &gradients,
+                        const std::vector<Tensor> &grad_inputs, size_t mb_id = 0) = 0;
 
   // Note: have to call init again after changing param dtype
   Layer &set_allocator(IAllocator &allocator);
@@ -54,7 +55,7 @@ public:
   Layer &set_training(bool training);
   bool is_training() const;
 
-  Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shape) const;
+  virtual Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shape) const = 0;
   std::string name() const { return name_; }
   void save_state(std::ofstream &file);
   virtual std::vector<ParamDescriptor> param_descriptors() { return {}; }
@@ -80,12 +81,6 @@ protected:
   virtual void on_set_param_dtype(DType_t dtype) {}
   virtual void on_set_compute_dtype(DType_t dtype) {}
 
-  // all assuming single input, single output. Can easily be modified later.
-  virtual void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) = 0;
-  virtual void backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
-                             size_t mb_id = 0) = 0;
-  virtual Vec<size_t> compute_output_shape(const Vec<size_t> &input_shape) const = 0;
-
 protected:
   bool initialized_ = false;
   IAllocator *allocator_ = nullptr;
@@ -100,7 +95,6 @@ protected:
   DType_t io_dtype_ = DType_t::FP32;       // data type for input/output tensors
   DType_t param_dtype_ = DType_t::FP32;    // data type for parameters/gradients
   DType_t compute_dtype_ = DType_t::FP32;  // data type for internal computations
-  std::vector<Tensor> params_, grads_;
 
   // helpers
   Tensor make_io_tensor(std::vector<size_t> shape);

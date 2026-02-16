@@ -58,7 +58,7 @@ private:
   std::unordered_map<size_t, AttentionStats> stats_cache;
   size_t get_shape_hash(size_t b, size_t h, size_t s, size_t d) const;
 
-  std::vector<Layer *> layers() override {
+  std::vector<SISOLayer *> layers() override {
     return {q_proj_.get(), k_proj_.get(), v_proj_.get(), out_proj_.get()};
   }
   // Expects input: [batch_size, seq_len, embed_dim], output: [batch_size, seq_len, embed_dim]

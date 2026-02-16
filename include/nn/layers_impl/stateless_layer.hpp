@@ -9,11 +9,11 @@
 
 #include <string>
 
-#include "nn/layer.hpp"
+#include "nn/siso_layer.hpp"
 
 namespace tnn {
 
-class StatelessLayer : public Layer {
+class StatelessLayer : public SISOLayer {
 public:
   explicit StatelessLayer(const std::string &name = "") { this->name_ = name; }
 

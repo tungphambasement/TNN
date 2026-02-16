@@ -18,6 +18,7 @@
 #include "nlohmann/json_fwd.hpp"
 #include "nn/block.hpp"
 #include "nn/layers.hpp"
+#include "nn/siso_layer.hpp"
 
 namespace tnn {
 
@@ -84,7 +85,7 @@ void Sequential::backward_impl(const ConstTensor &grad_output, const Tensor &gra
   this->device().getFlow(this->flow_handle_)->synchronize();
 }
 
-Sequential::Sequential(const std::string &name, std::vector<std::unique_ptr<Layer>> layers)
+Sequential::Sequential(const std::string &name, std::vector<std::unique_ptr<SISOLayer>> layers)
     : Block(name) {
   layers_ = std::move(layers);
 }
@@ -139,14 +140,7 @@ void Sequential::print_summary(const std::vector<size_t> &input_shape) const {
   std::cout << std::string(100, '-') << "\n";
 }
 
-const std::vector<Layer *> &Sequential::get_layers() const {
-  static std::vector<Layer *> layer_ptrs;
-  layer_ptrs.clear();
-  for (const auto &layer : layers_) {
-    layer_ptrs.push_back(layer.get());
-  }
-  return layer_ptrs;
-}
+std::vector<SISOLayer *> Sequential::get_layers() { return this->layers(); }
 
 LayerConfig Sequential::get_config() const {
   LayerConfig config;
@@ -162,7 +156,7 @@ LayerConfig Sequential::get_config() const {
 }
 
 std::unique_ptr<Sequential> Sequential::create_from_config(const LayerConfig &config) {
-  std::vector<std::unique_ptr<Layer>> layers;
+  std::vector<std::unique_ptr<SISOLayer>> layers;
   nlohmann::json layers_json = config.get<nlohmann::json>("layers", nlohmann::json::array());
   if (!layers_json.is_array()) {
     throw std::runtime_error("Sequential layer config 'layers' parameter must be an array");

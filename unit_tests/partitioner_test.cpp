@@ -22,33 +22,33 @@ protected:
 };
 
 TEST_F(PartitionerTest, NaivePipelineModelPartition) {
-  vector<std::unique_ptr<Layer>> layers = LayerBuilder({224, 224, 3})
-                                              .conv2d(64, 3, 3, 1, 1, 0, 0)
-                                              .batchnorm(1e-5, 0.1f, true, SBool::TRUE)
-                                              .maxpool2d(2, 2, 2, 2, 0, 0)
-                                              .basic_residual_block(64, 128)
-                                              .basic_residual_block(128, 256)
-                                              .basic_residual_block(256, 256)
-                                              .maxpool2d(2, 2, 2, 2, 0, 0)
-                                              .conv2d(512, 3, 3, 1, 1)
-                                              .batchnorm()
-                                              .conv2d(512, 3, 3, 1, 1)
-                                              .batchnorm()
-                                              .maxpool2d(2, 2, 2, 2, 0, 0)
-                                              .basic_residual_block(512, 512)
-                                              .basic_residual_block(512, 512)
-                                              .maxpool2d(2, 2, 2, 2, 0, 0)
-                                              .avgpool2d(7, 7, 1, 1, 0, 0)
-                                              .flatten()
-                                              .dense(4096)
-                                              .dense(1000)
-                                              .build();
+  auto layers = LayerBuilder({224, 224, 3})
+                    .conv2d(64, 3, 3, 1, 1, 0, 0)
+                    .batchnorm(1e-5, 0.1f, true, SBool::TRUE)
+                    .maxpool2d(2, 2, 2, 2, 0, 0)
+                    .basic_residual_block(64, 128)
+                    .basic_residual_block(128, 256)
+                    .basic_residual_block(256, 256)
+                    .maxpool2d(2, 2, 2, 2, 0, 0)
+                    .conv2d(512, 3, 3, 1, 1)
+                    .batchnorm()
+                    .conv2d(512, 3, 3, 1, 1)
+                    .batchnorm()
+                    .maxpool2d(2, 2, 2, 2, 0, 0)
+                    .basic_residual_block(512, 512)
+                    .basic_residual_block(512, 512)
+                    .maxpool2d(2, 2, 2, 2, 0, 0)
+                    .avgpool2d(7, 7, 1, 1, 0, 0)
+                    .flatten()
+                    .dense(4096)
+                    .dense(1000)
+                    .build();
 
   NaivePartitionerConfig config{{4, 3, 2}};
   NaivePipelinePartitioner partitioner(config);
 
   size_t num_partitions = 3;
-  vector<Layer *> layer_ptrs;
+  vector<SISOLayer *> layer_ptrs;
   for (const auto &layer : layers) {
     layer_ptrs.push_back(layer.get());
   }
@@ -80,17 +80,17 @@ TEST_F(PartitionerTest, NaivePipelineInputPartition) {
 }
 
 TEST_F(PartitionerTest, NaiveDataModelPartition) {
-  vector<std::unique_ptr<Layer>> layers = LayerBuilder({224, 224, 3})
-                                              .conv2d(64, 3, 3, 1, 1)
-                                              .batchnorm()
-                                              .maxpool2d(2, 2, 2, 2, 0, 0)
-                                              .dense(1000)
-                                              .build();
+  auto layers = LayerBuilder({224, 224, 3})
+                    .conv2d(64, 3, 3, 1, 1)
+                    .batchnorm()
+                    .maxpool2d(2, 2, 2, 2, 0, 0)
+                    .dense(1000)
+                    .build();
 
   NaivePartitionerConfig config{{1, 1, 1}};
   NaiveDataPartitioner partitioner(config);
 
-  vector<Layer *> layer_ptrs;
+  vector<SISOLayer *> layer_ptrs;
   for (const auto &layer : layers) {
     layer_ptrs.push_back(layer.get());
   }
@@ -144,7 +144,7 @@ TEST_F(PartitionerTest, NaiveDataInputPartitionUneven) {
 }
 
 // TEST_F(PartitionerTest, WeightedPartitionerModelPartition) {
-//   vector<std::unique_ptr<Layer>> layers = LayerBuilder({32, 32, 3})
+//   auto layers = LayerBuilder({32, 32, 3})
 //                                               .conv2d(16, 3, 3, 1, 1)
 //                                               .batchnorm()
 //                                               .maxpool2d(2, 2, 2, 2, 0, 0)
@@ -159,7 +159,7 @@ TEST_F(PartitionerTest, NaiveDataInputPartitionUneven) {
 //   WeightedPartitionerConfig config{{2, 1}, {64, 32, 32, 3}};
 //   WeightedPipelinePartitioner partitioner(config);
 
-//   vector<Layer *> layer_ptrs;
+//   vector<SISOLayer *> layer_ptrs;
 //   for (const auto &layer : layers) {
 //     layer_ptrs.push_back(layer.get());
 //   }
@@ -178,7 +178,7 @@ TEST_F(PartitionerTest, NaiveDataInputPartitionUneven) {
 // }
 
 // TEST_F(PartitionerTest, WeightedPartitionerEqualWeights) {
-//   vector<std::unique_ptr<Layer>> layers = LayerBuilder({28, 28, 1})
+//   auto layers = LayerBuilder({28, 28, 1})
 //                                               .conv2d(8, 3, 3, 1, 1)
 //                                               .conv2d(16, 3, 3, 1, 1)
 //                                               .conv2d(32, 3, 3, 1, 1)
@@ -206,7 +206,7 @@ TEST_F(PartitionerTest, NaiveDataInputPartitionUneven) {
 // }
 
 // TEST_F(PartitionerTest, WeightedPartitionerManyWorkers) {
-//   vector<std::unique_ptr<Layer>> layers = LayerBuilder({32, 32, 3})
+//   auto layers = LayerBuilder({32, 32, 3})
 //                                               .conv2d(16, 3, 3, 1, 1)
 //                                               .conv2d(16, 3, 3, 1, 1)
 //                                               .conv2d(32, 3, 3, 1, 1)
@@ -238,18 +238,18 @@ TEST_F(PartitionerTest, NaiveDataInputPartitionUneven) {
 // }
 
 TEST_F(PartitionerTest, NaivePipelineEqualProportions) {
-  vector<std::unique_ptr<Layer>> layers = LayerBuilder({28, 28, 1})
-                                              .conv2d(16, 3, 3, 1, 1)
-                                              .conv2d(16, 3, 3, 1, 1)
-                                              .conv2d(16, 3, 3, 1, 1)
-                                              .flatten()
-                                              .dense(10)
-                                              .build();
+  auto layers = LayerBuilder({28, 28, 1})
+                    .conv2d(16, 3, 3, 1, 1)
+                    .conv2d(16, 3, 3, 1, 1)
+                    .conv2d(16, 3, 3, 1, 1)
+                    .flatten()
+                    .dense(10)
+                    .build();
 
   NaivePartitionerConfig config{{1, 1}};
   NaivePipelinePartitioner partitioner(config);
 
-  vector<Layer *> layer_ptrs;
+  vector<SISOLayer *> layer_ptrs;
   for (const auto &layer : layers) {
     layer_ptrs.push_back(layer.get());
   }
@@ -266,13 +266,12 @@ TEST_F(PartitionerTest, NaivePipelineEqualProportions) {
 }
 
 TEST_F(PartitionerTest, NaivePipelineSinglePartition) {
-  vector<std::unique_ptr<Layer>> layers =
-      LayerBuilder({28, 28, 1}).conv2d(16, 3, 3, 1, 1).flatten().dense(10).build();
+  auto layers = LayerBuilder({28, 28, 1}).conv2d(16, 3, 3, 1, 1).flatten().dense(10).build();
 
   NaivePartitionerConfig config{{1}};
   NaivePipelinePartitioner partitioner(config);
 
-  vector<Layer *> layer_ptrs;
+  vector<SISOLayer *> layer_ptrs;
   for (const auto &layer : layers) {
     layer_ptrs.push_back(layer.get());
   }

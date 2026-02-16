@@ -21,14 +21,14 @@
 namespace tnn {
 class Sequential : public Block {
 private:
-  std::vector<std::unique_ptr<Layer>> layers_;
+  std::vector<std::unique_ptr<SISOLayer>> layers_;
   size_t max_size_ = 0;
 
   void compute_max_size(const std::vector<size_t> &input_shape, DType_t dtype);
 
 protected:
-  std::vector<Layer *> layers() override {
-    std::vector<Layer *> layers;
+  std::vector<SISOLayer *> layers() override {
+    std::vector<SISOLayer *> layers;
     for (auto &layer : layers_) {
       layers.push_back(layer.get());
     }
@@ -40,7 +40,7 @@ protected:
 
 public:
   explicit Sequential(const std::string &name = "seq",
-                      std::vector<std::unique_ptr<Layer>> layers = {});
+                      std::vector<std::unique_ptr<SISOLayer>> layers = {});
 
   static constexpr const char *TYPE_NAME = "sequential";
 
@@ -50,7 +50,7 @@ public:
    */
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
   void print_summary(const std::vector<size_t> &input_shape) const;
-  const std::vector<Layer *> &get_layers() const;
+  std::vector<SISOLayer *> get_layers();
   std::string type() const override { return TYPE_NAME; }
   LayerConfig get_config() const override;
   static std::unique_ptr<Sequential> create_from_config(const LayerConfig &config);

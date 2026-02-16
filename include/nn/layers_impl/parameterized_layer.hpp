@@ -8,11 +8,11 @@
 
 #include <string>
 
-#include "nn/layer.hpp"
+#include "nn/siso_layer.hpp"
 
 namespace tnn {
 
-class ParameterizedLayer : public Layer {
+class ParameterizedLayer : public SISOLayer {
 public:
   explicit ParameterizedLayer(const std::string &name = "") { this->name_ = name; }
 

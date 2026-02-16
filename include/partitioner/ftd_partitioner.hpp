@@ -34,7 +34,7 @@ public:
 
   ~FTDPartitioner() {}
 
-  std::vector<SeqPartition> partition_model(const std::vector<Layer *> &layers) override;
+  std::vector<SeqPartition> partition_model(const std::vector<SISOLayer *> &layers) override;
 
   std::vector<InputPartition> partition_input(const ConstTensor &input,
                                               const ConstTensor &labels) override {

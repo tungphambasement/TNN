@@ -107,11 +107,11 @@ protected:
   /**
    * Create a simple linear layer (y = scale * x) for testing
    */
-  std::vector<std::unique_ptr<Layer>> create_scaling_layer(float scale,
-                                                           const std::string &name = "scale",
-                                                           size_t in_channels = 1,
-                                                           size_t out_channels = 1) {
-    std::vector<std::unique_ptr<Layer>> layers;
+  std::vector<std::unique_ptr<SISOLayer>> create_scaling_layer(float scale,
+                                                               const std::string &name = "scale",
+                                                               size_t in_channels = 1,
+                                                               size_t out_channels = 1) {
+    std::vector<std::unique_ptr<SISOLayer>> layers;
     // Use a 1x1 conv with specific initialization to act as a simple linear transformation
     auto layer = std::make_unique<LegacyConv2DLayer>(in_channels, out_channels, 1, 1, 1, 1, 0, 0,
                                                      false, name);
@@ -142,7 +142,7 @@ protected:
 
 TEST_F(ResidualBlockTest, IdentityShortcutForward) {
   // Create simple main path: single layer that multiplies by 2
-  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
   main_path = create_scaling_layer(2.0f, "scale_2x");
 
   ResidualBlock residual(std::move(main_path), {}, "none", "identity_residual");
@@ -173,7 +173,7 @@ TEST_F(ResidualBlockTest, IdentityShortcutForward) {
 }
 
 TEST_F(ResidualBlockTest, IdentityShortcutForwardWithReLU) {
-  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
   main_path = create_scaling_layer(-2.0f, "scale_neg2x");
 
   ResidualBlock residual(std::move(main_path), {}, "relu", "identity_relu");
@@ -202,7 +202,7 @@ TEST_F(ResidualBlockTest, IdentityShortcutForwardWithReLU) {
 }
 
 TEST_F(ResidualBlockTest, IdentityShortcutMultiChannel) {
-  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
   main_path = create_scaling_layer(0.5f, "scale_half", 2, 2);
 
   ResidualBlock residual(std::move(main_path), {}, "none", "identity_multichannel");
@@ -238,7 +238,7 @@ TEST_F(ResidualBlockTest, IdentityShortcutMultiChannel) {
 }
 
 TEST_F(ResidualBlockTest, IdentityShortcutMultiBatch) {
-  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
   main_path = create_scaling_layer(1.0f, "scale_1x");
 
   ResidualBlock residual(std::move(main_path), {}, "none", "identity_multibatch");
@@ -273,11 +273,11 @@ TEST_F(ResidualBlockTest, IdentityShortcutMultiBatch) {
 // Projection Shortcut Tests
 
 TEST_F(ResidualBlockTest, ProjectionShortcutForward) {
-  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
   main_path = create_scaling_layer(0.5f, "scale_main");
 
   // Projection shortcut: 1x1 conv with scale 0.25
-  std::vector<std::unique_ptr<Layer>> shortcut = create_scaling_layer(0.25f, "scale_shortcut");
+  std::vector<std::unique_ptr<SISOLayer>> shortcut = create_scaling_layer(0.25f, "scale_shortcut");
 
   ResidualBlock residual(std::move(main_path), std::move(shortcut), "none", "projection_residual");
   {
@@ -305,10 +305,10 @@ TEST_F(ResidualBlockTest, ProjectionShortcutForward) {
 }
 
 TEST_F(ResidualBlockTest, ProjectionShortcutWithReLU) {
-  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
   main_path = create_scaling_layer(-1.0f, "scale_neg");
 
-  std::vector<std::unique_ptr<Layer>> shortcut = create_scaling_layer(0.5f, "scale_short");
+  std::vector<std::unique_ptr<SISOLayer>> shortcut = create_scaling_layer(0.5f, "scale_short");
 
   ResidualBlock residual(std::move(main_path), std::move(shortcut), "relu", "projection_relu");
   {
@@ -338,7 +338,7 @@ TEST_F(ResidualBlockTest, ProjectionShortcutWithReLU) {
 // Backward Pass Tests
 
 TEST_F(ResidualBlockTest, IdentityShortcutBackward) {
-  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
   main_path = create_scaling_layer(2.0f, "scale_2x");
 
   ResidualBlock residual(std::move(main_path), {}, "none", "identity_backward");
@@ -382,7 +382,7 @@ TEST_F(ResidualBlockTest, IdentityShortcutBackward) {
 }
 
 TEST_F(ResidualBlockTest, GetConfig) {
-  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
   main_path = create_scaling_layer(1.0f, "scale");
 
   ResidualBlock residual(std::move(main_path), {}, "relu", "test_residual");
@@ -395,10 +395,10 @@ TEST_F(ResidualBlockTest, GetConfig) {
 }
 
 TEST_F(ResidualBlockTest, GetConfigWithProjection) {
-  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
   main_path = create_scaling_layer(1.0f, "scale_main");
 
-  std::vector<std::unique_ptr<Layer>> shortcut;
+  std::vector<std::unique_ptr<SISOLayer>> shortcut;
   shortcut = create_scaling_layer(0.5f, "scale_short");
 
   ResidualBlock residual(std::move(main_path), std::move(shortcut), "relu", "test_projection");
@@ -410,7 +410,7 @@ TEST_F(ResidualBlockTest, GetConfigWithProjection) {
 }
 
 TEST_F(ResidualBlockTest, ComputeOutputShape) {
-  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
   main_path = create_scaling_layer(1.0f, "scale", 3, 3);
 
   ResidualBlock residual(std::move(main_path), {}, "none", "test_shape");
@@ -425,7 +425,7 @@ TEST_F(ResidualBlockTest, ComputeOutputShape) {
 // Edge Cases and Numerical Stability
 
 TEST_F(ResidualBlockTest, EdgeCaseZeroGradient) {
-  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
   main_path = create_scaling_layer(2.0f, "scale_2x");
 
   ResidualBlock residual(std::move(main_path), {}, "none", "zero_gradient");
@@ -455,7 +455,7 @@ TEST_F(ResidualBlockTest, EdgeCaseZeroGradient) {
 }
 
 TEST_F(ResidualBlockTest, EdgeCaseLargeValues) {
-  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
   main_path = create_scaling_layer(1.0f, "scale_1x");
 
   ResidualBlock residual(std::move(main_path), {}, "none", "large_values");
@@ -484,7 +484,7 @@ TEST_F(ResidualBlockTest, EdgeCaseLargeValues) {
 }
 
 TEST_F(ResidualBlockTest, EdgeCaseNegativeValues) {
-  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
   main_path = create_scaling_layer(-1.0f, "scale_neg");
 
   ResidualBlock residual(std::move(main_path), {}, "none", "negative_values");
@@ -513,7 +513,7 @@ TEST_F(ResidualBlockTest, EdgeCaseNegativeValues) {
 }
 
 TEST_F(ResidualBlockTest, NumericalStabilitySmallValues) {
-  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
   main_path = create_scaling_layer(1.0f, "scale_1x");
 
   ResidualBlock residual(std::move(main_path), {}, "none", "small_values");
@@ -542,7 +542,7 @@ TEST_F(ResidualBlockTest, NumericalStabilitySmallValues) {
 }
 
 TEST_F(ResidualBlockTest, NumericalStabilityBackward) {
-  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
   main_path = create_scaling_layer(1.0f, "scale_1x");
 
   ResidualBlock residual(std::move(main_path), {}, "none", "backward_stability");
@@ -576,7 +576,7 @@ TEST_F(ResidualBlockTest, NumericalStabilityBackward) {
 // Multi-path and Complex Scenarios
 
 TEST_F(ResidualBlockTest, MultiLayerMainPath) {
-  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
   auto layer1 = create_scaling_layer(0.5f, "scale_1");
   auto layer2 = create_scaling_layer(2.0f, "scale_2");
   main_path.push_back(std::move(layer1[0]));
@@ -608,7 +608,7 @@ TEST_F(ResidualBlockTest, MultiLayerMainPath) {
 }
 
 TEST_F(ResidualBlockTest, MultiLayerMainPathBackward) {
-  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
   auto layer1 = create_scaling_layer(0.5f, "scale_1");
   auto layer2 = create_scaling_layer(2.0f, "scale_2");
   main_path.push_back(std::move(layer1[0]));
@@ -645,7 +645,7 @@ TEST_F(ResidualBlockTest, MultiLayerMainPathBackward) {
 }
 
 TEST_F(ResidualBlockTest, ReLUNegativeInputSuppressionForward) {
-  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
   main_path = create_scaling_layer(0.0f, "scale_zero");
 
   ResidualBlock residual(std::move(main_path), {}, "relu", "relu_suppression");
@@ -674,7 +674,7 @@ TEST_F(ResidualBlockTest, ReLUNegativeInputSuppressionForward) {
 }
 
 TEST_F(ResidualBlockTest, ReLUNegativeInputSuppressionBackward) {
-  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
   main_path = create_scaling_layer(0.0f, "scale_zero");
 
   ResidualBlock residual(std::move(main_path), {}, "relu", "relu_suppression_bwd");

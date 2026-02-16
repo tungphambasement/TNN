@@ -16,8 +16,8 @@
 
 namespace tnn {
 
-ResidualBlock::ResidualBlock(std::vector<std::unique_ptr<Layer>> main_path,
-                             std::vector<std::unique_ptr<Layer>> shortcut_path,
+ResidualBlock::ResidualBlock(std::vector<std::unique_ptr<SISOLayer>> main_path,
+                             std::vector<std::unique_ptr<SISOLayer>> shortcut_path,
                              const std::string &final_activation, const std::string &name)
     : main_path_(std::move(main_path)),
       shortcut_path_(std::move(shortcut_path)),
@@ -34,7 +34,7 @@ ResidualBlock::ResidualBlock(std::vector<std::unique_ptr<Layer>> main_path,
   }
 }
 
-static size_t compute_path_max_size(const std::vector<std::unique_ptr<Layer>> &path,
+static size_t compute_path_max_size(const std::vector<std::unique_ptr<SISOLayer>> &path,
                                     const std::vector<size_t> &input_shape, DType_t dtype) {
   size_t max_size = 0;
   std::vector<size_t> current_shape = input_shape;
@@ -169,8 +169,8 @@ LayerConfig ResidualBlock::get_config() const {
 }
 
 std::unique_ptr<ResidualBlock> ResidualBlock::create_from_config(const LayerConfig &config) {
-  std::vector<std::unique_ptr<Layer>> main_path;
-  std::vector<std::unique_ptr<Layer>> shortcut_path;
+  std::vector<std::unique_ptr<SISOLayer>> main_path;
+  std::vector<std::unique_ptr<SISOLayer>> shortcut_path;
   nlohmann::json main_json = config.get<nlohmann::json>("main_path", nlohmann::json::array());
   LayerFactory::register_defaults();
   for (const auto &layer_json : main_json) {

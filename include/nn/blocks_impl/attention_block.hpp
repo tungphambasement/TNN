@@ -45,7 +45,7 @@ private:
                                                    size_t batch_size, size_t seq_len,
                                                    flowHandle_t handle);
 
-  std::vector<Layer *> layers() override {
+  std::vector<SISOLayer *> layers() override {
     return {q_proj_.get(), k_proj_.get(), v_proj_.get(), out_proj_.get()};
   }
   void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
