@@ -26,6 +26,8 @@ void PositionalEmbeddingLayer::init_impl() {
   } else {
     pos_embedding_->fill_random_uniform(-bound, bound);
   }
+
+  pos_embedding_gradients_->fill(0.0f);
 }
 
 void PositionalEmbeddingLayer::forward_impl(const ConstTensor &input, const Tensor &output,

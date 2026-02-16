@@ -38,7 +38,7 @@ enum class ParallelMode_t { DATA, PIPELINE };
 
 struct CoordinatorConfig {
   ParallelMode_t parallel_mode = ParallelMode_t::DATA;
-  std::unique_ptr<Sequential> model;
+  Sequential *model;
   std::unique_ptr<Optimizer> optimizer;
   std::unique_ptr<Scheduler> scheduler;
   std::unique_ptr<Partitioner> partitioner;
@@ -51,7 +51,7 @@ class Coordinator {
 public:
   Coordinator(CoordinatorConfig config)
       : parallel_mode_(config.parallel_mode),
-        model_(std::move(config.model)),
+        model_(config.model),
         optimizer_(std::move(config.optimizer)),
         scheduler_(std::move(config.scheduler)),
         partitioner_(std::move(config.partitioner)),
@@ -464,7 +464,7 @@ private:
 protected:
   // Components of the coordinator
   ParallelMode_t parallel_mode_ = ParallelMode_t::DATA;
-  std::unique_ptr<Sequential> model_;
+  Sequential *model_;
   std::unique_ptr<Optimizer> optimizer_;
   std::unique_ptr<Scheduler> scheduler_;
   std::unique_ptr<Partitioner> partitioner_;

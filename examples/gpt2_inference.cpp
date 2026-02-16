@@ -7,6 +7,7 @@
 #include "data_loading/open_webtext_data_loader.hpp"
 #include "nn/blocks_impl/sequential.hpp"
 #include "nn/example_models.hpp"
+#include "nn/graph_builder.hpp"
 #include "nn/layers.hpp"
 #include "tensor/tensor.hpp"
 #include "tokenizer/tokenizer.hpp"
@@ -36,23 +37,10 @@ int main(int argc, char **argv) {
   // Create model using ExampleModels or load from file
   const Device &device = device_type == DeviceType::GPU ? getGPU() : getHost();
   auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
-  Graph graph;
-  std::unique_ptr<Sequential> model;
-  // Try to load from file, otherwise create from ExampleModels
-  try {
-    std::ifstream file(model_path, std::ios::binary);
-    if (!file.is_open()) {
-      throw std::runtime_error("Failed to open model file");
-    }
-    model = load_state<Sequential>(file, graph, allocator);
-    file.close();
-  } catch (const std::exception &e) {
-    cerr << "Could not load from file, trying ExampleModels: " << e.what() << endl;
-    Sequential temp_model = ExampleModels::create("gpt2");
-    graph.add_layer(temp_model);
-    model = std::make_unique<Sequential>(std::move(temp_model));
-  }
-  model->set_training(false);
+
+  Sequential *model_ptr = nullptr;
+  GraphBuilder builder;
+  Graph graph = load_or_create_model("gpt2", model_path, allocator, model_ptr);
 
   size_t seq_len = 512;
 
@@ -92,7 +80,7 @@ int main(int argc, char **argv) {
     }
 
     Tensor output;
-    model->forward({model_input}, {output});
+    model_ptr->forward({model_input}, {output});
 
     // Transfer output to CPU for sampling
     Tensor cpu_output = output->to_host();

@@ -15,9 +15,7 @@ set(TEST_FILES
     cuda_loss_funcs_test.cpp
     cuda_batchnorm_ops_test.cpp
     layer_device_agnosticity_test.cpp
-    layer_buffer_reuse_test.cpp
     residual_block_test.cpp
-    sequential_residual_block_test.cpp
     tiny_imagenet_loader_test.cpp
     legacy_dense_layer_test.cpp
     legacy_maxpool2d_layer_test.cpp

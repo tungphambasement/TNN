@@ -58,6 +58,11 @@ void DenseLayer::init_impl() {
       bias_->fill_random_uniform(-bound, bound);
     }
   }
+
+  weight_gradients_->fill(0.0f);
+  if (use_bias_) {
+    bias_gradients_->fill(0.0f);
+  }
 }
 
 size_t DenseLayer::get_shape_hash(size_t batch_size) const {

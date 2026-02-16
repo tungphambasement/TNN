@@ -43,10 +43,11 @@ LayerNormLayer::~LayerNormLayer() {
 }
 
 void LayerNormLayer::init_impl() {
-  if (affine_) {
-    gamma_->fill(1.0f);
-    beta_->fill(0.0f);
-  }
+  gamma_->fill(1.0f);
+  beta_->fill(0.0f);
+
+  gamma_gradients_->fill(0.0f);
+  beta_gradients_->fill(0.0f);
 }
 
 size_t LayerNormLayer::get_shape_hash(size_t n, size_t c) const {

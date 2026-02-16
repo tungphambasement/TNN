@@ -1,5 +1,7 @@
 #pragma once
 
+#include <fstream>
+
 #include "device/device_allocator.hpp"
 #include "device/iallocator.hpp"
 #include "tensor/tensor.hpp"
@@ -92,6 +94,41 @@ inline Tensor dtype_cast(const ConstTensor &input, DType_t target_dtype) {
       input->data_type(), A_T,
       DISPATCH_DTYPE(target_dtype, B_T, ops::cast<A_T, B_T>(input_data, output_data, input_size)));
   return make_tensor(input->allocator(), target_dtype, input->shape(), std::move(output_data));
+}
+
+inline void load_into(std::ifstream &in, Tensor &tensor) {
+  if (!in.is_open()) {
+    throw std::runtime_error("File is not open for reading");
+  }
+  DType_t dtype;
+  in.read(reinterpret_cast<char *>(&dtype), sizeof(DType_t));
+  if (dtype != tensor->data_type()) {
+    throw std::runtime_error("Tensor dtype does not match data in file");
+  }
+  size_t dims;
+  in.read(reinterpret_cast<char *>(&dims), sizeof(size_t));
+  std::vector<size_t> shape(dims);
+  in.read(reinterpret_cast<char *>(shape.data()), dims * sizeof(size_t));
+  if (in.gcount() != static_cast<std::streamsize>(dims * sizeof(size_t))) {
+    throw std::runtime_error("Failed to read tensor shape from file");
+  }
+  if (shape != tensor->shape()) {
+    throw std::runtime_error("Tensor shape does not match data in file");
+  }
+  size_t byte_size = tensor->size() * get_dtype_size(dtype);
+  if (tensor->device().device_type() == DeviceType::CPU) {
+    in.read(reinterpret_cast<char *>(tensor->data()), byte_size);
+    if (in.gcount() != static_cast<std::streamsize>(byte_size)) {
+      throw std::runtime_error("Failed to read tensor data from file");
+    }
+  } else {
+    std::vector<char> host_buffer(byte_size);
+    in.read(reinterpret_cast<char *>(host_buffer.data()), byte_size);
+    if (in.gcount() != static_cast<std::streamsize>(byte_size)) {
+      throw std::runtime_error("Failed to read tensor data from file");
+    }
+    tensor->device().copyToDevice(tensor->data(), host_buffer.data(), byte_size);
+  }
 }
 
 inline Tensor load(std::ifstream &in, IAllocator &allocator) {

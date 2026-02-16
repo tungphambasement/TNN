@@ -75,7 +75,7 @@ void SISOLayer::backward(const std::vector<ConstTensor> &gradients,
 
 Vec<Vec<size_t>> SISOLayer::output_shape(const Vec<Vec<size_t>> &input_shape) const {
   if (input_shape.size() != 1) {
-    throw std::runtime_error("Currently only single input supported in output_shape.");
+    throw std::runtime_error("Only single input supported in output_shape for SISO layers.");
   }
   return {compute_output_shape(input_shape[0])};
 }

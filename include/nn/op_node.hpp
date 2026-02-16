@@ -14,34 +14,41 @@ class IONode;
 // Simple op node. 1 Input, 1 Output.
 class OpNode : public INode {
 public:
-  OpNode(GraphContextDescriptor &context, Layer &layer)
-      : layer_(layer) {
-    auto param_descriptors = layer_.param_descriptors();
+  OpNode(GraphContextDescriptor &context, std::unique_ptr<Layer> layer)
+      : layer_(std::move(layer)) {
+    auto param_descriptors = layer_->param_descriptors();
     for (const auto &desc : param_descriptors) {
       context.register_desc(desc);
     }
   }
 
   void init(IAllocator &allocator) {
-    layer_.set_allocator(allocator);
-    layer_.init();
+    layer_->set_allocator(allocator);
+    layer_->init();
   }
 
-  std::vector<ParamDescriptor> param_descriptors() const { return layer_.param_descriptors(); }
+  std::vector<ParamDescriptor> param_descriptors() const { return layer_->param_descriptors(); }
 
   void forward(const std::vector<ConstTensor> &inputs, const std::vector<Tensor> &outputs,
                size_t mb_id = 0) {
-    layer_.forward(inputs, outputs, mb_id);
+    layer_->forward(inputs, outputs, mb_id);
   }
 
   void backward(const std::vector<ConstTensor> &gradients, const std::vector<Tensor> &grad_inputs,
                 size_t mb_id = 0) {
-    layer_.backward(gradients, grad_inputs, mb_id);
+    layer_->backward(gradients, grad_inputs, mb_id);
   }
 
+  void set_seed(size_t seed) { layer_->set_seed(seed); }
+
+  void set_training(bool training) { layer_->set_training(training); }
+
   Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shapes) const {
-    return layer_.output_shape(input_shapes);
+    return layer_->output_shape(input_shapes);
   }
+
+  Vec<Tensor> parameters() { return layer_->parameters(); }
+  Vec<Tensor> gradients() { return layer_->gradients(); }
 
   std::string type() const override { return "op_node"; }
   void save_state(std::ofstream &file) override {}
@@ -53,8 +60,10 @@ public:
   void add_output(IONode *io_node) { outputs_.push_back(io_node); }
   const std::vector<IONode *> &outputs() const { return outputs_; }
 
+  const Device &device() const { return layer_->device(); }
+
 private:
-  Layer &layer_;
+  std::unique_ptr<Layer> layer_;
   std::vector<IONode *> inputs_;
   std::vector<IONode *> outputs_;
 };

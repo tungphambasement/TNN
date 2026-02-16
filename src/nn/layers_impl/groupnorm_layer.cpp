@@ -29,10 +29,11 @@ GroupNormLayer::GroupNormLayer(size_t num_groups, size_t num_channels, float eps
 }
 
 void GroupNormLayer::init_impl() {
-  if (affine_) {
-    gamma_->fill(1.0f);
-    beta_->fill(0.0f);
-  }
+  gamma_->fill(1.0f);
+  beta_->fill(0.0f);
+
+  gamma_gradients_->fill(0.0f);
+  beta_gradients_->fill(0.0f);
 }
 
 void GroupNormLayer::forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id) {

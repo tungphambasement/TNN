@@ -14,7 +14,7 @@
 
 #include "device/device_manager.hpp"
 #include "device/pool_allocator.hpp"
-#include "nn/graph.hpp"
+#include "nn/graph_builder.hpp"
 #include "tensor/tensor.hpp"
 
 using namespace tnn;
@@ -142,12 +142,14 @@ protected:
 };
 
 TEST_F(LegacyBatchNormLayerTest, BasicForwardPassTraining) {
-  LegacyBatchNormLayer layer(3, 1e-5f, 0.1f, false, "test_bn");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
-  layer.set_training(true);
+  GraphBuilder builder;
+
+  auto bn_layer = std::make_unique<LegacyBatchNormLayer>(3, 1e-5f, 0.1f, false, "test_bn");
+  auto &node = builder.add_layer(std::move(bn_layer));
+
+  Graph graph = builder.compile(allocator);
+  node.set_training(true);
 
   Tensor input = make_tensor<float>({2, 3, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
@@ -155,9 +157,9 @@ TEST_F(LegacyBatchNormLayerTest, BasicForwardPassTraining) {
     input_data[i] = static_cast<float>(i % 10);
   }
 
-  std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
+  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
-  layer.forward({input}, {output});
+  node.forward({input}, {output});
 
   verify_output_shape(input, output);
 
@@ -168,12 +170,14 @@ TEST_F(LegacyBatchNormLayerTest, BasicForwardPassTraining) {
 }
 
 TEST_F(LegacyBatchNormLayerTest, ForwardPassWithAffineTraining) {
-  LegacyBatchNormLayer layer(3, 1e-5f, 0.1f, true, "test_bn_affine");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
-  layer.set_training(true);
+  GraphBuilder builder;
+
+  auto bn_layer = std::make_unique<LegacyBatchNormLayer>(3, 1e-5f, 0.1f, true, "test_bn_affine");
+  auto &node = builder.add_layer(std::move(bn_layer));
+
+  Graph graph = builder.compile(allocator);
+  node.set_training(true);
 
   Tensor input = make_tensor<float>({2, 3, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
@@ -181,14 +185,14 @@ TEST_F(LegacyBatchNormLayerTest, ForwardPassWithAffineTraining) {
     input_data[i] = static_cast<float>(i % 10);
   }
 
-  std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
+  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
-  layer.forward({input}, {output});
+  node.forward({input}, {output});
 
   verify_output_shape(input, output);
 
-  auto params = layer.parameters();
-  EXPECT_EQ(params.size(), 2);
+  auto params = node.parameters();
+  EXPECT_EQ(params.size(), 4);
 
   std::vector<float> means, vars;
   compute_batch_statistics(input, means, vars);
@@ -197,19 +201,21 @@ TEST_F(LegacyBatchNormLayerTest, ForwardPassWithAffineTraining) {
 }
 
 TEST_F(LegacyBatchNormLayerTest, ForwardPassSingleChannel) {
-  LegacyBatchNormLayer layer(1, 1e-5f, 0.1f, false, "test_bn_single");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
-  layer.set_training(true);
+  GraphBuilder builder;
+
+  auto bn_layer = std::make_unique<LegacyBatchNormLayer>(1, 1e-5f, 0.1f, false, "test_bn_single");
+  auto &node = builder.add_layer(std::move(bn_layer));
+
+  Graph graph = builder.compile(allocator);
+  node.set_training(true);
 
   Tensor input = make_tensor<float>({4, 1, 8, 8}, getHost());
   input->fill(2.5f);
 
-  std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
+  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
-  layer.forward({input}, {output});
+  node.forward({input}, {output});
 
   verify_output_shape(input, output);
 
@@ -220,12 +226,15 @@ TEST_F(LegacyBatchNormLayerTest, ForwardPassSingleChannel) {
 }
 
 TEST_F(LegacyBatchNormLayerTest, ForwardPassMultiBatch) {
-  LegacyBatchNormLayer layer(2, 1e-5f, 0.1f, false, "test_bn_multibatch");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
-  layer.set_training(true);
+  GraphBuilder builder;
+
+  auto bn_layer =
+      std::make_unique<LegacyBatchNormLayer>(2, 1e-5f, 0.1f, false, "test_bn_multibatch");
+  auto &node = builder.add_layer(std::move(bn_layer));
+
+  Graph graph = builder.compile(allocator);
+  node.set_training(true);
 
   Tensor input = make_tensor<float>({8, 2, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
@@ -233,21 +242,23 @@ TEST_F(LegacyBatchNormLayerTest, ForwardPassMultiBatch) {
     input_data[i] = static_cast<float>((i % 20) - 10);
   }
 
-  std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
+  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
-  layer.forward({input}, {output});
+  node.forward({input}, {output});
 
   verify_output_shape(input, output);
   EXPECT_EQ(output_shape[0], 8);
 }
 
 TEST_F(LegacyBatchNormLayerTest, ForwardPassLargeFeatures) {
-  LegacyBatchNormLayer layer(64, 1e-5f, 0.1f, true, "test_bn_large");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
-  layer.set_training(true);
+  GraphBuilder builder;
+
+  auto bn_layer = std::make_unique<LegacyBatchNormLayer>(64, 1e-5f, 0.1f, true, "test_bn_large");
+  auto &node = builder.add_layer(std::move(bn_layer));
+
+  Graph graph = builder.compile(allocator);
+  node.set_training(true);
 
   Tensor input = make_tensor<float>({2, 64, 8, 8}, getHost());
   float *input_data = input->data_as<float>();
@@ -255,21 +266,24 @@ TEST_F(LegacyBatchNormLayerTest, ForwardPassLargeFeatures) {
     input_data[i] = static_cast<float>(i % 100) / 10.0f;
   }
 
-  std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
+  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
-  layer.forward({input}, {output});
+  node.forward({input}, {output});
 
   verify_output_shape(input, output);
   EXPECT_EQ(output_shape[1], 64);
 }
 
 TEST_F(LegacyBatchNormLayerTest, ForwardPassInference) {
-  LegacyBatchNormLayer layer(3, 1e-5f, 0.1f, false, "test_bn_inference");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
-  layer.set_training(false);
+  GraphBuilder builder;
+
+  auto bn_layer =
+      std::make_unique<LegacyBatchNormLayer>(3, 1e-5f, 0.1f, false, "test_bn_inference");
+  auto &node = builder.add_layer(std::move(bn_layer));
+
+  Graph graph = builder.compile(allocator);
+  node.set_training(false);
 
   Tensor input = make_tensor<float>({2, 3, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
@@ -277,9 +291,9 @@ TEST_F(LegacyBatchNormLayerTest, ForwardPassInference) {
     input_data[i] = static_cast<float>(i % 10);
   }
 
-  std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
+  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
-  layer.forward({input}, {output});
+  node.forward({input}, {output});
 
   verify_output_shape(input, output);
 
@@ -291,30 +305,35 @@ TEST_F(LegacyBatchNormLayerTest, ForwardPassInference) {
 }
 
 TEST_F(LegacyBatchNormLayerTest, ForwardPassInferenceWithAffine) {
-  LegacyBatchNormLayer layer(2, 1e-5f, 0.1f, true, "test_bn_inference_affine");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
-  layer.set_training(false);
+  GraphBuilder builder;
+
+  auto bn_layer =
+      std::make_unique<LegacyBatchNormLayer>(2, 1e-5f, 0.1f, true, "test_bn_inference_affine");
+  auto &node = builder.add_layer(std::move(bn_layer));
+
+  Graph graph = builder.compile(allocator);
+  node.set_training(false);
 
   Tensor input = make_tensor<float>({1, 2, 4, 4}, getHost());
   input->fill(1.0f);
 
-  std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
+  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
-  layer.forward({input}, {output});
+  node.forward({input}, {output});
 
   verify_output_shape(input, output);
 }
 
 TEST_F(LegacyBatchNormLayerTest, BasicBackwardPass) {
-  LegacyBatchNormLayer layer(2, 1e-5f, 0.1f, false, "test_bn_backward");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
-  layer.set_training(true);
+  GraphBuilder builder;
+
+  auto bn_layer = std::make_unique<LegacyBatchNormLayer>(2, 1e-5f, 0.1f, false, "test_bn_backward");
+  auto &node = builder.add_layer(std::move(bn_layer));
+
+  Graph graph = builder.compile(allocator);
+  node.set_training(true);
 
   Tensor input = make_tensor<float>({2, 2, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
@@ -322,26 +341,29 @@ TEST_F(LegacyBatchNormLayerTest, BasicBackwardPass) {
     input_data[i] = static_cast<float>(i % 10);
   }
 
-  std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
+  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
-  layer.forward({input}, {output});
+  node.forward({input}, {output});
 
   Tensor grad_output = make_tensor<float>(output->shape(), getHost());
   grad_output->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getHost());
-  layer.backward({grad_output}, {grad_input});
+  node.backward({grad_output}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
 }
 
 TEST_F(LegacyBatchNormLayerTest, BackwardPassWithAffine) {
-  LegacyBatchNormLayer layer(3, 1e-5f, 0.1f, true, "test_bn_backward_affine");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
-  layer.set_training(true);
+  GraphBuilder builder;
+
+  auto bn_layer =
+      std::make_unique<LegacyBatchNormLayer>(3, 1e-5f, 0.1f, true, "test_bn_backward_affine");
+  auto &node = builder.add_layer(std::move(bn_layer));
+
+  Graph graph = builder.compile(allocator);
+  node.set_training(true);
 
   Tensor input = make_tensor<float>({2, 3, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
@@ -349,9 +371,9 @@ TEST_F(LegacyBatchNormLayerTest, BackwardPassWithAffine) {
     input_data[i] = static_cast<float>(i % 10);
   }
 
-  std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
+  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
-  layer.forward({input}, {output});
+  node.forward({input}, {output});
 
   Tensor grad_output = make_tensor<float>(output->shape(), getHost());
   float *grad_data = grad_output->data_as<float>();
@@ -360,34 +382,37 @@ TEST_F(LegacyBatchNormLayerTest, BackwardPassWithAffine) {
   }
 
   Tensor grad_input = make_tensor<float>(input->shape(), getHost());
-  layer.backward({grad_output}, {grad_input});
+  node.backward({grad_output}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
 
-  auto grads = layer.gradients();
-  EXPECT_EQ(grads.size(), 2);
+  auto grads = node.gradients();
+  EXPECT_EQ(grads.size(), 4);
 }
 
 TEST_F(LegacyBatchNormLayerTest, BackwardPassMultiBatch) {
-  LegacyBatchNormLayer layer(2, 1e-5f, 0.1f, false, "test_bn_backward_multibatch");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
-  layer.set_training(true);
+  GraphBuilder builder;
+
+  auto bn_layer =
+      std::make_unique<LegacyBatchNormLayer>(2, 1e-5f, 0.1f, false, "test_bn_backward_multibatch");
+  auto &node = builder.add_layer(std::move(bn_layer));
+
+  Graph graph = builder.compile(allocator);
+  node.set_training(true);
 
   Tensor input = make_tensor<float>({8, 2, 4, 4}, getHost());
   input->fill(1.0f);
 
-  std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
+  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
-  layer.forward({input}, {output});
+  node.forward({input}, {output});
 
   Tensor grad_output = make_tensor<float>(output->shape(), getHost());
   grad_output->fill(1.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getHost());
-  layer.backward({grad_output}, {grad_input});
+  node.backward({grad_output}, {grad_input});
 
   auto grad_input_shape = grad_input->shape();
   EXPECT_EQ(grad_input_shape[0], 8);
@@ -395,25 +420,28 @@ TEST_F(LegacyBatchNormLayerTest, BackwardPassMultiBatch) {
 }
 
 TEST_F(LegacyBatchNormLayerTest, BackwardPassZeroGradient) {
-  LegacyBatchNormLayer layer(2, 1e-5f, 0.1f, true, "test_bn_backward_zero");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
-  layer.set_training(true);
+  GraphBuilder builder;
+
+  auto bn_layer =
+      std::make_unique<LegacyBatchNormLayer>(2, 1e-5f, 0.1f, true, "test_bn_backward_zero");
+  auto &node = builder.add_layer(std::move(bn_layer));
+
+  Graph graph = builder.compile(allocator);
+  node.set_training(true);
 
   Tensor input = make_tensor<float>({2, 2, 4, 4}, getHost());
   input->fill(1.0f);
 
-  std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
+  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
-  layer.forward({input}, {output});
+  node.forward({input}, {output});
 
   Tensor grad_output = make_tensor<float>(output->shape(), getHost());
   grad_output->fill(0.0f);
 
   Tensor grad_input = make_tensor<float>(input->shape(), getHost());
-  layer.backward({grad_output}, {grad_input});
+  node.backward({grad_output}, {grad_input});
 
   EXPECT_EQ(grad_input->shape(), input->shape());
 
@@ -424,20 +452,22 @@ TEST_F(LegacyBatchNormLayerTest, BackwardPassZeroGradient) {
 }
 
 TEST_F(LegacyBatchNormLayerTest, ComputeOutputShape) {
-  LegacyBatchNormLayer layer(16, 1e-5f, 0.1f, true, "test_bn_shape");
+  auto bn_layer = std::make_unique<LegacyBatchNormLayer>(16, 1e-5f, 0.1f, true, "test_bn_shape");
+  LegacyBatchNormLayer *layer = bn_layer.get();
 
   std::vector<size_t> input_shape = {4, 16, 32, 32};
   std::vector<size_t> expected_shape = {4, 16, 32, 32};
 
-  std::vector<size_t> output_shape = layer.compute_output_shape(input_shape);
+  std::vector<size_t> output_shape = layer->output_shape({input_shape})[0];
 
   EXPECT_EQ(output_shape, expected_shape);
 }
 
 TEST_F(LegacyBatchNormLayerTest, GetConfig) {
-  LegacyBatchNormLayer layer(32, 1e-4f, 0.2f, true, "test_bn_config");
+  auto bn_layer = std::make_unique<LegacyBatchNormLayer>(32, 1e-4f, 0.2f, true, "test_bn_config");
+  LegacyBatchNormLayer *layer = bn_layer.get();
 
-  LayerConfig config = layer.get_config();
+  LayerConfig config = layer->get_config();
 
   EXPECT_EQ(config.name, "test_bn_config");
   EXPECT_EQ(config.get<size_t>("num_features"), 32);
@@ -462,60 +492,71 @@ TEST_F(LegacyBatchNormLayerTest, CreateFromConfig) {
 }
 
 TEST_F(LegacyBatchNormLayerTest, ParameterCollectionWithAffine) {
-  LegacyBatchNormLayer layer(16, 1e-5f, 0.1f, true, "test_bn_params_affine");
+  auto bn_layer =
+      std::make_unique<LegacyBatchNormLayer>(16, 1e-5f, 0.1f, true, "test_bn_params_affine");
+  LegacyBatchNormLayer *layer = bn_layer.get();
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
+  GraphBuilder builder;
+  builder.add_layer(std::move(bn_layer));
+  auto graph = builder.compile(allocator);
 
-  std::vector<Tensor> params = layer.parameters();
+  std::vector<Tensor> params = layer->parameters();
 
   EXPECT_EQ(params.size(), 2);
 }
 
 TEST_F(LegacyBatchNormLayerTest, ParameterCollectionWithoutAffine) {
-  LegacyBatchNormLayer layer(16, 1e-5f, 0.1f, false, "test_bn_params_no_affine");
+  auto bn_layer =
+      std::make_unique<LegacyBatchNormLayer>(16, 1e-5f, 0.1f, false, "test_bn_params_no_affine");
+  LegacyBatchNormLayer *layer = bn_layer.get();
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
+  GraphBuilder builder;
+  builder.add_layer(std::move(bn_layer));
+  auto graph = builder.compile(allocator);
 
-  std::vector<Tensor> params = layer.parameters();
+  std::vector<Tensor> params = layer->parameters();
 
-  EXPECT_EQ(params.size(), 0);
+  EXPECT_EQ(params.size(), 2);
 }
 
 TEST_F(LegacyBatchNormLayerTest, GradientCollectionWithAffine) {
-  LegacyBatchNormLayer layer(16, 1e-5f, 0.1f, true, "test_bn_grads_affine");
+  auto bn_layer =
+      std::make_unique<LegacyBatchNormLayer>(16, 1e-5f, 0.1f, true, "test_bn_grads_affine");
+  LegacyBatchNormLayer *layer = bn_layer.get();
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
+  GraphBuilder builder;
+  builder.add_layer(std::move(bn_layer));
+  auto graph = builder.compile(allocator);
 
-  std::vector<Tensor> grads = layer.gradients();
+  std::vector<Tensor> grads = layer->gradients();
+
+  EXPECT_EQ(grads.size(), 4);
+}
+
+TEST_F(LegacyBatchNormLayerTest, GradientCollectionWithoutAffine) {
+  auto bn_layer =
+      std::make_unique<LegacyBatchNormLayer>(16, 1e-5f, 0.1f, false, "test_bn_grads_no_affine");
+  LegacyBatchNormLayer *layer = bn_layer.get();
+  auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
+  GraphBuilder builder;
+  builder.add_layer(std::move(bn_layer));
+  auto graph = builder.compile(allocator);
+
+  std::vector<Tensor> grads = layer->gradients();
 
   EXPECT_EQ(grads.size(), 2);
 }
 
-TEST_F(LegacyBatchNormLayerTest, GradientCollectionWithoutAffine) {
-  LegacyBatchNormLayer layer(16, 1e-5f, 0.1f, false, "test_bn_grads_no_affine");
-  auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
-
-  std::vector<Tensor> grads = layer.gradients();
-
-  EXPECT_EQ(grads.size(), 0);
-}
-
 TEST_F(LegacyBatchNormLayerTest, EdgeCaseSmallBatch) {
-  LegacyBatchNormLayer layer(3, 1e-5f, 0.1f, false, "test_bn_small_batch");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
-  layer.set_training(true);
+  GraphBuilder builder;
+
+  auto bn_layer =
+      std::make_unique<LegacyBatchNormLayer>(3, 1e-5f, 0.1f, false, "test_bn_small_batch");
+  auto &node = builder.add_layer(std::move(bn_layer));
+
+  Graph graph = builder.compile(allocator);
+  node.set_training(true);
 
   Tensor input = make_tensor<float>({1, 3, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
@@ -523,38 +564,44 @@ TEST_F(LegacyBatchNormLayerTest, EdgeCaseSmallBatch) {
     input_data[i] = static_cast<float>(i % 10);
   }
 
-  std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
+  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
-  layer.forward({input}, {output});
+  node.forward({input}, {output});
 
   verify_output_shape(input, output);
 }
 
 TEST_F(LegacyBatchNormLayerTest, EdgeCaseLargeEpsilon) {
-  LegacyBatchNormLayer layer(2, 1e-1f, 0.1f, false, "test_bn_large_epsilon");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
-  layer.set_training(true);
+  GraphBuilder builder;
+
+  auto bn_layer =
+      std::make_unique<LegacyBatchNormLayer>(2, 1e-1f, 0.1f, false, "test_bn_large_epsilon");
+  auto &node = builder.add_layer(std::move(bn_layer));
+
+  Graph graph = builder.compile(allocator);
+  node.set_training(true);
 
   Tensor input = make_tensor<float>({2, 2, 4, 4}, getHost());
   input->fill(1.0f);
 
-  std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
+  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
-  layer.forward({input}, {output});
+  node.forward({input}, {output});
 
   verify_output_shape(input, output);
 }
 
 TEST_F(LegacyBatchNormLayerTest, EdgeCaseSmallSpatialSize) {
-  LegacyBatchNormLayer layer(4, 1e-5f, 0.1f, true, "test_bn_small_spatial");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
-  layer.set_training(true);
+  GraphBuilder builder;
+
+  auto bn_layer =
+      std::make_unique<LegacyBatchNormLayer>(4, 1e-5f, 0.1f, true, "test_bn_small_spatial");
+  auto &node = builder.add_layer(std::move(bn_layer));
+
+  Graph graph = builder.compile(allocator);
+  node.set_training(true);
 
   Tensor input = make_tensor<float>({4, 4, 1, 1}, getHost());
   float *input_data = input->data_as<float>();
@@ -562,9 +609,9 @@ TEST_F(LegacyBatchNormLayerTest, EdgeCaseSmallSpatialSize) {
     input_data[i] = static_cast<float>(i);
   }
 
-  std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
+  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
-  layer.forward({input}, {output});
+  node.forward({input}, {output});
 
   verify_output_shape(input, output);
   EXPECT_EQ(output_shape[2], 1);
@@ -572,19 +619,22 @@ TEST_F(LegacyBatchNormLayerTest, EdgeCaseSmallSpatialSize) {
 }
 
 TEST_F(LegacyBatchNormLayerTest, EdgeCaseLargeValues) {
-  LegacyBatchNormLayer layer(2, 1e-5f, 0.1f, false, "test_bn_large_values");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
-  layer.set_training(true);
+  GraphBuilder builder;
+
+  auto bn_layer =
+      std::make_unique<LegacyBatchNormLayer>(2, 1e-5f, 0.1f, false, "test_bn_large_values");
+  auto &node = builder.add_layer(std::move(bn_layer));
+
+  Graph graph = builder.compile(allocator);
+  node.set_training(true);
 
   Tensor input = make_tensor<float>({2, 2, 4, 4}, getHost());
   input->fill(1e6f);
 
-  std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
+  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
-  layer.forward({input}, {output});
+  node.forward({input}, {output});
 
   verify_output_shape(input, output);
 
@@ -595,12 +645,14 @@ TEST_F(LegacyBatchNormLayerTest, EdgeCaseLargeValues) {
 }
 
 TEST_F(LegacyBatchNormLayerTest, EdgeCaseNegativeValues) {
-  LegacyBatchNormLayer layer(2, 1e-5f, 0.1f, true, "test_bn_negative");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
-  layer.set_training(true);
+  GraphBuilder builder;
+
+  auto bn_layer = std::make_unique<LegacyBatchNormLayer>(2, 1e-5f, 0.1f, true, "test_bn_negative");
+  auto &node = builder.add_layer(std::move(bn_layer));
+
+  Graph graph = builder.compile(allocator);
+  node.set_training(true);
 
   Tensor input = make_tensor<float>({2, 2, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
@@ -608,38 +660,43 @@ TEST_F(LegacyBatchNormLayerTest, EdgeCaseNegativeValues) {
     input_data[i] = -static_cast<float>(i + 1);
   }
 
-  std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
+  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
-  layer.forward({input}, {output});
+  node.forward({input}, {output});
 
   verify_output_shape(input, output);
 }
 
 TEST_F(LegacyBatchNormLayerTest, NumericalStabilitySmallValues) {
-  LegacyBatchNormLayer layer(2, 1e-5f, 0.1f, false, "test_bn_small_values");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
-  layer.set_training(true);
+  GraphBuilder builder;
+
+  auto bn_layer =
+      std::make_unique<LegacyBatchNormLayer>(2, 1e-5f, 0.1f, false, "test_bn_small_values");
+  auto &node = builder.add_layer(std::move(bn_layer));
+
+  Graph graph = builder.compile(allocator);
+  node.set_training(true);
 
   Tensor input = make_tensor<float>({2, 2, 4, 4}, getHost());
   input->fill(1e-6f);
 
-  std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
+  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
-  layer.forward({input}, {output});
+  node.forward({input}, {output});
 
   verify_output_shape(input, output);
 }
 
 TEST_F(LegacyBatchNormLayerTest, NumericalStabilityMixedValues) {
-  LegacyBatchNormLayer layer(2, 1e-5f, 0.1f, true, "test_bn_mixed");
   auto &allocator = PoolAllocator::instance(getHost(), defaultFlowHandle);
-  Graph graph;
-  graph.add_layer(layer);
-  graph.compile(allocator);
-  layer.set_training(true);
+  GraphBuilder builder;
+
+  auto bn_layer = std::make_unique<LegacyBatchNormLayer>(2, 1e-5f, 0.1f, true, "test_bn_mixed");
+  auto &node = builder.add_layer(std::move(bn_layer));
+
+  Graph graph = builder.compile(allocator);
+  node.set_training(true);
 
   Tensor input = make_tensor<float>({2, 2, 4, 4}, getHost());
   float *input_data = input->data_as<float>();
@@ -647,9 +704,9 @@ TEST_F(LegacyBatchNormLayerTest, NumericalStabilityMixedValues) {
     input_data[i] = (i % 2 == 0) ? 1e6f : 1e-6f;
   }
 
-  std::vector<size_t> output_shape = layer.compute_output_shape(input->shape());
+  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
-  layer.forward({input}, {output});
+  node.forward({input}, {output});
 
   verify_output_shape(input, output);
 }

@@ -36,7 +36,7 @@ struct GraphContextDescriptor {
 
 class GraphContext {
 public:
-  GraphContext(GraphContextDescriptor &ctx_desc, IAllocator &allocator)
+  GraphContext(IAllocator &allocator, GraphContextDescriptor &ctx_desc)
       : allocator_(allocator) {
     param_slab_ = allocator.allocate(ctx_desc.param_bytes);
     grad_slab_ = allocator.allocate(ctx_desc.grad_bytes);

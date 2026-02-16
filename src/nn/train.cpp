@@ -70,6 +70,16 @@ void TrainingConfig::load_from_env() {
   num_microbatches = Env::get<size_t>("NUM_MICROBATCHES", 2);
   string device_type_str = Env::get<string>("DEVICE_TYPE", "CPU");
   device_type = (device_type_str == "CPU") ? DeviceType::CPU : DeviceType::GPU;
+  model_name = Env::get<string>("MODEL_NAME", model_name);
+  model_path = Env::get<string>("MODEL_PATH", model_path);
+  dataset_name = Env::get<string>("DATASET_NAME", dataset_name);
+  dataset_path = Env::get<string>("DATASET_PATH", dataset_path);
+  string io_dtype_str = Env::get<string>("IO_DTYPE", dtype_to_string(io_dtype));
+  io_dtype = string_to_dtype(io_dtype_str);
+  string param_dtype_str = Env::get<string>("PARAM_DTYPE", dtype_to_string(param_dtype));
+  param_dtype = string_to_dtype(param_dtype_str);
+  string compute_dtype_str = Env::get<string>("COMPUTE_DTYPE", dtype_to_string(compute_dtype));
+  compute_dtype = string_to_dtype(compute_dtype_str);
 }
 
 void TrainingConfig::load_from_json(const string &config_path) {
@@ -117,7 +127,7 @@ void TrainingConfig::load_from_json(const string &config_path) {
   compute_dtype = string_to_dtype(compute_dtype_str);
 }
 
-static Result train_epoch(unique_ptr<Sequential> &model, unique_ptr<BaseDataLoader> &train_loader,
+static Result train_epoch(Sequential *model, unique_ptr<BaseDataLoader> &train_loader,
                           unique_ptr<Optimizer> &optimizer, const unique_ptr<Loss> &criterion,
                           unique_ptr<Scheduler> &scheduler, const TrainingConfig &config) {
   auto train_start = chrono::high_resolution_clock::now();
@@ -193,7 +203,7 @@ static Result train_epoch(unique_ptr<Sequential> &model, unique_ptr<BaseDataLoad
   return {avg_train_loss, avg_train_accuracy};
 }
 
-static void train_val(unique_ptr<Sequential> &model, unique_ptr<BaseDataLoader> &train_loader,
+static void train_val(Sequential *model, unique_ptr<BaseDataLoader> &train_loader,
                       unique_ptr<BaseDataLoader> &val_loader, unique_ptr<Optimizer> &optimizer,
                       const unique_ptr<Loss> &criterion, unique_ptr<Scheduler> &scheduler,
                       const TrainingConfig &config) {
@@ -248,7 +258,7 @@ static void train_val(unique_ptr<Sequential> &model, unique_ptr<BaseDataLoader> 
   });
 }
 
-static void train_step(unique_ptr<Sequential> &model, unique_ptr<BaseDataLoader> &train_loader,
+static void train_step(Sequential *model, unique_ptr<BaseDataLoader> &train_loader,
                        const unique_ptr<Optimizer> &optimizer, const unique_ptr<Loss> &criterion,
                        const unique_ptr<Scheduler> &scheduler, const TrainingConfig &config) {
   ThreadWrapper thread_wrapper({config.num_threads});
@@ -334,7 +344,7 @@ static void train_step(unique_ptr<Sequential> &model, unique_ptr<BaseDataLoader>
   });
 }
 
-void train_model(unique_ptr<Sequential> &model, GraphContext &graph_context,
+void train_model(Sequential *model, GraphContext &graph_context,
                  unique_ptr<BaseDataLoader> &train_loader, unique_ptr<BaseDataLoader> &val_loader,
                  unique_ptr<Optimizer> &optimizer, const unique_ptr<Loss> &criterion,
                  unique_ptr<Scheduler> &scheduler, const TrainingConfig &config) {
@@ -357,7 +367,7 @@ void train_model(unique_ptr<Sequential> &model, GraphContext &graph_context,
   }
 }
 
-Result validate_model(unique_ptr<Sequential> &model, unique_ptr<BaseDataLoader> &val_loader,
+Result validate_model(Sequential *model, unique_ptr<BaseDataLoader> &val_loader,
                       const unique_ptr<Loss> &criterion, const TrainingConfig &config) {
   PoolAllocator &mem_pool = PoolAllocator::instance(model->device(), defaultFlowHandle);
   Tensor batch_data = make_tensor(mem_pool, model->get_io_dtype()),

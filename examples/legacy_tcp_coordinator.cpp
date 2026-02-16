@@ -40,8 +40,6 @@ int main() {
   DeviceType device_type = (device_str == "GPU") ? DeviceType::GPU : DeviceType::CPU;
   const auto &device = DeviceManager::getInstance().getDevice(device_type);
   auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
-  Graph graph;
-
   string dataset_name = Env::get<std::string>("DATASET_NAME", "");
   if (dataset_name.empty()) {
     throw std::runtime_error("DATASET_NAME environment variable is not set!");
@@ -53,31 +51,8 @@ int main() {
     return 1;
   }
 
-  std::unique_ptr<Sequential> model;
-  if (!model_path.empty()) {
-    cout << "Loading model from: " << model_path << endl;
-    std::ifstream file(model_path, std::ios::binary);
-    if (!file.is_open()) {
-      throw std::runtime_error("Failed to open model file");
-    }
-    model = load_state<Sequential>(file, graph, allocator);
-    file.close();
-  } else {
-    cout << "Creating model: " << model_name << endl;
-    try {
-      Sequential temp_model = legacy::ExampleModels::create(model_name);
-      graph.add_layer(temp_model);
-      model = std::make_unique<Sequential>(std::move(temp_model));
-    } catch (const std::exception &e) {
-      cerr << "Error creating model: " << e.what() << endl;
-      cout << "Available models are: ";
-      for (const auto &name : legacy::ExampleModels::available_models()) {
-        cout << name << "\n";
-      }
-      cout << endl;
-      return 1;
-    }
-  }
+  Sequential *model_ptr = nullptr;
+  Graph graph = legacy::load_or_create_model(model_name, model_path, allocator, model_ptr);
 
   cout << "Training model on device: " << (device_type == DeviceType::CPU ? "CPU" : "GPU") << endl;
 
@@ -125,7 +100,7 @@ int main() {
   auto worker = std::make_unique<TCPWorker>(local_worker_endpoint, device_type == DeviceType::GPU);
 
   CoordinatorConfig config{
-      ParallelMode_t::PIPELINE, std::move(model),  std::move(optimizer), std::move(scheduler),
+      ParallelMode_t::PIPELINE, model_ptr,         std::move(optimizer), std::move(scheduler),
       std::move(partitioner),   std::move(worker), coordinator_endpoint, endpoints};
 
   NetworkCoordinator coordinator(std::move(config));

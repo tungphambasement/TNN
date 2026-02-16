@@ -29,6 +29,8 @@ void ClassTokenLayer::init_impl() {
   } else {
     class_token_->fill_random_uniform(-bound, bound);
   }
+
+  class_token_gradients_->fill(0.0f);
 }
 
 template <typename IO_T, typename Param_T, typename Compute_T>

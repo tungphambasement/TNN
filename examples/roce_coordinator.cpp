@@ -92,53 +92,23 @@ int main(int argc, char *argv[]) {
   train_config.print_config();
 
   // Prioritize loading existing model, else create from available ones
-  std::string model_name = Env::get<std::string>("MODEL_NAME", "cifar10_resnet9");
-  std::string model_path = Env::get<std::string>("MODEL_PATH", "");
-
-  std::string device_str = Env::get<std::string>("DEVICE_TYPE", "CPU");
-  DeviceType device_type = (device_str == "GPU") ? DeviceType::GPU : DeviceType::CPU;
+  DeviceType device_type = train_config.device_type;
   const auto &device = DeviceManager::getInstance().getDevice(device_type);
   auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
-  Graph graph;
 
-  std::unique_ptr<Sequential> model;
-  if (!model_path.empty()) {
-    cout << "Loading model from: " << model_path << endl;
-    std::ifstream file(model_path, std::ios::binary);
-    if (!file.is_open()) {
-      throw std::runtime_error("Failed to open model file");
-    }
-    model = load_state<Sequential>(file, graph, allocator);
-    file.close();
-  } else {
-    cout << "Creating model: " << model_name << endl;
-    try {
-      Sequential temp_model = ExampleModels::create(model_name);
-      graph.add_layer(temp_model);
-      model = std::make_unique<Sequential>(std::move(temp_model));
-    } catch (const std::exception &e) {
-      cerr << "Error creating model: " << e.what() << endl;
-      cout << "Available models are: ";
-      for (const auto &name : ExampleModels::available_models()) {
-        cout << name << "\n";
-      }
-      cout << endl;
-      return 1;
-    }
-  }
+  Sequential *model_ptr = nullptr;
+  Graph graph =
+      load_or_create_model(train_config.model_name, train_config.model_path, allocator, model_ptr);
 
-  string dataset_name = Env::get<std::string>("DATASET_NAME", "");
-  if (dataset_name.empty()) {
+  if (train_config.dataset_name.empty()) {
     throw std::runtime_error("DATASET_NAME environment variable is not set!");
   }
-  string dataset_path = Env::get<std::string>("DATASET_PATH", "data");
-  auto [train_loader, val_loader] = DataLoaderFactory::create(dataset_name, dataset_path);
+  auto [train_loader, val_loader] =
+      DataLoaderFactory::create(train_config.dataset_name, train_config.dataset_path);
   if (!train_loader || !val_loader) {
-    cerr << "Failed to create data loaders for model: " << model_name << endl;
+    cerr << "Failed to create data loaders for model: " << train_config.model_name << endl;
     return 1;
   }
-
-  cout << "Training model on device: " << (device_type == DeviceType::CPU ? "CPU" : "GPU") << endl;
 
   auto criterion = LossFactory::create_logsoftmax_crossentropy();
   auto optimizer =
@@ -171,9 +141,10 @@ int main(int argc, char *argv[]) {
   // initialize a partitioner with weights 2:1
   auto partitioner = std::make_unique<NaivePipelinePartitioner>(NaivePartitionerConfig({1, 2}));
 
-  CoordinatorConfig config{
-      ParallelMode_t::PIPELINE, std::move(model),        std::move(optimizer), std::move(scheduler),
-      std::move(partitioner),   std::move(local_worker), coordinator_endpoint, endpoints};
+  CoordinatorConfig config{ParallelMode_t::PIPELINE, model_ptr,
+                           std::move(optimizer),     std::move(scheduler),
+                           std::move(partitioner),   std::move(local_worker),
+                           coordinator_endpoint,     endpoints};
 
   RoCECoordinator coordinator(std::move(config));
 

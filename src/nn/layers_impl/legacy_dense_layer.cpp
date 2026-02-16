@@ -44,6 +44,11 @@ void LegacyDenseLayer::init_impl() {
       bias_->fill_random_uniform(-bound, bound);
     }
   }
+
+  weight_gradients_->fill(0.0f);
+  if (use_bias_) {
+    bias_gradients_->fill(0.0f);
+  }
 }
 
 void LegacyDenseLayer::forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id) {

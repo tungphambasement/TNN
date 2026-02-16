@@ -21,7 +21,7 @@ private:
   size_t embed_dim_;
   size_t padding_idx_;
   Tensor weight_;
-  Tensor grad_weight_;
+  Tensor weight_gradients_;
 
   template <typename IO_T, typename Param_T, typename Compute_T>
   std::unique_ptr<Task> compute_forward_impl(const ConstTensor &input, const ConstTensor &weight,
@@ -42,7 +42,7 @@ private:
         param_dtype_,
         {vocab_size_, embed_dim_},
         &weight_,
-        &grad_weight_,
+        &weight_gradients_,
     };
     descriptors.push_back(weight_desc);
     return descriptors;

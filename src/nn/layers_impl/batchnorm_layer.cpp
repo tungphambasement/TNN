@@ -41,12 +41,17 @@ BatchNormLayer::~BatchNormLayer() {
 }
 
 void BatchNormLayer::init_impl() {
-  if (affine_) {
-    gamma_->fill(1.0f);
-    beta_->fill(0.0f);
-  }
+  gamma_->fill(1.0f);
+  beta_->fill(0.0f);
+
   running_mean_->fill(0.0f);
   running_var_->fill(1.0f);
+
+  gamma_gradients_->fill(0.0f);
+  beta_gradients_->fill(0.0f);
+
+  dummy_mean_gradients_->fill(0.0f);
+  dummy_var_gradients_->fill(0.0f);
 }
 
 #ifdef USE_CUDNN

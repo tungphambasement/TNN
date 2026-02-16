@@ -305,7 +305,6 @@ private:
 
           std::cout << "  GID Index " << i << ": ";
           auto old_flags = std::cout.flags();
-          std::cout << std::hex;
           for (int b = 0; b < 16; ++b) std::cout << (int)gid.raw[b] << (b < 15 ? ":" : "");
           std::cout.flags(old_flags);
           std::cout << "\n";
@@ -461,7 +460,6 @@ private:
       std::cerr << "  MTU (Active/Path): " << port_attr.active_mtu << "/" << attr.path_mtu << "\n";
       std::cerr << "  Remote GID: ";
       auto old_flags = std::cerr.flags();
-      std::cerr << std::hex;
       for (int i = 0; i < 16; ++i) std::cerr << (int)peer_info.gid.raw[i] << ":";
       std::cerr.flags(old_flags);
       std::cerr << "\n";
@@ -469,7 +467,6 @@ private:
       union ibv_gid local_gid;
       if (ibv_query_gid(context_, ib_port_, gid_index_, &local_gid) == 0) {
         std::cerr << "  Local GID (Index " << gid_index_ << "): ";
-        std::cerr << std::hex;
         for (int i = 0; i < 16; ++i) std::cerr << (int)local_gid.raw[i] << ":";
         std::cerr.flags(old_flags);
         std::cerr << "\n";

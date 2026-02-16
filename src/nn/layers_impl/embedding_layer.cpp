@@ -47,6 +47,8 @@ void EmbeddingLayer::init_impl() {
       DISPATCH_DTYPE(weight_->data_type(), T, weight_->at<T>({padding_idx_, i}) = 0.0f);
     }
   }
+
+  weight_gradients_->fill(0.0f);
 }
 
 void EmbeddingLayer::forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id) {
@@ -78,7 +80,7 @@ void EmbeddingLayer::backward_impl(const ConstTensor &grad_output, const Tensor 
 
   size_t num_tokens = input->size();
 
-  DISPATCH_ON_3_DTYPES_TO_METHOD(compute_backward_impl, input, grad_output, grad_weight_,
+  DISPATCH_ON_3_DTYPES_TO_METHOD(compute_backward_impl, input, grad_output, weight_gradients_,
                                  num_tokens, vocab_size_, embed_dim_, padding_idx_,
                                  this->flow_handle_);
 }
@@ -121,7 +123,7 @@ std::unique_ptr<Task> EmbeddingLayer::compute_forward_impl(
 template <typename IO_T, typename Param_T, typename Compute_T>
 std::unique_ptr<Task> EmbeddingLayer::compute_backward_impl(const ConstTensor &input,
                                                             const ConstTensor &grad_output,
-                                                            const Tensor &grad_weight,
+                                                            const Tensor &weight_gradients,
                                                             size_t num_indices, size_t vocab_size,
                                                             size_t embed_dim, size_t padding_idx,
                                                             flowHandle_t handle) const {
@@ -132,7 +134,7 @@ std::unique_ptr<Task> EmbeddingLayer::compute_backward_impl(const ConstTensor &i
   if (input->data_type() != dtype_of<IO_T>() || grad_output->data_type() != dtype_of<IO_T>()) {
     throw std::runtime_error("EmbeddingLayer IO tensor dtype mismatch with dispatch IO_T");
   }
-  if (grad_weight->data_type() != dtype_of<Param_T>()) {
+  if (weight_gradients->data_type() != dtype_of<Param_T>()) {
     throw std::runtime_error(
         "EmbeddingLayer weight grad_output dtype mismatch with dispatch Param_T");
   }
@@ -140,15 +142,15 @@ std::unique_ptr<Task> EmbeddingLayer::compute_backward_impl(const ConstTensor &i
   if (input->device_type() == DeviceType::CPU) {
     return create_cpu_task(handle, cpu::embedding::compute_embedding_backward<Compute_T>,
                            input->data_as<Compute_T>(), grad_output->data_as<Compute_T>(),
-                           grad_weight->data_as<Compute_T>(), num_indices, vocab_size, embed_dim,
-                           padding_idx);
+                           weight_gradients->data_as<Compute_T>(), num_indices, vocab_size,
+                           embed_dim, padding_idx);
   }
 #ifdef USE_CUDA
   else if (input->device_type() == DeviceType::GPU) {
     return create_cuda_task(handle, cuda::embedding::compute_embedding_backward<Compute_T>,
                             input->data_as<Compute_T>(), grad_output->data_as<Compute_T>(),
-                            grad_weight->data_as<Compute_T>(), num_indices, vocab_size, embed_dim,
-                            padding_idx);
+                            weight_gradients->data_as<Compute_T>(), num_indices, vocab_size,
+                            embed_dim, padding_idx);
   }
 #endif
   else {

@@ -2,6 +2,7 @@
 #include "nn/blocks_impl/sequential.hpp"
 #include "nn/example_models.hpp"
 #include "nn/graph.hpp"
+#include "nn/graph_builder.hpp"
 
 using namespace tnn;
 using namespace std;
@@ -9,19 +10,19 @@ using namespace std;
 signed main() {
   ExampleModels::register_defaults();
   auto &allocator = PoolAllocator::instance(getGPU(), defaultFlowHandle);
-  Graph graph;
+  GraphBuilder builder;
 
   Sequential temp_model = ExampleModels::create("gpt2_small");
   auto model = std::make_unique<Sequential>(std::move(temp_model));
   model->set_seed(123456);
-  graph.add_layer(*model);
-  graph.compile(allocator);
+  auto &node = builder.add_layer(std::move(model));
+  Graph graph = builder.compile(allocator);
 
   int passes = 10;
   auto start = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < passes; ++i) {
     auto pass_start = std::chrono::high_resolution_clock::now();
-    auto grads = model->gradients();
+    auto grads = node.gradients();
     for (auto &grad : grads) {
       grad->fill(0.0);
     }
