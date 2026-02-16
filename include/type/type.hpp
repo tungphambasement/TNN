@@ -158,25 +158,49 @@ inline size_t get_dtype_size(DType_t dtype) {
 inline std::string dtype_to_string(DType_t dtype) {
   switch (dtype) {
     case DType_t::UINT8_T:
-      return "byte";
+      return "BYTE";
     case DType_t::BOOL:
-      return "bool";
+      return "BOOL";
     case DType_t::FP16:
-      return "fp16";
+      return "FP16";
     case DType_t::BF16:
-      return "bf16";
+      return "BF16";
     case DType_t::FP32:
-      return "fp32";
+      return "FP32";
     case DType_t::FP64:
-      return "fp64";
+      return "FP64";
     case DType_t::INT32_T:
-      return "int32";
+      return "INT32";
     case DType_t::INT64_T:
-      return "int64";
+      return "INT64";
     case DType_t::SIZE_T:
-      return "size_t";
+      return "SIZE_T";
     default:
-      return "unknown";
+      return "UNKNOWN";
+  }
+}
+
+inline DType_t string_to_dtype(const std::string &dtype_str) {
+  if (dtype_str == "BYTE" || dtype_str == "UINT8") {
+    return DType_t::UINT8_T;
+  } else if (dtype_str == "BOOL") {
+    return DType_t::BOOL;
+  } else if (dtype_str == "FP16") {
+    return DType_t::FP16;
+  } else if (dtype_str == "BF16") {
+    return DType_t::BF16;
+  } else if (dtype_str == "FP32" || dtype_str == "FLOAT") {
+    return DType_t::FP32;
+  } else if (dtype_str == "FP64" || dtype_str == "DOUBLE") {
+    return DType_t::FP64;
+  } else if (dtype_str == "INT32") {
+    return DType_t::INT32_T;
+  } else if (dtype_str == "INT64") {
+    return DType_t::INT64_T;
+  } else if (dtype_str == "SIZE_T") {
+    return DType_t::SIZE_T;
+  } else {
+    throw std::runtime_error("Unknown data type string: " + dtype_str);
   }
 }
 

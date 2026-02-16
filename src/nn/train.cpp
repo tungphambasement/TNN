@@ -10,6 +10,7 @@
 #include <chrono>
 #include <cstddef>
 #include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <memory>
@@ -20,6 +21,7 @@
 #include "nn/blocks_impl/sequential.hpp"
 #include "nn/graph_context.hpp"
 #include "threading/thread_wrapper.hpp"
+#include "type/type.hpp"
 #include "utils/env.hpp"
 #include "utils/memory.hpp"
 
@@ -70,11 +72,56 @@ void TrainingConfig::load_from_env() {
   device_type = (device_type_str == "CPU") ? DeviceType::CPU : DeviceType::GPU;
 }
 
+void TrainingConfig::load_from_json(const string &config_path) {
+  ifstream file(config_path);
+  if (!file.is_open()) {
+    throw runtime_error("Failed to open config file: " + config_path);
+  }
+
+  nlohmann::json config;
+  file >> config;
+  file.close();
+
+  epochs = config.value("epochs", epochs);
+  batch_size = config.value("batch_size", batch_size);
+  max_steps = config.value("max_steps", max_steps);
+  lr_initial = config.value("lr_initial", lr_initial);
+  gradient_accumulation_steps =
+      config.value("gradient_accumulation_steps", gradient_accumulation_steps);
+  progress_print_interval = config.value("progress_print_interval", progress_print_interval);
+  num_threads = config.value("num_threads", num_threads);
+  string profiler_type_str = config.value("profiler_type", "NONE");
+  if (profiler_type_str == "NORMAL") {
+    profiler_type = ProfilerType::NORMAL;
+  } else if (profiler_type_str == "CUMULATIVE") {
+    profiler_type = ProfilerType::CUMULATIVE;
+  } else {
+    profiler_type = ProfilerType::NONE;
+  }
+  print_layer_profiling = config.value("print_layer_profiling", print_layer_profiling);
+  print_layer_memory_usage = config.value("print_layer_memory_usage", print_layer_memory_usage);
+  num_microbatches = config.value("num_microbatches", num_microbatches);
+  if (config.contains("device_type")) {
+    string device_str = config["device_type"];
+    device_type = (device_str == "CPU") ? DeviceType::CPU : DeviceType::GPU;
+  }
+  model_name = config.value("model_name", model_name);
+  model_path = config.value("model_path", model_path);
+  dataset_name = config.value("dataset_name", dataset_name);
+  dataset_path = config.value("dataset_path", dataset_path);
+  string io_dtype_str = config.value("io_dtype", dtype_to_string(io_dtype));
+  io_dtype = string_to_dtype(io_dtype_str);
+  string param_dtype_str = config.value("param_dtype", dtype_to_string(param_dtype));
+  param_dtype = string_to_dtype(param_dtype_str);
+  string compute_dtype_str = config.value("compute_dtype", dtype_to_string(compute_dtype));
+  compute_dtype = string_to_dtype(compute_dtype_str);
+}
+
 static Result train_epoch(unique_ptr<Sequential> &model, unique_ptr<BaseDataLoader> &train_loader,
                           unique_ptr<Optimizer> &optimizer, const unique_ptr<Loss> &criterion,
                           unique_ptr<Scheduler> &scheduler, const TrainingConfig &config) {
   auto train_start = chrono::high_resolution_clock::now();
-  Tensor batch_data = make_tensor(config.dtype), batch_labels = make_tensor(config.dtype);
+  Tensor batch_data = make_tensor(config.io_dtype), batch_labels = make_tensor(config.io_dtype);
   cout << "Starting training epoch..." << endl;
   model->set_training(true);
   train_loader->shuffle();

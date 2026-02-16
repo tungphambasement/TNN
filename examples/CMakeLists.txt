@@ -14,8 +14,6 @@ create_executable(legacy_roce_coordinator.cpp LIBS tnn_lib)
 
 # Training executables
 create_executable(trainer.cpp LIBS tnn_nn)
-create_executable(fp16_trainer.cpp LIBS tnn_nn)
-create_executable(bf16_trainer.cpp LIBS tnn_nn)
 create_executable(legacy_trainer.cpp LIBS tnn_nn)
 
 # Inference executables

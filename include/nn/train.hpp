@@ -6,6 +6,8 @@
  */
 #pragma once
 
+#include <nlohmann/json.hpp>
+
 #include "data_loading/data_loader.hpp"
 #include "data_loading/regression_data_loader.hpp"
 #include "device/device_type.hpp"
@@ -43,7 +45,6 @@ constexpr int64_t DEFAULT_NUM_THREADS = 8;  // Typical number of P-Cores on lapt
 
 struct TrainingConfig {
   // Trainer params
-  DType_t dtype = DType_t::FP32;
   int epochs = 10;
   size_t batch_size = 32;
   int64_t max_steps = -1;  // -1 for no limit, otherwise max number of batches per epoch
@@ -54,13 +55,22 @@ struct TrainingConfig {
   ProfilerType profiler_type = ProfilerType::NONE;
   bool print_layer_profiling = false;
   bool print_layer_memory_usage = false;
+  std::string model_name =
+      "cifar10_resnet9";          // If set, will try to load this model from example models
+  std::string model_path = "";    // If set, will try to load model from this path before training
+  std::string dataset_name = "";  // e.g., "cifar10", "mnist", "open-web-text", etc.
+  std::string dataset_path = "data";
   DeviceType device_type = DeviceType::CPU;
+  DType_t io_dtype = DType_t::FP32;
+  DType_t param_dtype = DType_t::FP32;
+  DType_t compute_dtype = DType_t::FP32;
 
   // Distributed params
   size_t num_microbatches = 2;
 
   void print_config() const;
   void load_from_env();
+  void load_from_json(const std::string &config_path);
 };
 
 struct Result {
