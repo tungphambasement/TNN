@@ -1,11 +1,15 @@
 #pragma once
 
+#include <vector>
+
 #include "device/iallocator.hpp"
 #include "nn/graph_context.hpp"
 #include "nn/layer.hpp"
 #include "nn/node.hpp"
 
 namespace tnn {
+
+class IONode;
 
 // Simple op node. 1 Input, 1 Output.
 class OpNode : public INode {
@@ -43,8 +47,16 @@ public:
   void save_state(std::ofstream &file) override {}
   NodeConfig get_config() const override { return NodeConfig(); }
 
+  void add_input(IONode *io_node) { inputs_.push_back(io_node); }
+  const std::vector<IONode *> &inputs() const { return inputs_; }
+
+  void add_output(IONode *io_node) { outputs_.push_back(io_node); }
+  const std::vector<IONode *> &outputs() const { return outputs_; }
+
 private:
   Layer &layer_;
+  std::vector<IONode *> inputs_;
+  std::vector<IONode *> outputs_;
 };
 
 }  // namespace tnn

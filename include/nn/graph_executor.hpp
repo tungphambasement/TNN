@@ -25,8 +25,9 @@ public:
       node_outputs_[input_node].act = tensor;
     }
     // assuming topologically sorted layers, execute forward pass
-    for (auto it = graph_.op_nodes_.begin(); it != graph_.op_nodes_.end(); ++it) {
-      forward(*it);
+    const auto& ops = graph_.ops();
+    for (OpNode* op : ops) {
+      forward(*op);
     }
     // wire output tensors
     for (auto& [output_node, tensor] : outputs) {
@@ -39,8 +40,9 @@ public:
     for (const auto& [output_node, tensor] : grads) {
       node_outputs_[output_node].grad = tensor;
     }
-    for (auto it = graph_.op_nodes_.rbegin(); it != graph_.op_nodes_.rend(); ++it) {
-      backward(*it);
+    const auto& ops = graph_.ops();
+    for (auto it = ops.rbegin(); it != ops.rend(); ++it) {
+      backward(**it);
     }
     // wire downstream gradients
     for (auto& [input_node, tensor] : grad_inputs) {
@@ -61,7 +63,7 @@ private:
 
   void forward(OpNode& node) {
     // gather inputs
-    Vec<IONode*>& input_nodes = graph_.ins_[&node];
+    const std::vector<IONode*>& input_nodes = node.inputs();
     Vec<ConstTensor> inputs;
     for (const auto& input_node : input_nodes) {
       const ConstTensor& act = node_outputs_[input_node].act;
@@ -72,7 +74,7 @@ private:
     }
 
     // gather outputs
-    Vec<IONode*>& output_nodes = graph_.outs_[&node];
+    const std::vector<IONode*>& output_nodes = node.outputs();
     Vec<Tensor> outputs;
     auto out_shapes = inputs |
                       std::views::transform([&](const ConstTensor& t) { return t->shape(); }) |
@@ -99,7 +101,7 @@ private:
 
   void backward(OpNode& node) {
     // gather upstream grad_output
-    Vec<IONode*>& output_nodes = graph_.outs_[&node];
+    const std::vector<IONode*>& output_nodes = node.outputs();
     Vec<ConstTensor> gradients;
     for (const auto& output_node : output_nodes) {
       Tensor& grad = node_outputs_[output_node].grad;
@@ -110,7 +112,7 @@ private:
     }
 
     // gather downstream grad_output
-    Vec<IONode*>& input_nodes = graph_.ins_[&node];
+    const std::vector<IONode*>& input_nodes = node.inputs();
     Vec<Tensor> grad_inputs;
     for (const auto& input_node : input_nodes) {
       Tensor& grad = node_outputs_[input_node].grad;
