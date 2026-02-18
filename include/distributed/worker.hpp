@@ -180,7 +180,7 @@ protected:
         auto update_start = std::chrono::system_clock::now();
         // implicitly clear grads
         this->optimizer_->update();
-        this->optimizer_->clear_gradients();
+        this->optimizer_->zero_grads();
         if (scheduler_) {
           this->scheduler_->step();
         }

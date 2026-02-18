@@ -69,7 +69,7 @@ public:
   std::vector<Tensor> parameters() { return params_; }
   std::vector<Tensor> gradients() { return grads_; }
 
-  void clear_gradients() { ops::set_scalar<uchar>(grad_slab_, 0, grad_slab_.capacity()); }
+  void zero_grads() { ops::set_scalar<uchar>(grad_slab_, 0, grad_slab_.capacity()); }
 
   IAllocator &allocator() { return allocator_; }
 

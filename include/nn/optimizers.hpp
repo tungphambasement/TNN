@@ -49,7 +49,7 @@ public:
 
   virtual void update() = 0;
 
-  void clear_gradients() { context_->clear_gradients(); }
+  void zero_grads() { context_->zero_grads(); }
 
   void set_learning_rate(float lr) { learning_rate_ = lr; }
   float get_learning_rate() const { return learning_rate_; }

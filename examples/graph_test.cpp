@@ -93,7 +93,7 @@ signed main(int argc, char* argv[]) {
     grad_input = grad_inputs[&input_node];
 
     optimizer->update();
-    optimizer->clear_gradients();
+    optimizer->zero_grads();
   }
 
   return 0;

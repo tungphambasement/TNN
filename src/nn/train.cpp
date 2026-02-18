@@ -179,7 +179,7 @@ static Result train_epoch(Sequential *model, unique_ptr<BaseDataLoader> &train_l
     if (++grad_accum_counter == config.gradient_accumulation_steps) {
       grad_accum_counter = 0;
       optimizer->update();
-      optimizer->clear_gradients();
+      optimizer->zero_grads();
       if (scheduler) {
         scheduler->step();
       }
@@ -309,7 +309,7 @@ static void train_step(Sequential *model, unique_ptr<BaseDataLoader> &train_load
       if (++grad_accum_counter == config.gradient_accumulation_steps) {
         grad_accum_counter = 0;
         optimizer->update();
-        optimizer->clear_gradients();
+        optimizer->zero_grads();
         if (scheduler) {
           scheduler->step();
         }

@@ -42,7 +42,7 @@ signed main() {
   start = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < passes; ++i) {
     auto pass_start = std::chrono::high_resolution_clock::now();
-    graph.context().clear_gradients();
+    graph.context().zero_grads();
     Flow *flow = getGPU().getFlow(defaultFlowHandle);
     flow->synchronize();
     auto pass_end = std::chrono::high_resolution_clock::now();
