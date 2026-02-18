@@ -33,6 +33,10 @@ public:
 
   const Device& device() const { return ctx_.device(); }
 
+  const std::unordered_map<std::string, IONode>& io_nodes() const { return io_nodes_; }
+
+  const IONode& io_node(const std::string& uid) const { return io_nodes_.at(uid); }
+
   const std::vector<OpNode*>& ops() const { return execution_sequence_; }
 
   size_t num_nodes() const { return op_nodes_.size() + io_nodes_.size(); }
@@ -117,7 +121,6 @@ public:
   }
 
 private:
-  friend class GraphExecutor;
   GraphContext ctx_;
   std::unordered_map<std::string, OpNode> op_nodes_;
   std::unordered_map<std::string, IONode> io_nodes_;

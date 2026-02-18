@@ -29,27 +29,25 @@ public:
   OpNode& add_layer(std::unique_ptr<SISOLayer> siso_layer) {
     std::string uid = "op_" + std::to_string(node_count_++);
     OpNode new_node(uid, ctx_desc_, std::move(siso_layer));
-    auto& node = op_nodes_.emplace(new_node.uid(), std::move(new_node)).first->second;
+    auto& node = add_op_node(std::move(new_node));
     return node;
   }
 
   IONode& input(std::string uid = "input") {
     auto node = IONode(uid);
-    auto& input_node = io_nodes_.emplace(uid, std::move(node)).first->second;
+    auto& input_node = add_io_node(std::move(node));
     return input_node;
   }
 
-  // Assuming simple op node, 1 input, 1 output.
   IONode& output(OpNode& op_node, IONode& input) {
     std::string uid = "io_" + std::to_string(node_count_++);
     auto new_node = IONode(uid);
-    auto& output = io_nodes_.emplace(new_node.uid(), std::move(new_node)).first->second;
+    auto& output = add_io_node(std::move(new_node));
     add_out(op_node, output);
     add_in(op_node, input);
     return output;
   }
 
-  // topological sort the graph to determine execution order
   void sort() {
     execution_sequence_.clear();
     if (op_nodes_.empty()) return;
@@ -59,7 +57,6 @@ public:
       OpNode& op = op_pair.second;
       in_degree[&op] = 0;
       for (IONode* in_tensor : op.inputs()) {
-        // OpNode depends on producers of its inputs
         in_degree[&op] += in_tensor->producers().size();
       }
     }
@@ -120,6 +117,22 @@ private:
   void add_out(OpNode& op_node, IONode& output) {
     op_node.add_output(&output);
     output.add_producer(&op_node);
+  }
+
+  OpNode& add_op_node(OpNode&& op_node) {
+    auto [iter, inserted] = op_nodes_.emplace(op_node.uid(), std::move(op_node));
+    if (!inserted) {
+      throw std::runtime_error("Duplicate OpNode UID: " + op_node.uid());
+    }
+    return iter->second;
+  }
+
+  IONode& add_io_node(IONode&& io_node) {
+    auto [iter, inserted] = io_nodes_.emplace(io_node.uid(), std::move(io_node));
+    if (!inserted) {
+      throw std::runtime_error("Duplicate IONode UID: " + io_node.uid());
+    }
+    return iter->second;
   }
 };
 

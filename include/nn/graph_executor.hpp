@@ -14,7 +14,7 @@ public:
       : graph_(graph),
         allocator_(allocator) {
     // initialize node outputs
-    for (auto& [uid, node] : graph_.io_nodes_) {
+    for (auto& [uid, node] : graph_.io_nodes()) {
       node_outputs_[&node] = Output{nullptr, nullptr};
     }
   }
@@ -22,7 +22,7 @@ public:
   void forward(const InputPack& inputs, OutputPack& outputs) {
     // set input tensors
     for (const auto& [uid, tensor] : inputs) {
-      IONode& input_node = graph_.io_nodes_.at(uid);
+      const IONode& input_node = graph_.io_node(uid);
       node_outputs_[&input_node].act = tensor;
     }
     // assuming topologically sorted layers, execute forward pass
@@ -32,7 +32,7 @@ public:
     }
     // wire output tensors
     for (auto& [uid, tensor] : outputs) {
-      IONode& output_node = graph_.io_nodes_.at(uid);
+      const IONode& output_node = graph_.io_node(uid);
       tensor = node_outputs_[&output_node].act;
     }
   }
@@ -40,7 +40,7 @@ public:
   void backward(const InputPack& grads, OutputPack& grad_inputs) {
     // set upstream gradients
     for (const auto& [uid, tensor] : grads) {
-      IONode& output_node = graph_.io_nodes_.at(uid);
+      const IONode& output_node = graph_.io_node(uid);
       node_outputs_[&output_node].grad = tensor;
     }
     const auto& ops = graph_.ops();
@@ -49,7 +49,7 @@ public:
     }
     // wire downstream gradients
     for (auto& [uid, tensor] : grad_inputs) {
-      IONode& input_node = graph_.io_nodes_.at(uid);
+      const IONode& input_node = graph_.io_node(uid);
       tensor = node_outputs_[&input_node].grad;
     }
   }
@@ -63,7 +63,7 @@ private:
     Tensor grad;
   };
 
-  std::unordered_map<IONode*, Output> node_outputs_;
+  std::unordered_map<const IONode*, Output> node_outputs_;
 
   void forward(OpNode& node) {
     // gather inputs

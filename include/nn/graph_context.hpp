@@ -36,14 +36,15 @@ struct GraphContextDescriptor {
 
 class GraphContext {
 public:
-  GraphContext(IAllocator &allocator, GraphContextDescriptor &ctx_desc)
-      : allocator_(allocator) {
-    param_slab_ = allocator.allocate(ctx_desc.param_bytes);
-    grad_slab_ = allocator.allocate(ctx_desc.grad_bytes);
+  GraphContext(IAllocator &allocator, GraphContextDescriptor ctx_desc)
+      : ctx_desc_(std::move(ctx_desc)),
+        allocator_(allocator) {
+    param_slab_ = allocator.allocate(ctx_desc_.param_bytes);
+    grad_slab_ = allocator.allocate(ctx_desc_.grad_bytes);
 
     size_t param_offset = 0;
     size_t grad_offset = 0;
-    for (auto &param_desc : ctx_desc.param_descs) {
+    for (auto &param_desc : ctx_desc_.param_descs) {
       size_t bytes_size = get_bytes_size(param_desc.shape, param_desc.dtype);
       // round up to 256 bytes for better memory access pattern, can be tuned later
       bytes_size = (bytes_size + 255) & ~255;
@@ -66,6 +67,8 @@ public:
     }
   }
 
+  GraphContextDescriptor descriptor() const { return ctx_desc_; }
+
   std::vector<Tensor> parameters() { return params_; }
   std::vector<Tensor> gradients() { return grads_; }
 
@@ -76,6 +79,7 @@ public:
   const Device &device() const { return allocator_.device(); }
 
 private:
+  GraphContextDescriptor ctx_desc_;
   IAllocator &allocator_;
   std::vector<Tensor> params_, grads_;
   dptr param_slab_, grad_slab_;
