@@ -4,18 +4,18 @@
 
 #include "device/iallocator.hpp"
 #include "nn/graph_context.hpp"
+#include "nn/io_node.hpp"
 #include "nn/layer.hpp"
 #include "nn/node.hpp"
 
 namespace tnn {
 
-class IONode;
-
 // Simple op node. 1 Input, 1 Output.
 class OpNode : public INode {
 public:
-  OpNode(GraphContextDescriptor &context, std::unique_ptr<Layer> layer)
-      : layer_(std::move(layer)) {
+  OpNode(std::string uid, GraphContextDescriptor &context, std::unique_ptr<Layer> layer)
+      : INode(uid),
+        layer_(std::move(layer)) {
     auto param_descriptors = layer_->param_descriptors();
     for (const auto &desc : param_descriptors) {
       context.register_desc(desc);
@@ -52,7 +52,9 @@ public:
 
   std::string type() const override { return "op_node"; }
   void save_state(std::ofstream &file) override {}
-  NodeConfig get_config() const override { return NodeConfig(); }
+  NodeConfig get_config() const override;
+
+  static OpNode create_from_config(GraphContextDescriptor &ctx_desc, const NodeConfig &config);
 
   void add_input(IONode *io_node) { inputs_.push_back(io_node); }
   const std::vector<IONode *> &inputs() const { return inputs_; }

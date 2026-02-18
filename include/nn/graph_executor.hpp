@@ -5,8 +5,8 @@
 
 namespace tnn {
 
-using InputPack = std::unordered_map<IONode*, Tensor>;
-using OutputPack = std::unordered_map<IONode*, Tensor>;
+using InputPack = std::unordered_map<std::string, Tensor>;
+using OutputPack = std::unordered_map<std::string, Tensor>;
 
 class GraphExecutor {
 public:
@@ -14,15 +14,16 @@ public:
       : graph_(graph),
         allocator_(allocator) {
     // initialize node outputs
-    for (auto& node : graph_.io_nodes_) {
+    for (auto& [uid, node] : graph_.io_nodes_) {
       node_outputs_[&node] = Output{nullptr, nullptr};
     }
   }
 
   void forward(const InputPack& inputs, OutputPack& outputs) {
     // set input tensors
-    for (const auto& [input_node, tensor] : inputs) {
-      node_outputs_[input_node].act = tensor;
+    for (const auto& [uid, tensor] : inputs) {
+      IONode& input_node = graph_.io_nodes_.at(uid);
+      node_outputs_[&input_node].act = tensor;
     }
     // assuming topologically sorted layers, execute forward pass
     const auto& ops = graph_.ops();
@@ -30,23 +31,26 @@ public:
       forward(*op);
     }
     // wire output tensors
-    for (auto& [output_node, tensor] : outputs) {
-      tensor = node_outputs_[output_node].act;
+    for (auto& [uid, tensor] : outputs) {
+      IONode& output_node = graph_.io_nodes_.at(uid);
+      tensor = node_outputs_[&output_node].act;
     }
   }
 
   void backward(const InputPack& grads, OutputPack& grad_inputs) {
     // set upstream gradients
-    for (const auto& [output_node, tensor] : grads) {
-      node_outputs_[output_node].grad = tensor;
+    for (const auto& [uid, tensor] : grads) {
+      IONode& output_node = graph_.io_nodes_.at(uid);
+      node_outputs_[&output_node].grad = tensor;
     }
     const auto& ops = graph_.ops();
     for (auto it = ops.rbegin(); it != ops.rend(); ++it) {
       backward(**it);
     }
     // wire downstream gradients
-    for (auto& [input_node, tensor] : grad_inputs) {
-      tensor = node_outputs_[input_node].grad;
+    for (auto& [uid, tensor] : grad_inputs) {
+      IONode& input_node = graph_.io_nodes_.at(uid);
+      tensor = node_outputs_[&input_node].grad;
     }
   }
 

@@ -54,7 +54,14 @@ signed main(int argc, char* argv[]) {
   auto& output_node = builder.output(model_op, input_node);
 
   Graph graph = builder.compile(allocator);
-  GraphExecutor executor(graph, allocator);
+
+  GraphConfig graph_config = graph.get_config();
+
+  std::cout << "Graph config: \n" << graph_config.to_json().dump(4) << std::endl;
+
+  Graph reconstructed_graph = Graph::create_from_config(allocator, graph_config);
+
+  GraphExecutor executor(reconstructed_graph, allocator);
 
   auto [train_loader, val_loader] =
       DataLoaderFactory::create(train_config.dataset_name, train_config.dataset_path);
@@ -65,19 +72,19 @@ signed main(int argc, char* argv[]) {
   auto optimizer =
       OptimizerFactory::create_adam(train_config.lr_initial, 0.9f, 0.999f, 10e-4f, 3e-4f, false);
 
-  optimizer->attach(graph.context());
+  optimizer->attach(reconstructed_graph.context());
 
   while (train_loader->get_batch(256, input, label)) {
-    Tensor device_input = input->to_device(graph.context().device());
+    Tensor device_input = input->to_device(reconstructed_graph.context().device());
     Tensor device_output;
 
-    InputPack inputs = {{&input_node, device_input}};
-    OutputPack outputs = {{&output_node, device_output}};
+    InputPack inputs = {{input_node.uid(), device_input}};
+    OutputPack outputs = {{output_node.uid(), device_output}};
 
     executor.forward(inputs, outputs);
-    device_output = outputs[&output_node];
+    device_output = outputs[output_node.uid()];
     float loss;
-    Tensor device_labels = label->to_device(graph.context().device());
+    Tensor device_labels = label->to_device(reconstructed_graph.context().device());
     criterion->compute_loss(device_output, device_labels, loss);
     int class_corrects = compute_class_corrects(device_output, device_labels);
     std::cout << "Loss: " << loss << ", Accuracy: "
@@ -86,11 +93,11 @@ signed main(int argc, char* argv[]) {
     Tensor grad_output = create_like(device_output), grad_input = create_like(device_input);
     criterion->compute_gradient(device_output, device_labels, grad_output);
 
-    InputPack grad_outputs = {{&output_node, grad_output}};
-    OutputPack grad_inputs = {{&input_node, grad_input}};
+    InputPack grad_outputs = {{output_node.uid(), grad_output}};
+    OutputPack grad_inputs = {{input_node.uid(), grad_input}};
 
     executor.backward(grad_outputs, grad_inputs);
-    grad_input = grad_inputs[&input_node];
+    grad_input = grad_inputs[input_node.uid()];
 
     optimizer->update();
     optimizer->zero_grads();

@@ -2,6 +2,7 @@
 
 #include <deque>
 #include <stdexcept>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -23,22 +24,26 @@ public:
             .grad_bytes = 0,
         } {}
 
+  size_t num_nodes() const { return op_nodes_.size() + io_nodes_.size(); }
+
   OpNode& add_layer(std::unique_ptr<SISOLayer> siso_layer) {
-    OpNode new_node(ctx_desc_, std::move(siso_layer));
-    auto& node = op_nodes_.emplace_back(std::move(new_node));
+    std::string uid = "op_" + std::to_string(node_count_++);
+    OpNode new_node(uid, ctx_desc_, std::move(siso_layer));
+    auto& node = op_nodes_.emplace(new_node.uid(), std::move(new_node)).first->second;
     return node;
   }
 
-  IONode& input() {
-    auto node = IONode();
-    auto& input_node = io_nodes_.emplace_back(std::move(node));
+  IONode& input(std::string uid = "input") {
+    auto node = IONode(uid);
+    auto& input_node = io_nodes_.emplace(uid, std::move(node)).first->second;
     return input_node;
   }
 
   // Assuming simple op node, 1 input, 1 output.
   IONode& output(OpNode& op_node, IONode& input) {
-    auto new_node = IONode();
-    auto& output = io_nodes_.emplace_back(std::move(new_node));
+    std::string uid = "io_" + std::to_string(node_count_++);
+    auto new_node = IONode(uid);
+    auto& output = io_nodes_.emplace(new_node.uid(), std::move(new_node)).first->second;
     add_out(op_node, output);
     add_in(op_node, input);
     return output;
@@ -50,7 +55,8 @@ public:
     if (op_nodes_.empty()) return;
 
     std::unordered_map<OpNode*, int> in_degree;
-    for (auto& op : op_nodes_) {
+    for (auto& op_pair : op_nodes_) {
+      OpNode& op = op_pair.second;
       in_degree[&op] = 0;
       for (IONode* in_tensor : op.inputs()) {
         // OpNode depends on producers of its inputs
@@ -59,7 +65,8 @@ public:
     }
 
     std::deque<OpNode*> queue;
-    for (auto& op : op_nodes_) {
+    for (auto& op_pair : op_nodes_) {
+      OpNode& op = op_pair.second;
       if (in_degree[&op] == 0) {
         queue.push_back(&op);
       }
@@ -100,9 +107,10 @@ public:
 
 private:
   GraphContextDescriptor ctx_desc_;
-  std::deque<IONode> io_nodes_;
-  std::deque<OpNode> op_nodes_;
+  std::unordered_map<std::string, IONode> io_nodes_;
+  std::unordered_map<std::string, OpNode> op_nodes_;
   std::vector<OpNode*> execution_sequence_;
+  size_t node_count_ = 0;
 
   void add_in(OpNode& op_node, IONode& input) {
     op_node.add_input(&input);

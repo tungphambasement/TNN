@@ -10,11 +10,14 @@ class OpNode;
 
 class IONode : public INode {
 public:
-  IONode() = default;
+  IONode(std::string uid)
+      : INode(uid) {}
 
   std::string type() const override { return "io_node"; }
   void save_state(std::ofstream& file) override {}
-  NodeConfig get_config() const override { return NodeConfig(); }
+  NodeConfig get_config() const override;
+
+  static IONode create_from_config(const NodeConfig& config);
 
   void add_producer(OpNode* op_node) { producers_.push_back(op_node); }
   const std::vector<OpNode*>& producers() const { return producers_; }

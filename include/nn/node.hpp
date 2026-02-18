@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "common/config.hpp"
 
 namespace tnn {
@@ -8,15 +10,18 @@ using NodeConfig = TConfig;
 
 class INode {
 public:
+  INode(std::string uid)
+      : uid_(uid) {}
+
   virtual ~INode() = default;
 
-  /**
-   * @brief Initialize the layer (e.g., allocate parameters)
-   * ! Must set io, param, compute dtypes and device ptr prior to this to ensure proper math.
-   * ! Must be called before forward/backward.
-   */
   virtual std::string type() const = 0;
   virtual void save_state(std::ofstream &file) = 0;
   virtual NodeConfig get_config() const = 0;
+
+  std::string uid() const { return uid_; }
+
+protected:
+  std::string uid_;
 };
 }  // namespace tnn
