@@ -89,15 +89,16 @@ public:
     }
   }
 
-  // takes a sorted graph and eliminates redundant nodes/layers, e.g. consecutive linear layers can
-  // be merged into one
-  void reduce() {
-    // TODO: implement graph reduction to eliminate redundant nodes/layers
+  std::unordered_map<std::string, IONode>& io_nodes() { return io_nodes_; }
+  std::unordered_map<std::string, OpNode>& op_nodes() { return op_nodes_; }
+  std::vector<OpNode*>& execution_sequence() {
+    if (execution_sequence_.empty()) {
+      sort();
+    }
+    return execution_sequence_;
   }
 
   Graph compile(IAllocator& allocator) {
-    sort();
-    reduce();
     return Graph(allocator, ctx_desc_, std::move(op_nodes_), std::move(io_nodes_),
                  std::move(execution_sequence_));
   }

@@ -39,8 +39,8 @@ protected:
                      size_t mb_id = 0) override;
 
 public:
-  explicit Sequential(const std::string &name = "seq",
-                      std::vector<std::unique_ptr<SISOLayer>> layers = {});
+  explicit Sequential(std::vector<std::unique_ptr<SISOLayer>> layers = {},
+                      const std::string &name = "sequential");
 
   static constexpr const char *TYPE_NAME = "sequential";
 

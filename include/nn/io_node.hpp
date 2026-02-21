@@ -25,6 +25,11 @@ public:
   void add_consumer(OpNode* op_node) { consumers_.push_back(op_node); }
   const std::vector<OpNode*>& consumers() const { return consumers_; }
 
+  void clear() {
+    producers_.clear();
+    consumers_.clear();
+  }
+
 private:
   std::vector<OpNode*> producers_;
   std::vector<OpNode*> consumers_;

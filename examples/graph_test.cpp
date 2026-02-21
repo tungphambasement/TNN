@@ -9,7 +9,10 @@
 #include "nn/example_models.hpp"
 #include "nn/graph_builder.hpp"
 #include "nn/graph_executor.hpp"
+#include "nn/io_node.hpp"
 #include "nn/layers.hpp"
+#include "nn/reducer.hpp"
+#include "nn/siso_layer.hpp"
 #include "nn/train.hpp"
 
 using namespace std;
@@ -40,6 +43,11 @@ signed main(int argc, char* argv[]) {
   }
 
   TrainingConfig train_config;
+  if (config_path.empty()) {
+    cerr << "Error: Configuration file path is required. Use --config <path> to specify it."
+         << endl;
+    return 1;
+  }
   train_config.load_from_json(config_path);
   train_config.print_config();
 
@@ -49,19 +57,24 @@ signed main(int argc, char* argv[]) {
 
   auto model_uptr = make_unique<Sequential>(ExampleModels::create(train_config.model_name));
 
-  auto& input_node = builder.input();
-  auto& model_op = builder.add_layer(std::move(model_uptr));
-  auto& output_node = builder.output(model_op, input_node);
+  LayerFactory::register_defaults();
+  vector<SISOLayer*> layers = model_uptr->get_layers();
+  IONode& input_node = builder.input();
+  IONode* current_input = &input_node;
+  for (size_t i = 0; i < layers.size(); ++i) {
+    auto layer_config = layers[i]->get_config();
+    std::unique_ptr<SISOLayer> layer = LayerFactory::create(layer_config.type, layer_config);
+    auto& op_node = builder.add_layer(std::move(layer));
+    current_input = &builder.output(op_node, *current_input);
+  }
+  auto& output_node = *current_input;
+
+  Reducer reducer = ReducerBuilder().seq_reduction().build();
+  reducer.reduce(builder);
 
   Graph graph = builder.compile(allocator);
 
-  GraphConfig graph_config = graph.get_config();
-
-  std::cout << "Graph config: \n" << graph_config.to_json().dump(4) << std::endl;
-
-  Graph reconstructed_graph = Graph::create_from_config(allocator, graph_config);
-
-  GraphExecutor executor(reconstructed_graph, allocator);
+  GraphExecutor executor(graph, allocator);
 
   auto [train_loader, val_loader] =
       DataLoaderFactory::create(train_config.dataset_name, train_config.dataset_path);
@@ -72,10 +85,10 @@ signed main(int argc, char* argv[]) {
   auto optimizer =
       OptimizerFactory::create_adam(train_config.lr_initial, 0.9f, 0.999f, 10e-4f, 3e-4f, false);
 
-  optimizer->attach(reconstructed_graph.context());
+  optimizer->attach(graph.context());
 
   while (train_loader->get_batch(256, input, label)) {
-    Tensor device_input = input->to_device(reconstructed_graph.context().device());
+    Tensor device_input = input->to_device(graph.context().device());
     Tensor device_output;
 
     InputPack inputs = {{input_node.uid(), device_input}};
@@ -84,7 +97,7 @@ signed main(int argc, char* argv[]) {
     executor.forward(inputs, outputs);
     device_output = outputs[output_node.uid()];
     float loss;
-    Tensor device_labels = label->to_device(reconstructed_graph.context().device());
+    Tensor device_labels = label->to_device(graph.context().device());
     criterion->compute_loss(device_output, device_labels, loss);
     int class_corrects = compute_class_corrects(device_output, device_labels);
     std::cout << "Loss: " << loss << ", Accuracy: "

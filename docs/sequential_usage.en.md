@@ -23,7 +23,7 @@ auto layers = LayerBuilder({channels, height, width})  // Set input shape first
     .dense(output_features, ...)  // Auto-infers input features
     .build(); // Returns a vector<unique_ptr<Layer>>
 
-auto model = Sequential("model_name", std::move(layers));
+auto model = Sequential(std::move(layers), "model_name");
 
 model.initialize(); // Initialize parameters for all layers
 ```
@@ -241,7 +241,7 @@ auto layers = LayerBuilder({1, 28, 28})                                 // 1 cha
     .dense(10)                                // 10 output features, linear activation
     .build();                                           // returns a vector of layers.
 
-auto model = Sequential("mnist_classifier", std::move(layers));
+auto model = Sequential(std::move(layers), "mnist_classifier");
 
 // Configure training
 auto optimizer = std::make_unique<Adam<float>>(0.001f, 0.9f, 0.999f, 1e-8f);

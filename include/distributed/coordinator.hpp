@@ -410,7 +410,7 @@ private:
     auto splitted_layers = split(this->model_->get_layers(), this->partitions_);
 
     for (size_t i = 0; i < worker_endpoints_.size(); ++i) {
-      Sequential stage_model("stage_" + std::to_string(i), std::move(splitted_layers[i]));
+      Sequential stage_model(std::move(splitted_layers[i]), "stage_" + std::to_string(i));
       StageConfig config;
       config.model_config = stage_model.get_config();
       config.optimizer_config = optimizer_->get_config();

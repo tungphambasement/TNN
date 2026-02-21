@@ -33,7 +33,7 @@ Sequential create_mnist_cnn(DType_t io_dtype_ = DType_t::FP32) {
                     .flatten(1, -1, "flatten")
                     .legacy_dense(10, false, "output")
                     .build();
-  return Sequential("mnist_cnn", std::move(layers));
+  return Sequential(std::move(layers), "mnist_cnn");
 }
 
 Sequential create_cifar10_vgg(DType_t io_dtype_ = DType_t::FP32) {
@@ -68,7 +68,7 @@ Sequential create_cifar10_vgg(DType_t io_dtype_ = DType_t::FP32) {
                     .activation("relu", "relu10")
                     .legacy_dense(10, true, "fc1")
                     .build();
-  return Sequential("cifar10_vgg", std::move(layers));
+  return Sequential(std::move(layers), "cifar10_vgg");
 }
 
 Sequential create_cifar10_resnet9(DType_t io_dtype_ = DType_t::FP32) {
@@ -99,7 +99,7 @@ Sequential create_cifar10_resnet9(DType_t io_dtype_ = DType_t::FP32) {
                     // .legacy_dense(10, true, "output")
                     .legacy_dense(10, true, "output")
                     .build();
-  return Sequential("cifar10_resnet9", std::move(layers));
+  return Sequential(std::move(layers), "cifar10_resnet9");
 }
 
 Sequential create_cifar100_resnet18(DType_t io_dtype_ = DType_t::FP32) {
@@ -125,7 +125,7 @@ Sequential create_cifar100_resnet18(DType_t io_dtype_ = DType_t::FP32) {
                     .flatten(1, -1, "flatten")
                     .legacy_dense(100, true, "fc")
                     .build();
-  return Sequential("cifar100_resnet18", std::move(layers));
+  return Sequential(std::move(layers), "cifar100_resnet18");
 }
 
 Sequential create_cifar100_wrn16_8(DType_t io_dtype_ = DType_t::FP32) {
@@ -156,7 +156,7 @@ Sequential create_cifar100_wrn16_8(DType_t io_dtype_ = DType_t::FP32) {
                     .legacy_dense(100, true, "fc")
                     .build();
 
-  return Sequential("cifar100_wrn16_8", std::move(layers));
+  return Sequential(std::move(layers), "cifar100_wrn16_8");
 }
 
 Sequential create_tiny_imagenet_resnet18(DType_t io_dtype_ = DType_t::FP32) {
@@ -182,7 +182,7 @@ Sequential create_tiny_imagenet_resnet18(DType_t io_dtype_ = DType_t::FP32) {
                     .flatten(1, -1, "flatten")
                     .legacy_dense(200, true, "fc")
                     .build();
-  return Sequential("tiny_imagenet_resnet18", std::move(layers));
+  return Sequential(std::move(layers), "tiny_imagenet_resnet18");
 }
 
 Sequential create_tiny_imagenet_wrn16_8(DType_t io_dtype_ = DType_t::FP32) {
@@ -213,7 +213,7 @@ Sequential create_tiny_imagenet_wrn16_8(DType_t io_dtype_ = DType_t::FP32) {
                     .legacy_dense(200, true, "fc")
                     .build();
 
-  return Sequential("tiny_imagenet_wrn16_8", std::move(layers));
+  return Sequential(std::move(layers), "tiny_imagenet_wrn16_8");
 }
 
 Sequential create_tiny_imagenet_resnet50(DType_t io_dtype_ = DType_t::FP32) {
@@ -247,7 +247,7 @@ Sequential create_tiny_imagenet_resnet50(DType_t io_dtype_ = DType_t::FP32) {
                     .flatten(1, -1, "flatten")
                     .legacy_dense(200, true, "fc")
                     .build();
-  return Sequential("tiny_imagenet_resnet50", std::move(layers));
+  return Sequential(std::move(layers), "tiny_imagenet_resnet50");
 }
 
 Sequential create_resnet50_imagenet(DType_t io_dtype_ = DType_t::FP32) {
@@ -281,7 +281,7 @@ Sequential create_resnet50_imagenet(DType_t io_dtype_ = DType_t::FP32) {
                     .flatten(1, -1, "flatten")
                     .legacy_dense(1000, true, "fc")
                     .build();
-  return Sequential("imagenet_resnet50", std::move(layers));
+  return Sequential(std::move(layers), "imagenet_resnet50");
 }
 
 Sequential create_tiny_imagenet_vit(DType_t io_dtype_ = DType_t::FP32) {
@@ -332,7 +332,7 @@ Sequential create_tiny_imagenet_vit(DType_t io_dtype_ = DType_t::FP32) {
 
   auto layers = builder.build();
 
-  return Sequential("tiny_imagenet_vit", std::move(layers));
+  return Sequential(std::move(layers), "tiny_imagenet_vit");
 }
 
 Sequential create_gpt2_small(DType_t io_dtype_ = DType_t::FP32) {
@@ -356,7 +356,7 @@ Sequential create_gpt2_small(DType_t io_dtype_ = DType_t::FP32) {
   builder.layernorm(dtype_eps(io_dtype_), true, "ln_f").legacy_dense(vocab_size, true, "head");
 
   auto layers = builder.build();
-  return Sequential("gpt2_small", std::move(layers));
+  return Sequential(std::move(layers), "gpt2_small");
 }
 
 Sequential create_flash_gpt2_small(DType_t io_dtype_ = DType_t::FP32) {
@@ -380,7 +380,7 @@ Sequential create_flash_gpt2_small(DType_t io_dtype_ = DType_t::FP32) {
   builder.layernorm(dtype_eps(io_dtype_), true, "ln_f").legacy_dense(vocab_size, true, "head");
 
   auto layers = builder.build();
-  return Sequential("flash_gpt2_small", std::move(layers));
+  return Sequential(std::move(layers), "flash_gpt2_small");
 }
 
 Sequential create_gpt2_medium(DType_t io_dtype_ = DType_t::FP32) {
@@ -404,7 +404,7 @@ Sequential create_gpt2_medium(DType_t io_dtype_ = DType_t::FP32) {
   builder.layernorm(dtype_eps(io_dtype_), true, "ln_f").legacy_dense(vocab_size, true, "head");
 
   auto layers = builder.build();
-  return Sequential("gpt2_medium", std::move(layers));
+  return Sequential(std::move(layers), "gpt2_medium");
 }
 
 Sequential create_flash_gpt2_medium(DType_t io_dtype_ = DType_t::FP32) {
@@ -428,7 +428,7 @@ Sequential create_flash_gpt2_medium(DType_t io_dtype_ = DType_t::FP32) {
   builder.layernorm(dtype_eps(io_dtype_), true, "ln_f").legacy_dense(vocab_size, true, "head");
 
   auto layers = builder.build();
-  return Sequential("flash_gpt2_medium", std::move(layers));
+  return Sequential(std::move(layers), "flash_gpt2_medium");
 }
 
 Sequential create_gpt2_large(DType_t io_dtype_ = DType_t::FP32) {
@@ -452,7 +452,7 @@ Sequential create_gpt2_large(DType_t io_dtype_ = DType_t::FP32) {
   builder.layernorm(dtype_eps(io_dtype_), true, "ln_f").legacy_dense(vocab_size, true, "head");
 
   auto layers = builder.build();
-  return Sequential("gpt2_large", std::move(layers));
+  return Sequential(std::move(layers), "gpt2_large");
 }
 
 Sequential create_flash_gpt2_large(DType_t io_dtype_ = DType_t::FP32) {
@@ -476,7 +476,7 @@ Sequential create_flash_gpt2_large(DType_t io_dtype_ = DType_t::FP32) {
   builder.layernorm(dtype_eps(io_dtype_), true, "ln_f").legacy_dense(vocab_size, true, "head");
 
   auto layers = builder.build();
-  return Sequential("flash_gpt2_large", std::move(layers));
+  return Sequential(std::move(layers), "flash_gpt2_large");
 }
 
 // Register all models

@@ -85,7 +85,7 @@ void Sequential::backward_impl(const ConstTensor &grad_output, const Tensor &gra
   this->device().getFlow(this->flow_handle_)->synchronize();
 }
 
-Sequential::Sequential(const std::string &name, std::vector<std::unique_ptr<SISOLayer>> layers)
+Sequential::Sequential(std::vector<std::unique_ptr<SISOLayer>> layers, const std::string &name)
     : Block(name) {
   layers_ = std::move(layers);
 }
@@ -167,7 +167,7 @@ std::unique_ptr<Sequential> Sequential::create_from_config(const LayerConfig &co
     auto layer = LayerFactory::create(layer_config);
     layers.push_back(std::move(layer));
   }
-  return std::make_unique<Sequential>(config.name, std::move(layers));
+  return std::make_unique<Sequential>(std::move(layers), config.name);
 }
 
 }  // namespace tnn

@@ -64,6 +64,8 @@ public:
 
   const Device &device() const { return layer_->device(); }
 
+  std::unique_ptr<Layer> release_layer() { return std::move(layer_); }
+
 private:
   std::unique_ptr<Layer> layer_;
   std::vector<IONode *> inputs_;
