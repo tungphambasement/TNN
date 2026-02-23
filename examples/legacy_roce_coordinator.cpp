@@ -8,8 +8,6 @@
 #include "distributed/roce_coordinator.hpp"
 #include "distributed/roce_worker.hpp"
 #include "distributed/train.hpp"
-#include "nn/blocks_impl/sequential.hpp"
-#include "nn/layers.hpp"
 #include "nn/legacy/example_models.hpp"
 #include "nn/optimizers.hpp"
 #include "partitioner/naive_partitioner.hpp"
@@ -105,9 +103,8 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  Sequential *model_ptr = nullptr;
-  Graph graph = legacy::load_or_create_model(train_config.model_name, train_config.model_path,
-                                             allocator, model_ptr);
+  Graph graph =
+      legacy::load_or_create_model(train_config.model_name, train_config.model_path, allocator);
 
   auto criterion = LossFactory::create_logsoftmax_crossentropy();
   auto optimizer =
@@ -146,10 +143,8 @@ int main(int argc, char *argv[]) {
   auto partitioner = std::make_unique<NaivePipelinePartitioner>(NaivePartitionerConfig({2, 1}));
 
   CoordinatorConfig coord_config{
-      ParallelMode_t::PIPELINE, model_ptr,
-      std::move(optimizer),     std::move(scheduler),
-      std::move(partitioner),   std::move(local_worker),
-      coordinator_endpoint,     endpoints,
+      ParallelMode_t::PIPELINE, std::move(graph),        std::move(optimizer), std::move(scheduler),
+      std::move(partitioner),   std::move(local_worker), coordinator_endpoint, endpoints,
   };
 
   RoCECoordinator coordinator(std::move(coord_config));

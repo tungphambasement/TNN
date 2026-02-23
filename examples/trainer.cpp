@@ -4,11 +4,9 @@
 
 #include "data_loading/data_loader_factory.hpp"
 #include "device/device_manager.hpp"
-#include "nn/blocks_impl/sequential.hpp"
 #include "nn/example_models.hpp"
 #include "nn/graph.hpp"
 #include "nn/graph_builder.hpp"
-#include "nn/layers.hpp"
 #include "nn/schedulers.hpp"
 #include "nn/train.hpp"
 
@@ -64,9 +62,7 @@ signed main(int argc, char *argv[]) {
   }
   train_loader->set_seed(123456);
 
-  Sequential *model_ptr = nullptr;
-  Graph graph =
-      load_or_create_model(train_config.model_name, train_config.model_path, allocator, model_ptr);
+  Graph graph = load_or_create_model(train_config.model_name, train_config.model_path, allocator);
 
   auto criterion = LossFactory::create_logsoftmax_crossentropy();
   auto optimizer =
@@ -75,8 +71,7 @@ signed main(int argc, char *argv[]) {
       optimizer.get(), 5 * train_loader->size() / train_config.batch_size, 0.1f);
 
   try {
-    train_model(model_ptr, graph.context(), train_loader, val_loader, optimizer, criterion,
-                scheduler, train_config);
+    train_model(graph, train_loader, val_loader, optimizer, criterion, scheduler, train_config);
   } catch (const std::exception &e) {
     cerr << "Training failed: " << e.what() << endl;
     return 1;

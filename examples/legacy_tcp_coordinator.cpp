@@ -15,8 +15,6 @@
 #include "distributed/tcp_coordinator.hpp"
 #include "distributed/tcp_worker.hpp"
 #include "distributed/train.hpp"
-#include "nn/blocks_impl/sequential.hpp"
-#include "nn/layers.hpp"
 #include "nn/legacy/example_models.hpp"
 #include "partitioner/naive_partitioner.hpp"
 #include "utils/env.hpp"
@@ -51,8 +49,7 @@ int main() {
     return 1;
   }
 
-  Sequential *model_ptr = nullptr;
-  Graph graph = legacy::load_or_create_model(model_name, model_path, allocator, model_ptr);
+  Graph graph = legacy::load_or_create_model(model_name, model_path, allocator);
 
   cout << "Training model on device: " << (device_type == DeviceType::CPU ? "CPU" : "GPU") << endl;
 
@@ -100,7 +97,7 @@ int main() {
   auto worker = std::make_unique<TCPWorker>(local_worker_endpoint, device_type == DeviceType::GPU);
 
   CoordinatorConfig config{
-      ParallelMode_t::PIPELINE, model_ptr,         std::move(optimizer), std::move(scheduler),
+      ParallelMode_t::PIPELINE, std::move(graph),  std::move(optimizer), std::move(scheduler),
       std::move(partitioner),   std::move(worker), coordinator_endpoint, endpoints};
 
   NetworkCoordinator coordinator(std::move(config));

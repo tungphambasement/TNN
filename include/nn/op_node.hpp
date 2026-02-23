@@ -64,6 +64,9 @@ public:
 
   const Device &device() const { return layer_->device(); }
 
+  Layer *layer() { return layer_.get(); }
+  const Layer *layer() const { return layer_.get(); }
+
   std::unique_ptr<Layer> release_layer() { return std::move(layer_); }
 
 private:

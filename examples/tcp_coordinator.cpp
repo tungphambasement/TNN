@@ -17,9 +17,7 @@
 #include "distributed/endpoint.hpp"
 #include "distributed/tcp_worker.hpp"
 #include "distributed/train.hpp"
-#include "nn/blocks_impl/sequential.hpp"
 #include "nn/example_models.hpp"
-#include "nn/layers.hpp"
 #include "partitioner/naive_partitioner.hpp"
 #include "utils/env.hpp"
 
@@ -36,9 +34,7 @@ int main() {
   const auto &device = DeviceManager::getInstance().getDevice(train_config.device_type);
   auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
 
-  Sequential *model_ptr = nullptr;
-  Graph graph =
-      load_or_create_model(train_config.model_name, train_config.model_path, allocator, model_ptr);
+  Graph graph = load_or_create_model(train_config.model_name, train_config.model_path, allocator);
 
   if (train_config.dataset_name.empty()) {
     throw std::runtime_error("DATASET_NAME environment variable is not set!");
@@ -93,7 +89,7 @@ int main() {
       make_unique<NaivePipelinePartitioner>(NaivePartitionerConfig({1, 2}));
 
   CoordinatorConfig config{
-      ParallelMode_t::PIPELINE, model_ptr,         std::move(optimizer), std::move(scheduler),
+      ParallelMode_t::PIPELINE, std::move(graph),  std::move(optimizer), std::move(scheduler),
       std::move(partitioner),   std::move(worker), coordinator_endpoint, endpoints,
   };
 

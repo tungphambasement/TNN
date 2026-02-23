@@ -33,14 +33,12 @@ signed main() {
     return 1;
   }
 
-  Sequential *model_ptr = nullptr;
-  Graph graph =
-      load_or_create_model(train_config.model_name, train_config.model_path, allocator, model_ptr);
+  Graph graph = load_or_create_model(train_config.model_name, train_config.model_path, allocator);
 
   auto criterion = LossFactory::create_logsoftmax_crossentropy();
 
   try {
-    auto res = validate_model(model_ptr, val_loader, criterion, train_config);
+    auto res = validate_model(graph, val_loader, criterion, train_config);
     std::cout << "Validation Loss: " << res.avg_loss << ", Accuracy: " << res.avg_accuracy * 100.0
               << "%" << std::endl;
   } catch (const std::exception &e) {

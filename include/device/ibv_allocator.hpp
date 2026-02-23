@@ -153,7 +153,7 @@ public:
 
   size_t slab_size() const { return slab_size_; }
 
-  const Device &device() const { return device_; }
+  const Device &device() const override { return device_; }
 
   ibv_mr *get_mr() const { return slab_mr_; }
 

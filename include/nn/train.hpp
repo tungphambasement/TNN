@@ -11,8 +11,7 @@
 #include "data_loading/data_loader.hpp"
 #include "data_loading/regression_data_loader.hpp"
 #include "device/device_type.hpp"
-#include "nn/blocks_impl/sequential.hpp"
-#include "nn/graph_context.hpp"
+#include "nn/graph.hpp"
 #include "nn/loss.hpp"
 #include "nn/optimizers.hpp"
 #include "nn/schedulers.hpp"
@@ -78,11 +77,10 @@ struct Result {
   double avg_accuracy = -1.0f;
 };
 
-Result validate_model(Sequential *model, std::unique_ptr<BaseDataLoader> &val_loader,
+Result validate_model(Graph &graph, std::unique_ptr<BaseDataLoader> &val_loader,
                       const std::unique_ptr<Loss> &criterion, const TrainingConfig &config);
 
-void train_model(Sequential *model, GraphContext &graph_context,
-                 std::unique_ptr<BaseDataLoader> &train_loader,
+void train_model(Graph &graph, std::unique_ptr<BaseDataLoader> &train_loader,
                  std::unique_ptr<BaseDataLoader> &val_loader, std::unique_ptr<Optimizer> &optimizer,
                  const std::unique_ptr<Loss> &criterion, std::unique_ptr<Scheduler> &scheduler,
                  const TrainingConfig &config = TrainingConfig());

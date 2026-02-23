@@ -9,9 +9,7 @@
 #include "distributed/coordinator.hpp"
 #include "distributed/roce_worker.hpp"
 #include "distributed/train.hpp"
-#include "nn/blocks_impl/sequential.hpp"
 #include "nn/example_models.hpp"
-#include "nn/layers.hpp"
 #include "nn/optimizers.hpp"
 #include "partitioner/naive_partitioner.hpp"
 #include "utils/env.hpp"
@@ -96,9 +94,7 @@ int main(int argc, char *argv[]) {
   const auto &device = DeviceManager::getInstance().getDevice(device_type);
   auto &allocator = PoolAllocator::instance(device, defaultFlowHandle);
 
-  Sequential *model_ptr = nullptr;
-  Graph graph =
-      load_or_create_model(train_config.model_name, train_config.model_path, allocator, model_ptr);
+  Graph graph = load_or_create_model(train_config.model_name, train_config.model_path, allocator);
 
   if (train_config.dataset_name.empty()) {
     throw std::runtime_error("DATASET_NAME environment variable is not set!");
@@ -141,10 +137,9 @@ int main(int argc, char *argv[]) {
   // initialize a partitioner with weights 2:1
   auto partitioner = std::make_unique<NaivePipelinePartitioner>(NaivePartitionerConfig({1, 2}));
 
-  CoordinatorConfig config{ParallelMode_t::PIPELINE, model_ptr,
-                           std::move(optimizer),     std::move(scheduler),
-                           std::move(partitioner),   std::move(local_worker),
-                           coordinator_endpoint,     endpoints};
+  CoordinatorConfig config{
+      ParallelMode_t::PIPELINE, std::move(graph),        std::move(optimizer), std::move(scheduler),
+      std::move(partitioner),   std::move(local_worker), coordinator_endpoint, endpoints};
 
   RoCECoordinator coordinator(std::move(config));
 

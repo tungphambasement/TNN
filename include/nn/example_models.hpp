@@ -11,7 +11,9 @@
 #include "nn/blocks_impl/sequential.hpp"
 #include "nn/graph.hpp"
 #include "nn/graph_builder.hpp"
+#include "nn/io_node.hpp"
 #include "nn/layers.hpp"
+#include "nn/op_node.hpp"
 namespace tnn {
 
 class ExampleModels {
@@ -45,7 +47,7 @@ public:
 };
 
 inline Graph load_or_create_model(const std::string &model_name, const std::string &model_path,
-                                  IAllocator &allocator, Sequential *&out_model) {
+                                  IAllocator &allocator) {
   GraphBuilder builder;
   std::unique_ptr<Sequential> model;
   if (!model_path.empty()) {
@@ -55,17 +57,19 @@ inline Graph load_or_create_model(const std::string &model_name, const std::stri
       throw std::runtime_error("Failed to open model file");
     }
     auto model = load_config<Sequential>(file);
-    out_model = model.get();
-    builder.add_layer(std::move(model));
+    IONode &input_node = builder.input("input");
+    OpNode &op_node = builder.add_layer(std::move(model));
+    builder.output(op_node, input_node, "output");
     Graph graph = builder.compile(allocator);
-    load_params(file, *out_model);
+    load_params(file, *op_node.layer());
     file.close();
     return graph;
   } else {
     try {
       auto model = std::make_unique<Sequential>(ExampleModels::create(model_name));
-      out_model = model.get();
-      builder.add_layer(std::move(model));
+      IONode &input_node = builder.input("input");
+      OpNode &op_node = builder.add_layer(std::move(model));
+      builder.output(op_node, input_node, "output");
       Graph graph = builder.compile(allocator);
       std::cout << "Created model: " << model_name << std::endl;
       return graph;
