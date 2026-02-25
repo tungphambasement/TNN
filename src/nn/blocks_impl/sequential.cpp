@@ -9,7 +9,7 @@
 
 #include <fmt/core.h>
 
-#include <algorithm>
+#include <cstddef>
 #include <iomanip>
 #include <iostream>
 #include <numeric>
@@ -19,31 +19,32 @@
 #include "nn/block.hpp"
 #include "nn/layers.hpp"
 #include "nn/siso_layer.hpp"
+#include "type/type.hpp"
 
 namespace tnn {
 
-void Sequential::compute_max_size(const std::vector<size_t> &input_shape, DType_t dtype) {
-  std::vector<size_t> current_shape = input_shape;
-  size_t current_max =
-      std::accumulate(current_shape.begin(), current_shape.end(), 1, std::multiplies<size_t>());
-  for (const auto &layer : layers_) {
-    current_shape = layer->output_shape({current_shape})[0];
-    size_t activation_size =
-        std::accumulate(current_shape.begin(), current_shape.end(), 1, std::multiplies<size_t>());
-    current_max = std::max(current_max, activation_size);
+// Compute M_i (i in [0, n))
+Vec<size_t> Sequential::out_sizes(const std::vector<size_t> &shape, DType_t dtype) {
+  Vec<size_t> buffer_size(layers_.size());
+  size_t element_size = get_dtype_size(dtype);
+  Vec<size_t> current_shape = shape;
+  for (size_t i = 0; i < layers_.size(); ++i) {
+    current_shape = layers_[i]->output_shape({current_shape})[0];
+    buffer_size[i] = std::accumulate(current_shape.begin(), current_shape.end(), element_size,
+                                     std::multiplies<size_t>());
   }
-  max_size_ = current_max;
+  return buffer_size;
 }
 
 void Sequential::forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id) {
   if (layers_.empty()) {
     throw std::runtime_error("Cannot forward through empty sequential model");
   }
-  compute_max_size(input->shape(), input->data_type());
+  input_shape_cache_[mb_id] = input->shape();
   ConstTensor current_input = input;
   Tensor current_output = nullptr;
-  for (size_t i = 0; i < layers_.size(); ++i) {
-    try {
+  if (is_training_) {
+    for (size_t i = 0; i < layers_.size(); ++i) {
       if (i < layers_.size() - 1) {
         current_output = this->get_buffer(layers_[i]->output_shape({current_input->shape()})[0],
                                           input->data_type());
@@ -52,9 +53,28 @@ void Sequential::forward_impl(const ConstTensor &input, const Tensor &output, si
       }
       layers_[i]->forward({current_input}, {current_output}, mb_id);
       current_input = current_output;
-    } catch (const std::exception &e) {
-      throw std::runtime_error("Error while forward in layer " + std::to_string(i) + " (" +
-                               layers_[i]->name() + "): " + e.what());
+    }
+  } else {
+    Vec<size_t> m = this->out_sizes(input->shape(), input->data_type());
+    size_t m_b = 0;
+    for (size_t i = 0; i < m.size() - 1; ++i) {
+      m_b = std::max(m_b, m[i] + m[i + 1]);
+    }
+    dptr buffer = allocator_->allocate(m_b);
+    int side = 0;
+    DType_t dtype = input->data_type();
+    for (size_t i = 0; i < layers_.size(); ++i) {
+      if (i < layers_.size() - 1) {
+        size_t offset = side ? m_b - m[i] : 0;
+        dptr out_ptr = buffer.span(offset, m[i]);
+        Vec<size_t> out_shape = layers_[i]->output_shape({current_input->shape()})[0];
+        current_output = make_tensor(*allocator_, dtype, out_shape, std::move(out_ptr));
+        layers_[i]->forward({current_input}, {current_output}, mb_id);
+        side = 1 - side;
+        current_input = current_output;
+      } else {
+        layers_[i]->forward({current_input}, {output}, mb_id);
+      }
     }
   }
   this->device().getFlow(this->flow_handle_)->synchronize();
@@ -65,21 +85,39 @@ void Sequential::backward_impl(const ConstTensor &grad_output, const Tensor &gra
   if (layers_.empty()) {
     throw std::runtime_error("Cannot backward through empty sequential model");
   }
+  auto it_input_shape = input_shape_cache_.find(mb_id);
+  if (it_input_shape == input_shape_cache_.end()) {
+    throw std::runtime_error("No cached input shape found for micro-batch ID: " +
+                             std::to_string(mb_id));
+  }
+  Vec<size_t> input_shape = it_input_shape->second;
+  Vec<size_t> m = this->out_sizes(input_shape, grad_output->data_type());
+  Vec<Vec<size_t>> out_shapes(layers_.size());
+  out_shapes[0] = layers_[0]->output_shape({input_shape})[0];
+  for (size_t i = 1; i < layers_.size(); ++i) {
+    out_shapes[i] = layers_[i]->output_shape({out_shapes[i - 1]})[0];
+  }
+  size_t m_b = 0;
+  for (size_t i = 0; i < m.size() - 1; ++i) {
+    m_b = std::max(m_b, m[i] + m[i + 1]);
+  }
+  dptr buffer = allocator_->allocate(m_b);
   ConstTensor current_gradient = grad_output;
-  Tensor current_grad_input;
+  Tensor current_grad_input = nullptr;
+  int side = 0;
   for (int i = static_cast<int>(layers_.size()) - 1; i >= 0; --i) {
-    try {
-      // no need to renew buffer since backward doesn't cache inputs
-      if (i > 0) {
-        current_grad_input = this->get_buffer({max_size_}, grad_output->data_type());
-        layers_[i]->backward({current_gradient}, {current_grad_input}, mb_id);
-        current_gradient = current_grad_input;
-      } else {
-        layers_[i]->backward({current_gradient}, {grad_input}, mb_id);
-      }
-    } catch (const std::exception &e) {
-      throw std::runtime_error("Error in backward pass of layer " + std::to_string(i) + " (" +
-                               layers_[i]->type() + "): " + e.what());
+    // no need to renew buffer since backward doesn't cache inputs
+    if (i > 0) {
+      size_t offset = side ? m_b - m[i] : 0;
+      Vec<size_t> grad_input_shape = out_shapes[i - 1];
+      dptr grad_input_ptr = buffer.span(offset, m[i]);
+      current_grad_input = make_tensor(*allocator_, grad_output->data_type(), grad_input_shape,
+                                       std::move(grad_input_ptr));
+      layers_[i]->backward({current_gradient}, {current_grad_input}, mb_id);
+      side = 1 - side;
+      current_gradient = current_grad_input;
+    } else {
+      layers_[i]->backward({current_gradient}, {grad_input}, mb_id);
     }
   }
   this->device().getFlow(this->flow_handle_)->synchronize();

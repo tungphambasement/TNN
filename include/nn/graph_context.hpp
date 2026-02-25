@@ -69,8 +69,11 @@ public:
 
   GraphContextDescriptor descriptor() const { return ctx_desc_; }
 
-  std::vector<Tensor> parameters() { return params_; }
-  std::vector<Tensor> gradients() { return grads_; }
+  std::vector<Tensor> &parameters() { return params_; }
+  std::vector<Tensor> &gradients() { return grads_; }
+
+  const std::vector<Tensor> &parameters() const { return params_; }
+  const std::vector<Tensor> &gradients() const { return grads_; }
 
   void zero_grads() { ops::set_scalar<uchar>(grad_slab_, 0, grad_slab_.capacity()); }
 

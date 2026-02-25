@@ -12,6 +12,7 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "nn/block.hpp"
@@ -22,9 +23,9 @@ namespace tnn {
 class Sequential : public Block {
 private:
   std::vector<std::unique_ptr<SISOLayer>> layers_;
-  size_t max_size_ = 0;
+  std::unordered_map<size_t, Vec<size_t>> input_shape_cache_;
 
-  void compute_max_size(const std::vector<size_t> &input_shape, DType_t dtype);
+  Vec<size_t> out_sizes(const std::vector<size_t> &shape, DType_t dtype);
 
 protected:
   std::vector<SISOLayer *> layers() override {

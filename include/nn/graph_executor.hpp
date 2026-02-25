@@ -5,7 +5,7 @@
 
 namespace tnn {
 
-using InputPack = std::unordered_map<std::string, const Tensor>;
+using InputPack = std::unordered_map<std::string, Tensor>;
 using OutputPack = std::unordered_map<std::string, Tensor>;
 
 class GraphExecutor {
@@ -23,11 +23,17 @@ public:
     // set input tensors
     for (const auto& [uid, tensor] : inputs) {
       const IONode& input_node = graph_.io_node(uid);
+      if (!tensor) {
+        throw std::runtime_error("Null input tensor for uid: " + uid + " while executing graph");
+      }
       node_outputs_[&input_node].act = tensor;
     }
     // set output tensors
     for (auto& [uid, tensor] : outputs) {
       const IONode& output_node = graph_.io_node(uid);
+      if (!tensor) {
+        throw std::runtime_error("Null output tensor for uid: " + uid + " while executing graph");
+      }
       node_outputs_[&output_node].act = tensor;
     }
     // assuming topologically sorted layers, execute forward pass
@@ -35,32 +41,28 @@ public:
     for (OpNode* op : ops) {
       forward(*op);
     }
-    // wire output tensors (in case user pass null output tensors)
-    for (auto& [uid, tensor] : outputs) {
-      const IONode& output_node = graph_.io_node(uid);
-      tensor = node_outputs_[&output_node].act;
-    }
   }
 
   void backward(const InputPack& grads, OutputPack& grad_inputs) {
     // set upstream gradients
     for (const auto& [uid, tensor] : grads) {
       const IONode& output_node = graph_.io_node(uid);
+      if (!tensor) {
+        throw std::runtime_error("Null gradient tensor for uid: " + uid + " while executing graph");
+      }
       node_outputs_[&output_node].grad = tensor;
     }
     // set downstream gradients
     for (auto& [uid, tensor] : grad_inputs) {
       const IONode& input_node = graph_.io_node(uid);
+      if (!tensor) {
+        throw std::runtime_error("Null gradient tensor for uid: " + uid + " while executing graph");
+      }
       node_outputs_[&input_node].grad = tensor;
     }
     const auto& ops = graph_.ops();
     for (auto it = ops.rbegin(); it != ops.rend(); ++it) {
       backward(**it);
-    }
-    // wire downstream gradients (in case user pass null grad inputs)
-    for (auto& [uid, tensor] : grad_inputs) {
-      const IONode& input_node = graph_.io_node(uid);
-      tensor = node_outputs_[&input_node].grad;
     }
   }
 

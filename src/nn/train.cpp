@@ -246,7 +246,7 @@ static void train_val(Graph &graph, unique_ptr<BaseDataLoader> &train_loader,
           if (!file.is_open()) {
             throw runtime_error("Failed to open file: " + filepath);
           }
-          // graph.save_state(file); // TODO: implement graph-level save_state
+          graph.save_state(file);
           file.close();
           cout << "Model saved to " << filepath << endl;
         } catch (const exception &e) {
@@ -355,7 +355,7 @@ static void train_step(Graph &graph, unique_ptr<BaseDataLoader> &train_loader,
       if (!file.is_open()) {
         throw runtime_error("Failed to open file: " + filepath);
       }
-      // model->save_state(file);
+      graph.save_state(file);
       file.close();
       cout << "Model saved to " << filepath << endl;
     } catch (const exception &e) {
@@ -401,12 +401,13 @@ Result validate_model(Graph &graph, unique_ptr<BaseDataLoader> &val_loader,
   csref<Device> model_device = graph.device();
 
   Tensor device_batch_labels;
-  Tensor predictions;
 
   while (val_loader->get_batch(config.batch_size, batch_data, batch_labels)) {
+    Tensor device_input = batch_data->to_device(model_device);
     const InputPack inputs{
-        {"input", batch_data},
+        {"input", device_input},
     };
+    Tensor predictions = make_tensor<float>();
     OutputPack outputs{
         {"output", predictions},
     };

@@ -10,7 +10,6 @@
 #include "graph_context.hpp"
 #include "nn/graph.hpp"
 #include "nn/io_node.hpp"
-#include "nn/layers.hpp"
 #include "nn/op_node.hpp"
 #include "nn/siso_layer.hpp"
 
@@ -103,58 +102,6 @@ public:
     sort();
     return Graph(allocator, ctx_desc_, std::move(op_nodes_), std::move(io_nodes_),
                  std::move(execution_sequence_));
-  }
-
-  static Graph create_from_config(IAllocator& allocator, const GraphConfig& config) {
-    LayerFactory::register_defaults();
-
-    // Reconstruct IONodes
-    std::unordered_map<std::string, IONode> io_nodes;
-    nlohmann::json io_json = config.get<nlohmann::json>("io_nodes", nlohmann::json::array());
-    for (const auto& io_j : io_json) {
-      NodeConfig io_cfg = NodeConfig::from_json(io_j);
-      IONode node = IONode::create_from_config(io_cfg);
-      io_nodes.emplace(node.uid(), std::move(node));
-    }
-
-    // Reconstruct OpNodes (layers only; edges wired below)
-    GraphContextDescriptor ctx_desc;
-    std::unordered_map<std::string, OpNode> op_nodes;
-    nlohmann::json op_json = config.get<nlohmann::json>("op_nodes", nlohmann::json::array());
-    for (const auto& op_j : op_json) {
-      NodeConfig op_cfg = NodeConfig::from_json(op_j);
-      OpNode node = OpNode::create_from_config(ctx_desc, op_cfg);
-      op_nodes.emplace(node.uid(), std::move(node));
-    }
-
-    // Wire edges between OpNodes and IONodes
-    for (const auto& op_j : op_json) {
-      NodeConfig op_cfg = NodeConfig::from_json(op_j);
-      OpNode* op_ptr = &op_nodes.at(op_cfg.get<std::string>("uid"));
-
-      for (const auto& uid : op_cfg.get<std::vector<std::string>>("inputs", {})) {
-        IONode* io_ptr = &io_nodes.at(uid);
-        op_ptr->add_input(io_ptr);
-        io_ptr->add_consumer(op_ptr);
-      }
-
-      for (const auto& uid : op_cfg.get<std::vector<std::string>>("outputs", {})) {
-        IONode* io_ptr = &io_nodes.at(uid);
-        op_ptr->add_output(io_ptr);
-        io_ptr->add_producer(op_ptr);
-      }
-    }
-
-    // Reconstruct execution sequence
-    auto exec_seq_uids = config.get<std::vector<std::string>>("execution_sequence", {});
-    std::vector<OpNode*> execution_sequence;
-    execution_sequence.reserve(exec_seq_uids.size());
-    for (const auto& uid : exec_seq_uids) {
-      execution_sequence.push_back(&op_nodes.at(uid));
-    }
-
-    return Graph(allocator, ctx_desc, std::move(op_nodes), std::move(io_nodes),
-                 std::move(execution_sequence));
   }
 
 private:

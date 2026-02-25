@@ -56,14 +56,9 @@ inline Graph load_or_create_model(const std::string &model_name, const std::stri
     if (!file.is_open()) {
       throw std::runtime_error("Failed to open model file");
     }
-    auto model = load_config<Sequential>(file);
-    IONode &input_node = builder.input("input");
-    OpNode &op_node = builder.add_layer(std::move(model));
-    builder.output(op_node, input_node, "output");
-    Graph graph = builder.compile(allocator);
-    load_params(file, *op_node.layer());
+    auto model = Graph::load_state(file, allocator);
     file.close();
-    return graph;
+    return model;
   } else {
     try {
       auto model = std::make_unique<Sequential>(ExampleModels::create(model_name));
