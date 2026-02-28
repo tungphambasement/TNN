@@ -407,7 +407,7 @@ Result validate_model(Graph &graph, unique_ptr<BaseDataLoader> &val_loader,
     const InputPack inputs{
         {"input", device_input},
     };
-    Tensor predictions = make_tensor<float>();
+    Tensor predictions = make_tensor<float>(mem_pool, {});
     OutputPack outputs{
         {"output", predictions},
     };
@@ -421,8 +421,8 @@ Result validate_model(Graph &graph, unique_ptr<BaseDataLoader> &val_loader,
     ++val_batches;
   }
 
-  const double avg_val_loss = val_loss / val_batches;
-  const double avg_val_accuracy = val_corrects / val_loader->size();
+  double avg_val_loss = val_loss / val_batches;
+  double avg_val_accuracy = val_corrects / val_loader->size();
 
   return {avg_val_loss, avg_val_accuracy};
 }

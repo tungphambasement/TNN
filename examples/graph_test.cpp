@@ -58,12 +58,12 @@ signed main(int argc, char* argv[]) {
   auto model_uptr = make_unique<Sequential>(ExampleModels::create(train_config.model_name));
 
   LayerFactory::register_defaults();
-  vector<SISOLayer*> layers = model_uptr->get_layers();
+  vector<Layer*> layers = model_uptr->get_layers();
   IONode& input_node = builder.input();
   IONode* current_input = &input_node;
   for (size_t i = 0; i < layers.size(); ++i) {
     auto layer_config = layers[i]->get_config();
-    std::unique_ptr<SISOLayer> layer = LayerFactory::create(layer_config.type, layer_config);
+    std::unique_ptr<Layer> layer = LayerFactory::create(layer_config.type, layer_config);
     auto& op_node = builder.add_layer(std::move(layer));
     current_input = &builder.output(op_node, *current_input);
   }

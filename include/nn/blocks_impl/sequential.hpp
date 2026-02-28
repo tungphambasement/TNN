@@ -22,37 +22,35 @@
 namespace tnn {
 class Sequential : public Block {
 private:
-  std::vector<std::unique_ptr<SISOLayer>> layers_;
+  std::vector<std::unique_ptr<Layer>> layers_;
   std::unordered_map<size_t, Vec<size_t>> input_shape_cache_;
 
   Vec<size_t> out_sizes(const std::vector<size_t> &shape, DType_t dtype);
 
 protected:
-  std::vector<SISOLayer *> layers() override {
-    std::vector<SISOLayer *> layers;
+  std::vector<Layer *> layers() override {
+    std::vector<Layer *> layers;
     for (auto &layer : layers_) {
       layers.push_back(layer.get());
     }
     return layers;
   }
-  void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
-  void backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
-                     size_t mb_id = 0) override;
 
 public:
-  explicit Sequential(std::vector<std::unique_ptr<SISOLayer>> layers = {},
+  explicit Sequential(std::vector<std::unique_ptr<Layer>> layers = {},
                       const std::string &name = "sequential");
 
   static constexpr const char *TYPE_NAME = "sequential";
 
-  /**
-   * @brief Returns the output shape for given input shape
-   * @param input_shape The shape of the input tensor as a vector of sizes.
-   */
-  std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
-  void print_summary(const std::vector<size_t> &input_shape) const;
-  std::vector<SISOLayer *> get_layers();
   std::string type() const override { return TYPE_NAME; }
+
+  void forward(const Vec<ConstTensor> &inputs, const Vec<Tensor> &outputs, size_t mb_id) override;
+  void backward(const Vec<ConstTensor> &grad_outputs, const Vec<Tensor> &grad_inputs,
+                size_t mb_id) override;
+
+  Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shape) const override;
+  void print_summary(const std::vector<size_t> &input_shape) const;
+  std::vector<Layer *> get_layers();
   LayerConfig get_config() const override;
   static std::unique_ptr<Sequential> create_from_config(const LayerConfig &config);
 };

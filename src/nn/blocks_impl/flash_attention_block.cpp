@@ -65,8 +65,11 @@ size_t FlashAttentionBlock::get_shape_hash(size_t b, size_t h, size_t s, size_t 
   return seed;
 }
 
-void FlashAttentionBlock::forward_impl(const ConstTensor &input, const Tensor &output,
-                                       size_t mb_id) {
+void FlashAttentionBlock::forward(const Vec<ConstTensor> &inputs, const Vec<Tensor> &outputs,
+                                  size_t mb_id) {
+  const ConstTensor &input = inputs[0];
+  const Tensor &output = outputs[0];
+
   if (input->dims() != 3) {
     throw std::invalid_argument("FlashAttentionBlock: Input must be 3D (B, S, E)");
   }
@@ -307,8 +310,10 @@ void FlashAttentionBlock::cudnn_backward(const ConstTensor &grad_output, const T
 }
 #endif
 
-void FlashAttentionBlock::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
-                                        size_t mb_id) {
+void FlashAttentionBlock::backward(const Vec<ConstTensor> &grad_outputs,
+                                   const Vec<Tensor> &grad_inputs, size_t mb_id) {
+  const ConstTensor &grad_output = grad_outputs[0];
+  const Tensor &grad_input = grad_inputs[0];
 #ifdef USE_CUDNN
   if (this->device().device_type() == DeviceType::GPU) {
     cudnn_backward(grad_output, grad_input, mb_id);
@@ -328,9 +333,8 @@ LayerConfig FlashAttentionBlock::get_config() const {
   return config;
 }
 
-std::vector<size_t> FlashAttentionBlock::compute_output_shape(
-    const std::vector<size_t> &input_shape) const {
-  return input_shape;
+Vec<Vec<size_t>> FlashAttentionBlock::output_shape(const Vec<Vec<size_t>> &input_shapes) const {
+  return input_shapes;
 }
 
 std::unique_ptr<FlashAttentionBlock> FlashAttentionBlock::create_from_config(

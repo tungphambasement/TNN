@@ -88,26 +88,23 @@ concept HasLayerTypeName = requires {
 
 class LayerFactory {
 private:
-  static std::unordered_map<std::string,
-                            std::function<std::unique_ptr<SISOLayer>(const LayerConfig &)>>
+  static std::unordered_map<std::string, std::function<std::unique_ptr<Layer>(const LayerConfig &)>>
       creators_;
 
 public:
-  static void register_layer(
-      const std::string &type,
-      std::function<std::unique_ptr<SISOLayer>(const LayerConfig &)> creator) {
+  static void register_layer(const std::string &type,
+                             std::function<std::unique_ptr<Layer>(const LayerConfig &)> creator) {
     creators_[type] = creator;
   }
 
   template <HasLayerTypeName LayerType>
   static void register_layer_type() {
-    register_layer(LayerType::TYPE_NAME,
-                   [](const LayerConfig &config) -> std::unique_ptr<SISOLayer> {
-                     return LayerType::create_from_config(config);
-                   });
+    register_layer(LayerType::TYPE_NAME, [](const LayerConfig &config) -> std::unique_ptr<Layer> {
+      return LayerType::create_from_config(config);
+    });
   }
 
-  static std::unique_ptr<SISOLayer> create(const std::string &type, const LayerConfig &config) {
+  static std::unique_ptr<Layer> create(const std::string &type, const LayerConfig &config) {
     auto it = creators_.find(type);
     if (it != creators_.end()) {
       return it->second(config);
@@ -115,7 +112,7 @@ public:
     throw std::invalid_argument("Unknown layer type: " + type);
   }
 
-  static std::unique_ptr<SISOLayer> create(const LayerConfig &config) {
+  static std::unique_ptr<Layer> create(const LayerConfig &config) {
     return create(config.type, config);
   }
 
@@ -167,7 +164,7 @@ std::unique_ptr<LayerType> load_config(std::ifstream &file) {
   nlohmann::json j = nlohmann::json::parse(j_str);
   LayerConfig config = LayerConfig::from_json(j);
   LayerFactory::register_defaults();
-  std::unique_ptr<SISOLayer> base_layer = LayerFactory::create(config);
+  std::unique_ptr<Layer> base_layer = LayerFactory::create(config);
   LayerType *raw_ptr = dynamic_cast<LayerType *>(base_layer.release());
   if (!raw_ptr) {
     throw std::runtime_error("Failed to cast layer to requested type");
@@ -183,8 +180,7 @@ inline void load_params(std::ifstream &file, Layer &layer) {
   }
 }
 
-inline std::unordered_map<std::string,
-                          std::function<std::unique_ptr<SISOLayer>(const LayerConfig &)>>
+inline std::unordered_map<std::string, std::function<std::unique_ptr<Layer>(const LayerConfig &)>>
     LayerFactory::creators_;
 
 }  // namespace tnn

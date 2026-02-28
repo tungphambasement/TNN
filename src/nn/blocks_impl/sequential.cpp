@@ -18,7 +18,6 @@
 #include "nlohmann/json_fwd.hpp"
 #include "nn/block.hpp"
 #include "nn/layers.hpp"
-#include "nn/siso_layer.hpp"
 #include "type/type.hpp"
 
 namespace tnn {
@@ -36,10 +35,13 @@ Vec<size_t> Sequential::out_sizes(const std::vector<size_t> &shape, DType_t dtyp
   return buffer_size;
 }
 
-void Sequential::forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id) {
+void Sequential::forward(const Vec<ConstTensor> &inputs, const Vec<Tensor> &outputs, size_t mb_id) {
   if (layers_.empty()) {
     throw std::runtime_error("Cannot forward through empty sequential model");
   }
+  const ConstTensor &input = inputs[0];
+  const Tensor &output = outputs[0];
+
   input_shape_cache_[mb_id] = input->shape();
   ConstTensor current_input = input;
   Tensor current_output = nullptr;
@@ -61,6 +63,7 @@ void Sequential::forward_impl(const ConstTensor &input, const Tensor &output, si
       m_b = std::max(m_b, m[i] + m[i + 1]);
     }
     dptr buffer = allocator_->allocate(m_b);
+    std::cout << "Allocated sequential buffer of size: " << m_b << " bytes\n";
     int side = 0;
     DType_t dtype = input->data_type();
     for (size_t i = 0; i < layers_.size(); ++i) {
@@ -69,22 +72,23 @@ void Sequential::forward_impl(const ConstTensor &input, const Tensor &output, si
         dptr out_ptr = buffer.span(offset, m[i]);
         Vec<size_t> out_shape = layers_[i]->output_shape({current_input->shape()})[0];
         current_output = make_tensor(*allocator_, dtype, out_shape, std::move(out_ptr));
-        layers_[i]->forward({current_input}, {current_output}, mb_id);
-        side = 1 - side;
-        current_input = current_output;
-      } else {
-        layers_[i]->forward({current_input}, {output}, mb_id);
       }
+      layers_[i]->forward({current_input}, {current_output}, mb_id);
+      side = 1 - side;
+      current_input = current_output;
     }
   }
   this->device().getFlow(this->flow_handle_)->synchronize();
 }
 
-void Sequential::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
-                               size_t mb_id) {
+void Sequential::backward(const Vec<ConstTensor> &grad_outputs, const Vec<Tensor> &grad_inputs,
+                          size_t mb_id) {
   if (layers_.empty()) {
     throw std::runtime_error("Cannot backward through empty sequential model");
   }
+  const ConstTensor &grad_output = grad_outputs[0];
+  const Tensor &grad_input = grad_inputs[0];
+
   auto it_input_shape = input_shape_cache_.find(mb_id);
   if (it_input_shape == input_shape_cache_.end()) {
     throw std::runtime_error("No cached input shape found for micro-batch ID: " +
@@ -123,22 +127,22 @@ void Sequential::backward_impl(const ConstTensor &grad_output, const Tensor &gra
   this->device().getFlow(this->flow_handle_)->synchronize();
 }
 
-Sequential::Sequential(std::vector<std::unique_ptr<SISOLayer>> layers, const std::string &name)
+Sequential::Sequential(std::vector<std::unique_ptr<Layer>> layers, const std::string &name)
     : Block(name) {
   layers_ = std::move(layers);
 }
 
-std::vector<size_t> Sequential::compute_output_shape(const std::vector<size_t> &input_shape) const {
+Vec<Vec<size_t>> Sequential::output_shape(const Vec<Vec<size_t>> &input_shapes) const {
   if (layers_.empty()) {
-    return input_shape;
+    return input_shapes;
   }
 
-  std::vector<size_t> current_shape = input_shape;
+  Vec<Vec<size_t>> current_shapes = input_shapes;
   for (const auto &layer : layers_) {
-    current_shape = layer->output_shape({current_shape})[0];
+    current_shapes[0] = layer->output_shape({current_shapes[0]})[0];
   }
 
-  return current_shape;
+  return current_shapes;
 }
 
 void Sequential::print_summary(const std::vector<size_t> &input_shape) const {
@@ -178,7 +182,7 @@ void Sequential::print_summary(const std::vector<size_t> &input_shape) const {
   std::cout << std::string(100, '-') << "\n";
 }
 
-std::vector<SISOLayer *> Sequential::get_layers() { return this->layers(); }
+std::vector<Layer *> Sequential::get_layers() { return this->layers(); }
 
 LayerConfig Sequential::get_config() const {
   LayerConfig config;
@@ -194,7 +198,7 @@ LayerConfig Sequential::get_config() const {
 }
 
 std::unique_ptr<Sequential> Sequential::create_from_config(const LayerConfig &config) {
-  std::vector<std::unique_ptr<SISOLayer>> layers;
+  std::vector<std::unique_ptr<Layer>> layers;
   nlohmann::json layers_json = config.get<nlohmann::json>("layers", nlohmann::json::array());
   if (!layers_json.is_array()) {
     throw std::runtime_error("Sequential layer config 'layers' parameter must be an array");

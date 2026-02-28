@@ -13,11 +13,12 @@
 #include "nn/activations.hpp"
 #include "nn/layers.hpp"
 #include "ops/ops.hpp"
+#include "tensor/tensor.hpp"
 
 namespace tnn {
 
-ResidualBlock::ResidualBlock(std::vector<std::unique_ptr<SISOLayer>> main_path,
-                             std::vector<std::unique_ptr<SISOLayer>> shortcut_path,
+ResidualBlock::ResidualBlock(std::vector<std::unique_ptr<Layer>> main_path,
+                             std::vector<std::unique_ptr<Layer>> shortcut_path,
                              const std::string &final_activation, const std::string &name)
     : main_path_(std::move(main_path)),
       shortcut_path_(std::move(shortcut_path)),
@@ -34,7 +35,7 @@ ResidualBlock::ResidualBlock(std::vector<std::unique_ptr<SISOLayer>> main_path,
   }
 }
 
-static size_t compute_path_max_size(const std::vector<std::unique_ptr<SISOLayer>> &path,
+static size_t compute_path_max_size(const std::vector<std::unique_ptr<Layer>> &path,
                                     const std::vector<size_t> &input_shape, DType_t dtype) {
   size_t max_size = 0;
   std::vector<size_t> current_shape = input_shape;
@@ -47,7 +48,11 @@ static size_t compute_path_max_size(const std::vector<std::unique_ptr<SISOLayer>
   return max_size;
 }
 
-void ResidualBlock::forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id) {
+void ResidualBlock::forward(const Vec<ConstTensor> &inputs, const Vec<Tensor> &outputs,
+                            size_t mb_id) {
+  const ConstTensor &input = inputs[0];
+  const Tensor &output = outputs[0];
+
   input_shape_cache_[mb_id] = input->shape();
 
   ConstTensor main_output = input;  // main output = f exist ? input : f(input)
@@ -84,8 +89,10 @@ void ResidualBlock::forward_impl(const ConstTensor &input, const Tensor &output,
   }
 }
 
-void ResidualBlock::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
-                                  size_t mb_id) {
+void ResidualBlock::backward(const Vec<ConstTensor> &grad_outputs, const Vec<Tensor> &grad_inputs,
+                             size_t mb_id) {
+  const ConstTensor &grad_output = grad_outputs[0];
+  const Tensor &grad_input = grad_inputs[0];
   const Tensor &pre_act = this->get_mutable_tensor(mb_id, "pre_activation");
   if (final_activation_ && !pre_act) {
     throw std::runtime_error("No cached pre-activation output found for micro-batch ID: " +
@@ -133,13 +140,12 @@ void ResidualBlock::backward_impl(const ConstTensor &grad_output, const Tensor &
                     grad_input->data_ptr(), grad_input->size());
 }
 
-std::vector<size_t> ResidualBlock::compute_output_shape(
-    const std::vector<size_t> &input_shape) const {
-  std::vector<size_t> shape = input_shape;
+Vec<Vec<size_t>> ResidualBlock::output_shape(const Vec<Vec<size_t>> &input_shape) const {
+  std::vector<size_t> shape = input_shape[0];
   for (const auto &layer : main_path_) {
     shape = layer->output_shape({shape})[0];
   }
-  return shape;
+  return {shape};
 }
 
 LayerConfig ResidualBlock::get_config() const {
@@ -169,8 +175,8 @@ LayerConfig ResidualBlock::get_config() const {
 }
 
 std::unique_ptr<ResidualBlock> ResidualBlock::create_from_config(const LayerConfig &config) {
-  std::vector<std::unique_ptr<SISOLayer>> main_path;
-  std::vector<std::unique_ptr<SISOLayer>> shortcut_path;
+  std::vector<std::unique_ptr<Layer>> main_path;
+  std::vector<std::unique_ptr<Layer>> shortcut_path;
   nlohmann::json main_json = config.get<nlohmann::json>("main_path", nlohmann::json::array());
   LayerFactory::register_defaults();
   for (const auto &layer_json : main_json) {

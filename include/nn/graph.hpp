@@ -9,7 +9,6 @@
 #include "nn/io_node.hpp"
 #include "nn/layers.hpp"
 #include "nn/op_node.hpp"
-#include "nn/siso_layer.hpp"
 
 namespace tnn {
 
@@ -59,8 +58,8 @@ public:
 
   // temporary: get layers from op nodes
   // need to refactor later if we want to support more complex graph structures
-  std::vector<SISOLayer*> get_layers() {
-    std::vector<SISOLayer*> layers;
+  std::vector<Layer*> get_layers() {
+    std::vector<Layer*> layers;
     for (auto& op_pair : op_nodes_) {
       OpNode& node = op_pair.second;
       Sequential* seq = dynamic_cast<Sequential*>(node.layer());
@@ -68,10 +67,10 @@ public:
         auto seq_layers = seq->get_layers();
         layers.insert(layers.end(), seq_layers.begin(), seq_layers.end());
         continue;
+      } else {
+        Layer* layer = dynamic_cast<Layer*>(node.layer());
+        if (layer) layers.push_back(layer);
       }
-
-      SISOLayer* layer = dynamic_cast<SISOLayer*>(node.layer());
-      if (layer) layers.push_back(layer);
     }
     return layers;
   }
@@ -169,6 +168,7 @@ public:
     for (auto& param : params) {
       load_into(is, param);
     }
+    graph.set_name(config.name);
     return graph;
   }
 

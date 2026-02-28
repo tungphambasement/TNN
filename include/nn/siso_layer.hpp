@@ -3,7 +3,7 @@
 #include "nn/layer.hpp"
 
 namespace tnn {
-class SISOLayer : public Layer {
+class SISOLayer : virtual public Layer {
 public:
   SISOLayer() = default;
 

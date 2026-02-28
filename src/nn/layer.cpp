@@ -108,10 +108,12 @@ std::vector<Tensor> Layer::gradients() {
   return grads;
 }
 
-Tensor Layer::make_io_tensor(std::vector<size_t> shape) { return get_buffer(shape, io_dtype_); }
+Tensor Layer::make_io_tensor(std::vector<size_t> shape) {
+  return make_tensor(io_dtype_, shape, device());
+}
 
 Tensor Layer::make_compute_tensor(std::vector<size_t> shape) {
-  return get_buffer(shape, compute_dtype_);
+  return make_tensor(compute_dtype_, shape, device());
 }
 
 ConstTensor &Layer::get_cached_tensor(size_t mb_id, const std::string &key) {

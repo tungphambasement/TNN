@@ -1,10 +1,9 @@
 #pragma once
 
 #include "nn/layer.hpp"
-#include "nn/siso_layer.hpp"
 
 namespace tnn {
-class Block : public SISOLayer {
+class Block : virtual public Layer {
 public:
   Block(const std::string &name = "block") { this->name_ = name; }
 
@@ -68,6 +67,6 @@ protected:
     }
   }
 
-  virtual std::vector<SISOLayer *> layers() = 0;
+  virtual std::vector<Layer *> layers() = 0;
 };
 }  // namespace tnn

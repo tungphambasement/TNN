@@ -39,7 +39,10 @@ AttentionBlock::AttentionBlock(size_t embed_dim, size_t num_heads, bool is_causa
   out_proj_ = std::make_unique<DenseLayer>(embed_dim, embed_dim, true, name + "_out");
 }
 
-void AttentionBlock::forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id) {
+void AttentionBlock::forward(const Vec<ConstTensor> &inputs, const Vec<Tensor> &outputs,
+                             size_t mb_id) {
+  const ConstTensor &input = inputs[0];
+  const Tensor &output = outputs[0];
   const auto &input_shape = input->shape();
 
   size_t batch_size = input_shape[0];
@@ -67,8 +70,10 @@ void AttentionBlock::forward_impl(const ConstTensor &input, const Tensor &output
   out_proj_->forward({attn_out}, {output}, mb_id);
 }
 
-void AttentionBlock::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
-                                   size_t mb_id) {
+void AttentionBlock::backward(const Vec<ConstTensor> &grad_outputs, const Vec<Tensor> &grad_inputs,
+                              size_t mb_id) {
+  const ConstTensor &grad_output = grad_outputs[0];
+  const Tensor &grad_input = grad_inputs[0];
   ConstTensor &input = this->get_cached_tensor(mb_id, "input");
   if (!input) {
     throw std::runtime_error("No cached input found for micro-batch ID: " + std::to_string(mb_id));
@@ -114,9 +119,8 @@ void AttentionBlock::backward_impl(const ConstTensor &grad_output, const Tensor 
                     defaultFlowHandle);
 }
 
-std::vector<size_t> AttentionBlock::compute_output_shape(
-    const std::vector<size_t> &input_shape) const {
-  return input_shape;
+Vec<Vec<size_t>> AttentionBlock::output_shape(const Vec<Vec<size_t>> &input_shapes) const {
+  return input_shapes;
 }
 
 template <typename IO_T, typename Param_T, typename Compute_T>

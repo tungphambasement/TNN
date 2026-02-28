@@ -11,7 +11,6 @@
 #include "nn/graph.hpp"
 #include "nn/io_node.hpp"
 #include "nn/op_node.hpp"
-#include "nn/siso_layer.hpp"
 
 namespace tnn {
 
@@ -26,7 +25,7 @@ public:
 
   size_t num_nodes() const { return op_nodes_.size() + io_nodes_.size(); }
 
-  OpNode& add_layer(std::unique_ptr<SISOLayer> siso_layer) {
+  OpNode& add_layer(std::unique_ptr<Layer> siso_layer) {
     std::string uid = "op_" + std::to_string(node_count_++);
     OpNode new_node(uid, ctx_desc_, std::move(siso_layer));
     auto& node = add_op_node(std::move(new_node));
@@ -39,6 +38,8 @@ public:
     return input_node;
   }
 
+  // in reality, only the specific layer knows how many outputs it has, but for simplicity we assume
+  // it's always 1-1
   IONode& output(OpNode& op_node, IONode& input, std::string uid = "") {
     uid = uid.empty() ? "io_" + std::to_string(node_count_++) : uid;
     auto new_node = IONode(uid);

@@ -2,7 +2,6 @@
 
 #include "nn/layers.hpp"
 #include "partitioner/naive_partitioner.hpp"
-#include "partitioner/weighted_partitioner.hpp"
 #include "tensor/tensor_factory.hpp"
 #include "type/type.hpp"
 
@@ -48,7 +47,7 @@ TEST_F(PartitionerTest, NaivePipelineModelPartition) {
   NaivePipelinePartitioner partitioner(config);
 
   size_t num_partitions = 3;
-  vector<SISOLayer *> layer_ptrs;
+  vector<Layer *> layer_ptrs;
   for (const auto &layer : layers) {
     layer_ptrs.push_back(layer.get());
   }
@@ -90,7 +89,7 @@ TEST_F(PartitionerTest, NaiveDataModelPartition) {
   NaivePartitionerConfig config{{1, 1, 1}};
   NaiveDataPartitioner partitioner(config);
 
-  vector<SISOLayer *> layer_ptrs;
+  vector<Layer *> layer_ptrs;
   for (const auto &layer : layers) {
     layer_ptrs.push_back(layer.get());
   }
@@ -159,7 +158,7 @@ TEST_F(PartitionerTest, NaiveDataInputPartitionUneven) {
 //   WeightedPartitionerConfig config{{2, 1}, {64, 32, 32, 3}};
 //   WeightedPipelinePartitioner partitioner(config);
 
-//   vector<SISOLayer *> layer_ptrs;
+//   vector<Layer *> layer_ptrs;
 //   for (const auto &layer : layers) {
 //     layer_ptrs.push_back(layer.get());
 //   }
@@ -249,7 +248,7 @@ TEST_F(PartitionerTest, NaivePipelineEqualProportions) {
   NaivePartitionerConfig config{{1, 1}};
   NaivePipelinePartitioner partitioner(config);
 
-  vector<SISOLayer *> layer_ptrs;
+  vector<Layer *> layer_ptrs;
   for (const auto &layer : layers) {
     layer_ptrs.push_back(layer.get());
   }
@@ -271,7 +270,7 @@ TEST_F(PartitionerTest, NaivePipelineSinglePartition) {
   NaivePartitionerConfig config{{1}};
   NaivePipelinePartitioner partitioner(config);
 
-  vector<SISOLayer *> layer_ptrs;
+  vector<Layer *> layer_ptrs;
   for (const auto &layer : layers) {
     layer_ptrs.push_back(layer.get());
   }

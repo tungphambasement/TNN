@@ -9,7 +9,6 @@
 #include "nn/io_node.hpp"
 #include "nn/op_node.hpp"
 #include "nn/reduction_strategy.hpp"
-#include "nn/siso_layer.hpp"
 
 namespace tnn {
 class SeqReduction : public ReductionStrategy {
@@ -27,7 +26,7 @@ public:
         }
         return;
       }
-      Vec<std::unique_ptr<SISOLayer>> layers;
+      Vec<std::unique_ptr<Layer>> layers;
       IONode *pre = nullptr;   // io node before the sequence of op nodes
       IONode *next = nullptr;  // io node after the sequence of op nodes
       while (!node_stack.empty()) {
@@ -44,12 +43,7 @@ public:
           next = top_node.outputs()[0];
         }
         std::unique_ptr<Layer> layer = top_node.release_layer();
-        Layer *raw_layer = layer.release();
-        SISOLayer *siso_layer = dynamic_cast<SISOLayer *>(raw_layer);
-        if (siso_layer == nullptr) {
-          throw std::runtime_error("Layer is not a SISOLayer?");
-        }
-        layers.push_back(std::unique_ptr<SISOLayer>(siso_layer));
+        layers.push_back(std::move(layer));
       }
       std::reverse(layers.begin(), layers.end());
       std::unique_ptr<Sequential> sequential_layer =

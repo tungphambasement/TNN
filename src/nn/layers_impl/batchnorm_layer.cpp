@@ -149,22 +149,21 @@ void BatchNormLayer::cudnn_forward(const ConstTensor &input, const Tensor &outpu
     cached_input = input;
   }
 
-  Tensor &batch_invar = this->get_mutable_tensor(mb_id, "batch_invar");
-  Tensor &batch_mean = this->get_mutable_tensor(mb_id, "batch_mean");
-  Tensor &relu_mask = this->get_mutable_tensor(mb_id, "relu_mask");
-  if (batch_invar == nullptr) {
-    batch_invar = this->get_buffer({num_features_}, io_dtype_);
-  }
-  if (batch_mean == nullptr) {
-    batch_mean = this->get_buffer({num_features_}, io_dtype_);
-  }
-  if (use_relu_ && relu_mask == nullptr) {
-    relu_mask = this->get_buffer(input->shape(), DType_t::UINT8_T);
-  }
-
   size_t io_dtype_size = get_dtype_size(io_dtype_);
 
   if (this->is_training_) {
+    Tensor &batch_invar = this->get_mutable_tensor(mb_id, "batch_invar");
+    Tensor &batch_mean = this->get_mutable_tensor(mb_id, "batch_mean");
+    Tensor &relu_mask = this->get_mutable_tensor(mb_id, "relu_mask");
+    if (batch_invar == nullptr) {
+      batch_invar = this->make_io_tensor({num_features_});
+    }
+    if (batch_mean == nullptr) {
+      batch_mean = this->make_io_tensor({num_features_});
+    }
+    if (use_relu_ && relu_mask == nullptr) {
+      relu_mask = make_tensor(*allocator_, DType_t::UINT8_T, input->shape());
+    }
     size_t workspace_elems = (current_stats.fwd_workspace_size + io_dtype_size - 1) / io_dtype_size;
     Tensor workspace = this->get_buffer({workspace_elems}, io_dtype_);
     DISPATCH_ON_3_DTYPES_TO_METHOD(forward_training_task, fe_handle, current_stats, input, output,

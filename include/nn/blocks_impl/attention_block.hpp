@@ -45,12 +45,9 @@ private:
                                                    size_t batch_size, size_t seq_len,
                                                    flowHandle_t handle);
 
-  std::vector<SISOLayer *> layers() override {
+  std::vector<Layer *> layers() override {
     return {q_proj_.get(), k_proj_.get(), v_proj_.get(), out_proj_.get()};
   }
-  void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) override;
-  void backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
-                     size_t mb_id = 0) override;
 
 public:
   AttentionBlock(size_t embed_dim, size_t num_heads, bool is_causal = true,
@@ -60,8 +57,13 @@ public:
 
   std::string type() const override { return TYPE_NAME; }
 
+  void forward(const Vec<ConstTensor> &inputs, const Vec<Tensor> &outputs,
+               size_t mb_id = 0) override;
+  void backward(const Vec<ConstTensor> &grad_outputs, const Vec<Tensor> &grad_inputs,
+                size_t mb_id = 0) override;
+
   LayerConfig get_config() const override;
-  std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
+  Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shape) const override;
   static std::unique_ptr<AttentionBlock> create_from_config(const LayerConfig &config);
 };
 
