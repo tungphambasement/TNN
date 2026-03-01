@@ -140,8 +140,8 @@ void ResidualBlock::backward(const Vec<ConstTensor> &grad_outputs, const Vec<Ten
                     grad_input->data_ptr(), grad_input->size());
 }
 
-Vec<Vec<size_t>> ResidualBlock::output_shape(const Vec<Vec<size_t>> &input_shape) const {
-  std::vector<size_t> shape = input_shape[0];
+Vec<Vec<size_t>> ResidualBlock::output_shape(const Vec<Vec<size_t>> &input_shapes) const {
+  std::vector<size_t> shape = input_shapes[0];
   for (const auto &layer : main_path_) {
     shape = layer->output_shape({shape})[0];
   }
@@ -195,6 +195,55 @@ std::unique_ptr<ResidualBlock> ResidualBlock::create_from_config(const LayerConf
   std::string activation = config.get<std::string>("activation", "relu");
   return std::make_unique<ResidualBlock>(std::move(main_path), std::move(shortcut_path), activation,
                                          config.name);
+}
+
+size_t ResidualBlock::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  if (input_shapes.empty() || input_shapes[0].empty()) return 0;
+  const auto &in_shape = input_shapes[0];
+  size_t dtype_size = get_dtype_size(io_dtype_);
+
+  auto path_peak = [&](const std::vector<std::unique_ptr<Layer>> &path) -> size_t {
+    size_t peak = 0;
+    Vec<size_t> cur = in_shape;
+    size_t prev_bytes = 0;
+    for (const auto &layer : path) {
+      Vec<size_t> out = layer->output_shape({cur})[0];
+      size_t out_bytes =
+          std::accumulate(out.begin(), out.end(), dtype_size, std::multiplies<size_t>());
+      if (prev_bytes > 0) peak = std::max(peak, prev_bytes + out_bytes);
+      prev_bytes = out_bytes;
+      cur = out;
+    }
+    return peak;
+  };
+
+  auto path_last_bytes = [&](const std::vector<std::unique_ptr<Layer>> &path) -> size_t {
+    Vec<size_t> cur = in_shape;
+    for (const auto &layer : path) cur = layer->output_shape({cur})[0];
+    return std::accumulate(cur.begin(), cur.end(), dtype_size, std::multiplies<size_t>());
+  };
+
+  auto path_sub_ws = [&](const std::vector<std::unique_ptr<Layer>> &path) -> size_t {
+    size_t max_ws = 0;
+    Vec<size_t> cur = in_shape;
+    for (const auto &layer : path) {
+      max_ws = std::max(max_ws, layer->fwd_workspace({{cur}}));
+      cur = layer->output_shape({cur})[0];
+    }
+    return max_ws;
+  };
+
+  size_t main_peak_bytes = path_peak(main_path_);
+  size_t main_last = path_last_bytes(main_path_);
+  size_t shortcut_last = shortcut_path_.empty() ? main_last : path_last_bytes(shortcut_path_);
+  size_t pre_act_bytes = final_activation_ ? main_last : 0;
+
+  // Peak when adding main + shortcut (both final outputs are simultaneously alive)
+  size_t addition_peak = main_last + shortcut_last + pre_act_bytes;
+
+  size_t max_sub_ws = std::max(path_sub_ws(main_path_), path_sub_ws(shortcut_path_));
+
+  return std::max({main_peak_bytes, path_peak(shortcut_path_), addition_peak}) + max_sub_ws;
 }
 
 }  // namespace tnn

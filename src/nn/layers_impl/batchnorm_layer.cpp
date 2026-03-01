@@ -6,10 +6,13 @@
  */
 #include "nn/layers_impl/batchnorm_layer.hpp"
 
+#include <cstddef>
+
 #include "device/task.hpp"
 #include "nn/layer.hpp"
 #include "nn/layers_impl/common/batchnorm.hpp"
 #include "type/type.hpp"
+#include "utils/misc.hpp"
 #ifdef USE_CUDNN
 #include "device/cuda/cuda_context.hpp"
 #include "nn/layers_impl/cuda/cudnn_batchnorm_ops.hpp"
@@ -54,20 +57,6 @@ void BatchNormLayer::init_impl() {
   dummy_var_gradients_->fill(0.0f);
 }
 
-#ifdef USE_CUDNN
-size_t BatchNormLayer::get_shape_hash(size_t n, size_t c, size_t h, size_t w) const {
-  size_t seed = 0;
-  auto hash_combine = [&](size_t v) {
-    seed ^= std::hash<size_t>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-  };
-  hash_combine(n);
-  hash_combine(c);
-  hash_combine(h);
-  hash_combine(w);
-  return seed;
-}
-#endif
-
 /**
  * @brief Forward pass for BatchNormLayer
  * @param input Tensor in NHWC format
@@ -108,25 +97,15 @@ void BatchNormLayer::backward_impl(const ConstTensor &grad_output, const Tensor 
 }
 
 #ifdef USE_CUDNN
-void BatchNormLayer::cudnn_forward(const ConstTensor &input, const Tensor &output, size_t mb_id) {
-  const size_t batch_size = input->dimension(0);
-  const size_t height = input->dimension(1);
-  const size_t width = input->dimension(2);
-  const size_t channels = input->dimension(3);
-  if (num_features_ != channels) {
-    throw std::invalid_argument("BatchNorm: Input channels must match num_features." +
-                                std::to_string(num_features_) + ", but got " +
-                                std::to_string(channels));
-  }
-
-  output->ensure(input->shape());
-
-  size_t shape_key = get_shape_hash(batch_size, channels, height, width);
-
-  cuda::cudnn_batchnorm::feHandle_t *fe_handle = nullptr;
+void BatchNormLayer::build_graph(const Vec<size_t> &input_shape) const {
+  size_t batch_size = input_shape[0];
+  size_t height = input_shape[1];
+  size_t width = input_shape[2];
+  size_t channels = input_shape[3];
+  size_t shape_key = get_shape_hash(input_shape);
   if (fe_handle_cache.find(shape_key) == fe_handle_cache.end()) {
     BatchNormStats new_stats;
-    init_batchnorm_stats(new_stats, batch_size, channels, height, width, epsilon_, momentum_,
+    init_batchnorm_stats(new_stats, batch_size, height, width, channels, epsilon_, momentum_,
                          use_relu_);
     auto cuda_context = dynamic_cast<CUDAContext *>(this->device().context());
     if (!cuda_context) {
@@ -139,8 +118,21 @@ void BatchNormLayer::cudnn_forward(const ConstTensor &input, const Tensor &outpu
         shared_handle, io_data_type, compute_data_type, new_stats);
     stats_cache[shape_key] = new_stats;
   }
+}
 
-  fe_handle = fe_handle_cache.at(shape_key);
+void BatchNormLayer::cudnn_forward(const ConstTensor &input, const Tensor &output, size_t mb_id) {
+  const size_t channels = input->dimension(3);
+  if (num_features_ != channels) {
+    throw std::invalid_argument("BatchNorm: Input channels must match num_features." +
+                                std::to_string(num_features_) + ", but got " +
+                                std::to_string(channels));
+  }
+
+  output->ensure(input->shape());
+
+  size_t shape_key = get_shape_hash(input->shape());
+
+  cuda::cudnn_batchnorm::feHandle_t *fe_handle = fe_handle_cache.at(shape_key);
   BatchNormStats &current_stats = stats_cache.at(shape_key);
   round_workspace_size(current_stats);
 
@@ -197,12 +189,8 @@ void BatchNormLayer::cudnn_backward(const ConstTensor &grad_output, const Tensor
   }
 
   const auto &input_shape = input->shape();
-  const size_t batch_size = input_shape[0];
-  const size_t height = input_shape[1];
-  const size_t width = input_shape[2];
-  const size_t channels = input_shape[3];
 
-  size_t shape_key = get_shape_hash(batch_size, channels, height, width);
+  size_t shape_key = get_shape_hash(input_shape);
   cuda::cudnn_batchnorm::feHandle_t *fe_handle = fe_handle_cache.at(shape_key);
   BatchNormStats &current_stats = stats_cache.at(shape_key);
 
@@ -298,6 +286,36 @@ std::unique_ptr<Task> BatchNormLayer::backward_task(
   return nullptr;
 }
 #endif
+
+size_t BatchNormLayer::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  auto &shape = input_shapes[0];
+  if (shape.empty() || shape.size() < 4) return 0;
+#ifdef USE_CUDNN
+  if (!allocator_ || allocator_->device().device_type() != DeviceType::GPU) return 0;
+  size_t shape_key = get_shape_hash(shape);
+  build_graph(shape);
+  BatchNormStats stats = stats_cache.at(shape_key);
+  round_workspace_size(stats);
+  return stats.fwd_workspace_size;
+#else
+  return 0;
+#endif
+}
+
+size_t BatchNormLayer::bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  auto &shape = input_shapes[0];
+  if (shape.empty() || shape.size() < 4) return 0;
+#ifdef USE_CUDNN
+  if (!allocator_ || allocator_->device().device_type() != DeviceType::GPU) return 0;
+  size_t shape_key = get_shape_hash(shape);
+  build_graph(shape);
+  BatchNormStats stats = stats_cache.at(shape_key);
+  round_workspace_size(stats);
+  return stats.bwd_workspace_size;
+#else
+  return 0;
+#endif
+}
 
 LayerConfig BatchNormLayer::get_config() const {
   LayerConfig config;

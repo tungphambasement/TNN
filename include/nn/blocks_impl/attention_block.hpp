@@ -63,7 +63,8 @@ public:
                 size_t mb_id = 0) override;
 
   LayerConfig get_config() const override;
-  Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shape) const override;
+  Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shapes) const override;
+  size_t fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
   static std::unique_ptr<AttentionBlock> create_from_config(const LayerConfig &config);
 };
 

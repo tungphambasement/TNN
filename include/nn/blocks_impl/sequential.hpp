@@ -27,6 +27,9 @@ private:
 
   Vec<size_t> out_sizes(const std::vector<size_t> &shape, DType_t dtype);
 
+  Vec<size_t> fwd_workspace_sizes(const std::vector<size_t> &shape);
+  Vec<size_t> bwd_workspace_sizes(const std::vector<size_t> &shape);
+
 protected:
   std::vector<Layer *> layers() override {
     std::vector<Layer *> layers;
@@ -48,7 +51,8 @@ public:
   void backward(const Vec<ConstTensor> &grad_outputs, const Vec<Tensor> &grad_inputs,
                 size_t mb_id) override;
 
-  Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shape) const override;
+  Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shapes) const override;
+  size_t fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
   void print_summary(const std::vector<size_t> &input_shape) const;
   std::vector<Layer *> get_layers();
   LayerConfig get_config() const override;

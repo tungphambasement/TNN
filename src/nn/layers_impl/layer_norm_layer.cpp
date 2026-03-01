@@ -12,6 +12,7 @@
 #include "device/task.hpp"
 #include "nn/layers_impl/common/layer_norm.hpp"
 #include "nn/layers_impl/cpu/layer_norm_ops.hpp"
+#include "utils/misc.hpp"
 #ifdef USE_CUDA
 #include "nn/layers_impl/cuda/layer_norm_ops.hpp"
 #endif
@@ -48,16 +49,6 @@ void LayerNormLayer::init_impl() {
 
   gamma_gradients_->fill(0.0f);
   beta_gradients_->fill(0.0f);
-}
-
-size_t LayerNormLayer::get_shape_hash(size_t n, size_t c) const {
-  size_t seed = 0;
-  auto hash_combine = [&](size_t v) {
-    seed ^= std::hash<size_t>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-  };
-  hash_combine(n);
-  hash_combine(c);
-  return seed;
 }
 
 template <typename IO_T, typename Param_T, typename Compute_T>
@@ -138,6 +129,32 @@ std::unique_ptr<Task> LayerNormLayer::layer_norm_backward(
 }
 
 #ifdef USE_CUDNN
+void LayerNormLayer::build_graph(const Vec<size_t> &input_shape) const {
+  size_t batch_size = 1;
+  for (size_t i = 0; i < input_shape.size() - 1; ++i) {
+    batch_size *= input_shape[i];
+  }
+
+  size_t channels = input_shape.back();
+  size_t shape_key = get_shape_hash({batch_size, channels});
+
+  if (fe_handle_cache.find(shape_key) == fe_handle_cache.end()) {
+    LayerNormStats new_stats;
+    init_layer_norm_stats(new_stats, batch_size, channels, affine_, epsilon_);
+
+    auto cuda_context = dynamic_cast<CUDAContext *>(this->device().context());
+    if (!cuda_context) {
+      throw std::runtime_error("LayerNormLayer requires CUDAContext for cuDNN operations");
+    }
+    cudnnHandle_t shared_handle = cuda_context->getCudnnHandle();
+    auto io_data_type = cuda::cudnn::to_cudnn_datatype(io_dtype_);
+    auto compute_type = cuda::cudnn::to_cudnn_datatype(compute_dtype_);
+    fe_handle_cache[shape_key] = cuda::cudnn_layer_norm::initialize_fe_handle(
+        shared_handle, io_data_type, compute_type, new_stats);
+    stats_cache[shape_key] = new_stats;
+  }
+}
+
 template <typename IO_T, typename Param_T, typename Compute_T>
 std::unique_ptr<Task> LayerNormLayer::cudnn_layer_norm_forward(
     cuda::cudnn_layer_norm::feHandle_t *fe_handle, LayerNormStats &stats, const ConstTensor &input,
@@ -187,35 +204,20 @@ void LayerNormLayer::cudnn_forward(const ConstTensor &input, const Tensor &outpu
     batch_size *= shape[i];
   }
 
+  build_graph(shape);
+
   output->ensure(shape);
 
-  size_t shape_key = get_shape_hash(batch_size, channels);
+  size_t shape_key = get_shape_hash({batch_size, channels});
 
   cuda::cudnn_layer_norm::feHandle_t *fe_handle = nullptr;
   size_t io_dtype_size = get_dtype_size(io_dtype_);
 
-  if (fe_handle_cache.find(shape_key) == fe_handle_cache.end()) {
-    LayerNormStats new_stats;
-    init_layer_norm_stats(new_stats, batch_size, channels, affine_, epsilon_);
-
-    auto cuda_context = dynamic_cast<CUDAContext *>(this->device().context());
-    if (!cuda_context) {
-      throw std::runtime_error("LayerNormLayer requires CUDAContext for cuDNN operations");
-    }
-    cudnnHandle_t shared_handle = cuda_context->getCudnnHandle();
-    auto io_data_type = cuda::cudnn::to_cudnn_datatype(io_dtype_);
-    auto compute_type = cuda::cudnn::to_cudnn_datatype(compute_dtype_);
-    fe_handle_cache[shape_key] = cuda::cudnn_layer_norm::initialize_fe_handle(
-        shared_handle, io_data_type, compute_type, new_stats);
-    stats_cache[shape_key] = new_stats;
-  }
-
   fe_handle = fe_handle_cache.at(shape_key);
   LayerNormStats &current_stats = stats_cache.at(shape_key);
 
-  size_t max_workspace_size =
-      std::max(current_stats.fwd_workspace_size, current_stats.bwd_workspace_size);
-  size_t workspace_elements = (max_workspace_size + io_dtype_size - 1) / io_dtype_size;
+  size_t workspace_size = current_stats.fwd_workspace_size;
+  size_t workspace_elements = (workspace_size + io_dtype_size - 1) / io_dtype_size;
   Tensor cudnn_workspace = this->get_buffer({workspace_elements});
 
   // Cache mean and inv_variance for backward pass (like batch norm)
@@ -255,14 +257,13 @@ void LayerNormLayer::cudnn_backward(const ConstTensor &grad_output, const Tensor
     batch_size *= shape[i];
   }
 
-  size_t shape_key = get_shape_hash(batch_size, channels);
+  size_t shape_key = get_shape_hash({batch_size, channels});
   cuda::cudnn_layer_norm::feHandle_t *fe_handle = fe_handle_cache.at(shape_key);
   LayerNormStats &current_stats = stats_cache.at(shape_key);
 
   size_t io_dtype_size = get_dtype_size(io_dtype_);
-  size_t max_workspace_size =
-      std::max(current_stats.fwd_workspace_size, current_stats.bwd_workspace_size);
-  size_t workspace_elements = (max_workspace_size + io_dtype_size - 1) / io_dtype_size;
+  size_t workspace_size = current_stats.bwd_workspace_size;
+  size_t workspace_elements = (workspace_size + io_dtype_size - 1) / io_dtype_size;
   Tensor cudnn_workspace = this->get_buffer({workspace_elements});
 
   // Retrieve cached mean and inv_variance from forward pass (like batch norm)
@@ -344,6 +345,40 @@ void LayerNormLayer::backward_impl(const ConstTensor &grad_output, const Tensor 
   {
     def_backward(grad_output, grad_input, mb_id);
   }
+}
+
+size_t LayerNormLayer::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  auto &shape = input_shapes[0];
+  if (shape.empty() || shape.size() < 2) return 0;
+#ifdef USE_CUDNN
+  if (!allocator_ || allocator_->device().device_type() != DeviceType::GPU) return 0;
+  build_graph(shape);
+  size_t channels = shape.back();
+  size_t batch_size = 1;
+  for (size_t i = 0; i < shape.size() - 1; ++i) batch_size *= shape[i];
+  size_t shape_key = get_shape_hash({batch_size, channels});
+  const LayerNormStats &stats = stats_cache.at(shape_key);
+  return stats.fwd_workspace_size;
+#else
+  return 0;
+#endif
+}
+
+size_t LayerNormLayer::bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  auto &shape = input_shapes[0];
+  if (shape.empty() || shape.size() < 2) return 0;
+#ifdef USE_CUDNN
+  if (!allocator_ || allocator_->device().device_type() != DeviceType::GPU) return 0;
+  build_graph(shape);
+  size_t channels = shape.back();
+  size_t batch_size = 1;
+  for (size_t i = 0; i < shape.size() - 1; ++i) batch_size *= shape[i];
+  size_t shape_key = get_shape_hash({batch_size, channels});
+  const LayerNormStats &stats = stats_cache.at(shape_key);
+  return stats.bwd_workspace_size;
+#else
+  return 0;
+#endif
 }
 
 LayerConfig LayerNormLayer::get_config() const {

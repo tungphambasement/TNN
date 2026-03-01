@@ -55,8 +55,9 @@ public:
   Layer &set_training(bool training);
   bool is_training() const;
 
-  virtual Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shape) const = 0;
-  virtual size_t workspace_bytes(const Vec<Vec<size_t>> &input_shape) const { return 0; }
+  virtual Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shapes) const = 0;
+  virtual size_t fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const { return 0; }
+  virtual size_t bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const { return 0; }
   std::string name() const { return name_; }
   void save_state(std::ofstream &file);
   virtual std::vector<ParamDescriptor> param_descriptors() { return {}; }

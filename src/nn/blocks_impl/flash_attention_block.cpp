@@ -11,6 +11,7 @@
 #include "device/task.hpp"
 #include "nn/blocks_impl/common/flash_attention.hpp"
 #include "nn/layer.hpp"
+#include "utils/misc.hpp"
 #ifdef USE_CUDA
 #include "nn/blocks_impl/cuda/permute_heads.hpp"
 #endif
@@ -53,16 +54,6 @@ FlashAttentionBlock::~FlashAttentionBlock() {
   }
   fe_handle_cache.clear();
 #endif
-}
-
-size_t FlashAttentionBlock::get_shape_hash(size_t b, size_t h, size_t s, size_t d) const {
-  size_t seed = 0;
-  auto hash_combine = [&](size_t v) { seed ^= v + 0x9e3779b9 + (seed << 6) + (seed >> 2); };
-  hash_combine(b);
-  hash_combine(h);
-  hash_combine(s);
-  hash_combine(d);
-  return seed;
 }
 
 void FlashAttentionBlock::forward(const Vec<ConstTensor> &inputs, const Vec<Tensor> &outputs,
@@ -122,7 +113,7 @@ void FlashAttentionBlock::cudnn_forward(const ConstTensor &input, const Tensor &
   size_t batch_size = input_shape[0];
   size_t seq_len = input_shape[1];
 
-  size_t shape_key = get_shape_hash(batch_size, num_heads_, seq_len, head_dim_);
+  size_t shape_key = get_shape_hash({batch_size, num_heads_, seq_len, head_dim_});
 
   if (stats_cache.find(shape_key) == stats_cache.end()) {
     AttentionStats stats;
@@ -208,7 +199,7 @@ void FlashAttentionBlock::cudnn_backward(const ConstTensor &grad_output, const T
   size_t batch_size = grad_shape[0];
   size_t seq_len = grad_shape[1];
 
-  size_t shape_key = get_shape_hash(batch_size, num_heads_, seq_len, head_dim_);
+  size_t shape_key = get_shape_hash({batch_size, num_heads_, seq_len, head_dim_});
 
   auto *fe_handle = fe_handle_cache[shape_key];
   auto &stats = stats_cache[shape_key];
@@ -335,6 +326,108 @@ LayerConfig FlashAttentionBlock::get_config() const {
 
 Vec<Vec<size_t>> FlashAttentionBlock::output_shape(const Vec<Vec<size_t>> &input_shapes) const {
   return input_shapes;
+}
+
+size_t FlashAttentionBlock::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  const auto &shape = input_shapes[0];
+  size_t batch_size = shape[0], seq_len = shape[1];
+  size_t dtype_size = get_dtype_size(io_dtype_);
+  size_t fp16_size = get_dtype_size(DType_t::FP16);
+
+  // q, k, v projected outputs: 3 * [B, L, E]
+  size_t qkv_bytes = 3 * batch_size * seq_len * embed_dim_ * dtype_size;
+
+  // q_heads, k_heads, v_heads in FP16: 3 * [B, H, L, D]
+  size_t qkv_heads_bytes = 3 * batch_size * num_heads_ * seq_len * head_dim_ * fp16_size;
+
+  // attn_heads in FP16: [B, H, L, D]
+  size_t attn_heads_bytes = batch_size * num_heads_ * seq_len * head_dim_ * fp16_size;
+
+  // cuDNN flash attention workspace
+  size_t cudnn_ws_bytes = 0;
+#ifdef USE_CUDNN
+  if (allocator_ && allocator_->device().device_type() == DeviceType::GPU) {
+    size_t shape_key = get_shape_hash({batch_size, num_heads_, seq_len, head_dim_});
+    if (stats_cache.find(shape_key) == stats_cache.end()) {
+      AttentionStats stats;
+      float attn_scale = static_cast<float>(1.0 / std::sqrt(static_cast<double>(head_dim_)));
+      init_attention_stats(stats, batch_size, num_heads_, seq_len, head_dim_, attn_scale,
+                           is_causal_);
+      auto *cuda_context = dynamic_cast<CUDAContext *>(this->device().context());
+      if (cuda_context) {
+        cudnnHandle_t cudnn_handle = cuda_context->getCudnnHandle();
+        cudnnDataType_t io_dtype = cuda::cudnn::to_cudnn_datatype(DType_t::FP16);
+        cudnnDataType_t compute_dtype = cuda::cudnn::to_cudnn_datatype(DType_t::FP32);
+        fe_handle_cache[shape_key] = cuda::cudnn_flash_attention::initialize_fe_handle(
+            cudnn_handle, io_dtype, compute_dtype, stats);
+        stats_cache[shape_key] = stats;
+      }
+    }
+    if (stats_cache.count(shape_key)) {
+      cudnn_ws_bytes = stats_cache.at(shape_key).fwd_workspace_size;
+    }
+  }
+#endif
+
+  // Dense projection sub-layer workspace
+  size_t proj_ws = 0;
+  if (q_proj_) {
+    proj_ws = q_proj_->fwd_workspace({{batch_size, seq_len, embed_dim_}});
+  }
+
+  return qkv_bytes + qkv_heads_bytes + attn_heads_bytes + cudnn_ws_bytes + proj_ws;
+}
+
+size_t FlashAttentionBlock::bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  const auto &shape = input_shapes[0];
+  size_t batch_size = shape[0], seq_len = shape[1];
+  size_t dtype_size = get_dtype_size(io_dtype_);
+  size_t fp16_size = get_dtype_size(DType_t::FP16);
+
+  // q, k, v projected outputs + grads: 6 * [B, L, E]
+  size_t qkv_bytes = 6 * batch_size * seq_len * embed_dim_ * dtype_size;
+
+  // q_heads, k_heads, v_heads + grad heads in FP16: 6 * [B, H, L, D]
+  size_t qkv_heads_bytes = 6 * batch_size * num_heads_ * seq_len * head_dim_ * fp16_size;
+
+  // attn_heads + grad_attn_heads in FP16: 2 * [B, H, L, D]
+  size_t attn_heads_bytes = 2 * batch_size * num_heads_ * seq_len * head_dim_ * fp16_size;
+
+  // cuDNN flash attention backward workspace
+  size_t cudnn_ws_bytes = 0;
+
+#ifdef USE_CUDNN
+  if (allocator_ && allocator_->device().device_type() == DeviceType::GPU) {
+    size_t shape_key = get_shape_hash({batch_size, num_heads_, seq_len, head_dim_});
+    if (stats_cache.find(shape_key) == stats_cache.end()) {
+      AttentionStats stats;
+      float attn_scale = static_cast<float>(1.0 / std::sqrt(static_cast<double>(head_dim_)));
+      init_attention_stats(stats, batch_size, num_heads_, seq_len, head_dim_, attn_scale,
+                           is_causal_);
+      auto *cuda_context = dynamic_cast<CUDAContext *>(this->device().context());
+      if (cuda_context) {
+        cudnnHandle_t cudnn_handle = cuda_context->getCudnnHandle();
+        cudnnDataType_t io_dtype = cuda::cudnn::to_cudnn_datatype(DType_t::FP16);
+        cudnnDataType_t compute_dtype = cuda::cudnn::to_cudnn_datatype(DType_t::FP32);
+        fe_handle_cache[shape_key] = cuda::cudnn_flash_attention::initialize_fe_handle(
+            cudnn_handle, io_dtype, compute_dtype, stats);
+        stats_cache[shape_key] = stats;
+      }
+    }
+    if (stats_cache.count(shape_key)) {
+      const AttentionStats &stats = stats_cache.at(shape_key);
+      cudnn_ws_bytes = stats.bwd_workspace_size;
+    }
+  }
+#endif
+
+  // Dense projection sub-layer workspace
+  size_t proj_ws = 0;
+  if (q_proj_) {
+    proj_ws = q_proj_->bwd_workspace({{batch_size, seq_len, embed_dim_}});
+  }
+
+  return qkv_bytes + qkv_heads_bytes + attn_heads_bytes + cudnn_ws_bytes + proj_ws;
 }
 
 std::unique_ptr<FlashAttentionBlock> FlashAttentionBlock::create_from_config(

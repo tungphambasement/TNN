@@ -46,6 +46,8 @@ private:
                                             flowHandle_t handle = defaultFlowHandle) const;
 
 #ifdef USE_CUDNN
+  void build_graph(const Vec<size_t> &input_shape) const;
+
   template <typename IO_T, typename Param_T, typename Compute_T>
   std::unique_ptr<Task> cudnn_layer_norm_forward(cuda::cudnn_layer_norm::feHandle_t *fe_handle,
                                                  LayerNormStats &stats, const ConstTensor &input,
@@ -66,10 +68,9 @@ private:
   void cudnn_forward(const ConstTensor &input, const Tensor &output, size_t mb_id);
   void cudnn_backward(const ConstTensor &grad_output, const Tensor &grad_input, size_t mb_id);
 
-  std::unordered_map<size_t, cuda::cudnn_layer_norm::feHandle_t *> fe_handle_cache;
+  mutable std::unordered_map<size_t, cuda::cudnn_layer_norm::feHandle_t *> fe_handle_cache;
 #endif
-  std::unordered_map<size_t, LayerNormStats> stats_cache;
-  size_t get_shape_hash(size_t n, size_t c) const;
+  mutable std::unordered_map<size_t, LayerNormStats> stats_cache;
 
   void def_forward(const ConstTensor &input, const Tensor &output, size_t mb_id = 0);
   void def_backward(const ConstTensor &grad_output, const Tensor &grad_input, size_t mb_id = 0);
@@ -113,7 +114,8 @@ public:
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override {
     return input_shape;
   }
-
+  size_t fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
+  size_t bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
   static std::unique_ptr<LayerNormLayer> create_from_config(const LayerConfig &config);
 };
 

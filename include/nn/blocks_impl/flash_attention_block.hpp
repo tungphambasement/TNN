@@ -53,10 +53,9 @@ private:
   void cudnn_forward(const ConstTensor &input, const Tensor &output, size_t mb_id);
   void cudnn_backward(const ConstTensor &grad_output, const Tensor &grad_input, size_t mb_id);
 
-  std::unordered_map<size_t, cuda::cudnn_flash_attention::feHandle_t *> fe_handle_cache;
+  mutable std::unordered_map<size_t, cuda::cudnn_flash_attention::feHandle_t *> fe_handle_cache;
 #endif
-  std::unordered_map<size_t, AttentionStats> stats_cache;
-  size_t get_shape_hash(size_t b, size_t h, size_t s, size_t d) const;
+  mutable std::unordered_map<size_t, AttentionStats> stats_cache;
 
   std::vector<Layer *> layers() override {
     return {q_proj_.get(), k_proj_.get(), v_proj_.get(), out_proj_.get()};
@@ -79,6 +78,8 @@ public:
   std::string type() const override { return TYPE_NAME; }
   LayerConfig get_config() const override;
   Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shapes) const override;
+  size_t fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
+  size_t bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
   static std::unique_ptr<FlashAttentionBlock> create_from_config(const LayerConfig &config);
 };
 

@@ -35,6 +35,28 @@ Vec<size_t> Sequential::out_sizes(const std::vector<size_t> &shape, DType_t dtyp
   return buffer_size;
 }
 
+Vec<size_t> Sequential::fwd_workspace_sizes(const std::vector<size_t> &shape) {
+  Vec<size_t> workspace_sizes;
+  Vec<size_t> current_shape = shape;
+  for (size_t i = 0; i < layers_.size(); ++i) {
+    current_shape = layers_[i]->output_shape({current_shape})[0];
+    size_t ws = layers_[i]->fwd_workspace({{current_shape}});
+    workspace_sizes.push_back(ws);
+  }
+  return workspace_sizes;
+}
+
+Vec<size_t> Sequential::bwd_workspace_sizes(const std::vector<size_t> &shape) {
+  Vec<size_t> workspace_sizes;
+  Vec<size_t> current_shape = shape;
+  for (size_t i = 0; i < layers_.size(); ++i) {
+    current_shape = layers_[i]->output_shape({current_shape})[0];
+    size_t ws = layers_[i]->bwd_workspace({{current_shape}});
+    workspace_sizes.push_back(ws);
+  }
+  return workspace_sizes;
+}
+
 void Sequential::forward(const Vec<ConstTensor> &inputs, const Vec<Tensor> &outputs, size_t mb_id) {
   if (layers_.empty()) {
     throw std::runtime_error("Cannot forward through empty sequential model");
@@ -63,7 +85,6 @@ void Sequential::forward(const Vec<ConstTensor> &inputs, const Vec<Tensor> &outp
       m_b = std::max(m_b, m[i] + m[i + 1]);
     }
     dptr buffer = allocator_->allocate(m_b);
-    std::cout << "Allocated sequential buffer of size: " << m_b << " bytes\n";
     int side = 0;
     DType_t dtype = input->data_type();
     for (size_t i = 0; i < layers_.size(); ++i) {
@@ -72,6 +93,8 @@ void Sequential::forward(const Vec<ConstTensor> &inputs, const Vec<Tensor> &outp
         dptr out_ptr = buffer.span(offset, m[i]);
         Vec<size_t> out_shape = layers_[i]->output_shape({current_input->shape()})[0];
         current_output = make_tensor(*allocator_, dtype, out_shape, std::move(out_ptr));
+      } else {
+        current_output = output;
       }
       layers_[i]->forward({current_input}, {current_output}, mb_id);
       side = 1 - side;
@@ -143,6 +166,35 @@ Vec<Vec<size_t>> Sequential::output_shape(const Vec<Vec<size_t>> &input_shapes) 
   }
 
   return current_shapes;
+}
+
+size_t Sequential::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  if (layers_.empty()) return 0;
+  const auto &input_shape = input_shapes[0];
+  size_t dtype_size = get_dtype_size(io_dtype_);
+
+  // Compute each layer's output size (in bytes) and its own workspace requirement
+  Vec<size_t> out_bytes;
+  Vec<size_t> sub_ws;
+  Vec<size_t> cur = input_shape;
+  for (const auto &layer : layers_) {
+    Vec<size_t> out = layer->output_shape({cur})[0];
+    size_t bytes = std::accumulate(out.begin(), out.end(), dtype_size, std::multiplies<size_t>());
+    out_bytes.push_back(bytes);
+    sub_ws.push_back(layer->fwd_workspace({{cur}}));
+    cur = out;
+  }
+
+  // Peak intermediate buffer: max consecutive pair of output sizes (layers 0..n-2)
+  // The last layer writes to the pre-provided output tensor, so only n-1 intermediate buffers
+  size_t max_pair = 0;
+  for (size_t i = 0; i + 1 < out_bytes.size(); ++i) {
+    max_pair = std::max(max_pair, out_bytes[i] + out_bytes[i + 1]);
+  }
+
+  size_t max_sub = 0;
+  for (const auto &ws : sub_ws) max_sub = std::max(max_sub, ws);
+  return max_pair + max_sub;
 }
 
 void Sequential::print_summary(const std::vector<size_t> &input_shape) const {

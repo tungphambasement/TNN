@@ -73,11 +73,11 @@ void SISOLayer::backward(const std::vector<ConstTensor> &gradients,
   clear_cache(mb_id);
 }
 
-Vec<Vec<size_t>> SISOLayer::output_shape(const Vec<Vec<size_t>> &input_shape) const {
-  if (input_shape.size() != 1) {
+Vec<Vec<size_t>> SISOLayer::output_shape(const Vec<Vec<size_t>> &input_shapes) const {
+  if (input_shapes.size() != 1) {
     throw std::runtime_error("Only single input supported in output_shape for SISO layers.");
   }
-  return {compute_output_shape(input_shape[0])};
+  return {compute_output_shape(input_shapes[0])};
 }
 
 }  // namespace tnn

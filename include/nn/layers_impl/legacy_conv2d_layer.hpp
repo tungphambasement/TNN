@@ -48,10 +48,12 @@ private:
   std::unordered_map<size_t, std::vector<size_t>> micro_batch_input_shapes_;
   std::unordered_map<size_t, Tensor> micro_batch_col_buffers_;
 
-  ConvolutionStats stats_;
 #ifdef USE_CUDNN
-  cuda::cudnn_conv2d::ConvolutionHandle *convolution_handle_ = nullptr;
-  size_t max_workspace_ = 0;
+  void build_graph(const Vec<size_t> &input_shape) const;
+
+  mutable std::unordered_map<size_t, cuda::cudnn_conv2d::ConvolutionHandle *>
+      convolution_handle_cache;
+  mutable std::unordered_map<size_t, ConvolutionStats> stats_cache;
 #endif
 
   template <typename IO_T, typename Param_T, typename Compute_T>
@@ -157,6 +159,8 @@ public:
   LayerConfig get_config() const override;
 
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
+  size_t fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
+  size_t bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
 
   static std::unique_ptr<LegacyConv2DLayer> create_from_config(const LayerConfig &config);
 };

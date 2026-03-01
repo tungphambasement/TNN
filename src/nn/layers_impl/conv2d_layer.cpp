@@ -9,6 +9,7 @@
 #include "device/device_type.hpp"
 #include "device/task.hpp"
 #include "nn/layers_impl/cpu/conv2d_nhwc_ops.hpp"
+#include "utils/misc.hpp"
 #ifdef USE_CUDNN
 #include <type_traits>
 
@@ -210,18 +211,6 @@ void Conv2DLayer::def_backward(const ConstTensor &grad_output, const Tensor &gra
 }
 
 #ifdef USE_CUDNN
-size_t Conv2DLayer::get_shape_hash(size_t n, size_t c, size_t h, size_t w) const {
-  size_t seed = 0;
-  auto hash_combine = [&](size_t v) {
-    seed ^= std::hash<size_t>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-  };
-  hash_combine(n);
-  hash_combine(c);
-  hash_combine(h);
-  hash_combine(w);
-  return seed;
-}
-
 template <typename IO_T, typename Param_T, typename Compute_T>
 std::unique_ptr<Task> Conv2DLayer::conv2d_forward_task(
     cuda::cudnn_conv2d::feHandle_t *fe_handle, ConvolutionStats &stats, const ConstTensor &input,
@@ -276,6 +265,25 @@ std::unique_ptr<Task> Conv2DLayer::conv2d_backward_weights_and_bias_task(
                           use_bias_ ? bias_gradients->data() : nullptr, workspace->data());
 }
 
+void Conv2DLayer::build_graph(const Vec<size_t> &input_shape) const {
+  // NHWC format: [N, H, W, C]
+  size_t shape_key = get_shape_hash(input_shape);
+  if (fe_handle_cache.find(shape_key) == fe_handle_cache.end()) {
+    ConvolutionStats new_stats;
+    init_convolution_stats(new_stats, input_shape[0], input_shape[3], input_shape[1],
+                           input_shape[2], out_channels_, kernel_h_, kernel_w_, stride_h_,
+                           stride_w_, pad_h_, pad_w_, use_bias_);
+    auto cuda_context = dynamic_cast<CUDAContext *>(this->device().context());
+    if (!cuda_context) return;
+    cudnnHandle_t shared_handle = cuda_context->getCudnnHandle();
+    auto io_data_type = cuda::cudnn::to_cudnn_datatype(io_dtype_);
+    auto compute_type = cuda::cudnn::to_cudnn_datatype(compute_dtype_);
+    fe_handle_cache[shape_key] = cuda::cudnn_conv2d::initialize_fe_handle(
+        shared_handle, io_data_type, compute_type, new_stats);
+    stats_cache[shape_key] = new_stats;
+  }
+}
+
 void Conv2DLayer::cudnn_forward(const ConstTensor &input, const Tensor &output, size_t mb_id) {
   const size_t batch_size = input->dimension(0);
   const size_t input_h = input->dimension(1);
@@ -286,27 +294,12 @@ void Conv2DLayer::cudnn_forward(const ConstTensor &input, const Tensor &output, 
 
   output->ensure({batch_size, output_h, output_w, out_channels_});
 
-  size_t shape_key = get_shape_hash(batch_size, in_channels_, input_h, input_w);
+  size_t shape_key = get_shape_hash(input->shape());
 
   cuda::cudnn_conv2d::feHandle_t *fe_handle = nullptr;
   size_t io_dtype_size = get_dtype_size(io_dtype_);
 
-  if (fe_handle_cache.find(shape_key) == fe_handle_cache.end()) {
-    ConvolutionStats new_stats;
-    init_convolution_stats(new_stats, batch_size, in_channels_, input_h, input_w, out_channels_,
-                           kernel_h_, kernel_w_, stride_h_, stride_w_, pad_h_, pad_w_, use_bias_);
-
-    auto cuda_context = dynamic_cast<CUDAContext *>(this->device().context());
-    if (!cuda_context) {
-      throw std::runtime_error("Conv2DLayer requires CUDAContext for cuDNN operations");
-    }
-    cudnnHandle_t shared_handle = cuda_context->getCudnnHandle();
-    auto io_data_type = cuda::cudnn::to_cudnn_datatype(io_dtype_);
-    auto compute_type = cuda::cudnn::to_cudnn_datatype(compute_dtype_);
-    fe_handle_cache[shape_key] = cuda::cudnn_conv2d::initialize_fe_handle(
-        shared_handle, io_data_type, compute_type, new_stats);
-    stats_cache[shape_key] = new_stats;
-  }
+  build_graph(input->shape());
 
   fe_handle = fe_handle_cache.at(shape_key);
   ConvolutionStats &current_stats = stats_cache.at(shape_key);
@@ -344,7 +337,8 @@ void Conv2DLayer::cudnn_backward(const ConstTensor &grad_output, const Tensor &g
 
   grad_input->ensure(input_shape);
 
-  size_t shape_key = get_shape_hash(batch_size, in_channels_, input_h, input_w);
+  size_t shape_key = get_shape_hash(input_shape);
+
   cuda::cudnn_conv2d::feHandle_t *fe_handle = fe_handle_cache.at(shape_key);
   ConvolutionStats &current_stats = stats_cache.at(shape_key);
 
@@ -408,6 +402,30 @@ std::unique_ptr<Conv2DLayer> Conv2DLayer::create_from_config(const LayerConfig &
   bool use_bias = config.get<bool>("use_bias", true);
   return std::make_unique<Conv2DLayer>(in_channels, out_channels, kernel_h, kernel_w, stride_h,
                                        stride_w, pad_h, pad_w, use_bias, config.name);
+}
+
+size_t Conv2DLayer::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  auto &shape = input_shapes[0];
+#ifdef USE_CUDNN
+  build_graph(shape);
+  const size_t shape_key = get_shape_hash(shape);
+  const ConvolutionStats &stats = stats_cache.at(shape_key);
+  return stats.fwd_workspace_size;
+#else
+  return 0;
+#endif
+}
+
+size_t Conv2DLayer::bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  auto &shape = input_shapes[0];
+#ifdef USE_CUDNN
+  build_graph(shape);
+  const size_t shape_key = get_shape_hash(shape);
+  const ConvolutionStats &stats = stats_cache.at(shape_key);
+  return stats.wgrad_workspace_size + stats.dgrad_workspace_size + stats.bgrad_workspace_size;
+#else
+  return 0;
+#endif
 }
 
 }  // namespace tnn

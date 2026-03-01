@@ -8,6 +8,7 @@
 
 #include "device/task.hpp"
 #include "nn/layers_impl/cpu/dense_ops.hpp"
+#include "utils/misc.hpp"
 #ifdef USE_CUDA
 #include "nn/layers_impl/cuda/dense_ops.hpp"
 #endif
@@ -35,10 +36,10 @@ DenseLayer::DenseLayer(size_t input_features, size_t output_features, bool use_b
 
 DenseLayer::~DenseLayer() {
 #ifdef USE_CUDNN
-  for (auto &pair : handle_cache) {
+  for (auto &pair : fe_handle_cache) {
     cuda::cudnn_gemm::destroy_fe_handle(pair.second);
   }
-  handle_cache.clear();
+  fe_handle_cache.clear();
 #endif
 }
 
@@ -63,15 +64,6 @@ void DenseLayer::init_impl() {
   if (use_bias_) {
     bias_gradients_->fill(0.0f);
   }
-}
-
-size_t DenseLayer::get_shape_hash(size_t batch_size) const {
-  size_t seed = 0;
-  auto hash_combine = [&](size_t v) { seed ^= v + 0x9e3779b9 + (seed << 6) + (seed >> 2); };
-  hash_combine(batch_size);
-  hash_combine(input_features_);
-  hash_combine(output_features_);
-  return seed;
 }
 
 void DenseLayer::forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id) {
@@ -115,18 +107,15 @@ void DenseLayer::backward_impl(const ConstTensor &grad_output, const Tensor &gra
 }
 
 #ifdef USE_CUDNN
-void DenseLayer::cudnn_forward(const ConstTensor &input, const Tensor &output, size_t mb_id) {
-  const std::vector<size_t> &in_shape = input->shape();
+void DenseLayer::build_graph(const Vec<size_t> &input_shape) const {
   size_t batch_size = 1;
-  for (size_t i = 0; i < in_shape.size() - 1; ++i) {
-    batch_size *= in_shape[i];
+  for (size_t i = 0; i < input_shape.size() - 1; ++i) {
+    batch_size *= input_shape[i];
   }
 
-  size_t shape_key = get_shape_hash(batch_size);
+  size_t shape_key = get_shape_hash({batch_size});
 
-  cuda::cudnn_gemm::feHandle_t *handle = nullptr;
-
-  if (handle_cache.find(shape_key) == handle_cache.end()) {
+  if (fe_handle_cache.find(shape_key) == fe_handle_cache.end()) {
     cudnnDataType_t io_dtype = cuda::cudnn::to_cudnn_datatype(io_dtype_);
     cudnnDataType_t param_dtype = cuda::cudnn::to_cudnn_datatype(param_dtype_);
     cudnnDataType_t compute_dtype = cuda::cudnn::to_cudnn_datatype(compute_dtype_);
@@ -138,13 +127,25 @@ void DenseLayer::cudnn_forward(const ConstTensor &input, const Tensor &output, s
 
     init_gemm_stats(stats, batch_size, output_features_, input_features_);
 
-    handle = cuda::cudnn_gemm::initialize_fe_handle(cudnn_handle, io_dtype, param_dtype,
-                                                    compute_dtype, stats);
-    handle_cache[shape_key] = handle;
+    cuda::cudnn_gemm::feHandle_t *handle = cuda::cudnn_gemm::initialize_fe_handle(
+        cudnn_handle, io_dtype, param_dtype, compute_dtype, stats);
+    fe_handle_cache[shape_key] = handle;
     stats_cache[shape_key] = stats;
   }
+}
 
-  handle = handle_cache[shape_key];
+void DenseLayer::cudnn_forward(const ConstTensor &input, const Tensor &output, size_t mb_id) {
+  const std::vector<size_t> &in_shape = input->shape();
+
+  build_graph(in_shape);
+
+  size_t batch_size = 1;
+  for (size_t i = 0; i < in_shape.size() - 1; ++i) {
+    batch_size *= in_shape[i];
+  }
+  size_t shape_key = get_shape_hash({batch_size});
+
+  cuda::cudnn_gemm::feHandle_t *handle = fe_handle_cache[shape_key];
   GemmStats &stats = stats_cache[shape_key];
 
   size_t io_dtype_size = get_dtype_size(io_dtype_);
@@ -177,8 +178,8 @@ void DenseLayer::cudnn_backward(const ConstTensor &grad_output, const Tensor &gr
     batch_size *= in_shape[i];
   }
 
-  size_t shape_key = get_shape_hash(batch_size);
-  cuda::cudnn_gemm::feHandle_t *handle = handle_cache.at(shape_key);
+  size_t shape_key = get_shape_hash({batch_size});
+  cuda::cudnn_gemm::feHandle_t *handle = fe_handle_cache.at(shape_key);
 
   GemmStats &stats = stats_cache.at(shape_key);
 
@@ -268,6 +269,40 @@ std::unique_ptr<Task> DenseLayer::add_bias_vector(const Tensor &output, const Co
     throw std::runtime_error("Unsupported device type for add_bias_vector");
   }
   return nullptr;
+}
+
+size_t DenseLayer::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  auto &shape = input_shapes[0];
+#ifdef USE_CUDNN
+  if (!allocator_ || allocator_->device().device_type() != DeviceType::GPU) return 0;
+  build_graph(shape);
+  size_t batch_size = 1;
+  for (size_t i = 0; i < shape.size() - 1; ++i) {
+    batch_size *= shape[i];
+  }
+  size_t shape_key = get_shape_hash({batch_size});
+  const GemmStats &stats = stats_cache.at(shape_key);
+  return stats.fwd_workspace_size;
+#else
+  return 0;
+#endif
+}
+
+size_t DenseLayer::bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  auto &shape = input_shapes[0];
+#ifdef USE_CUDNN
+  if (!allocator_ || allocator_->device().device_type() != DeviceType::GPU) return 0;
+  build_graph(shape);
+  size_t batch_size = 1;
+  for (size_t i = 0; i < shape.size() - 1; ++i) {
+    batch_size *= shape[i];
+  }
+  size_t shape_key = get_shape_hash({batch_size});
+  const GemmStats &stats = stats_cache.at(shape_key);
+  return std::max(stats.dgrad_workspace_size, stats.wgrad_workspace_size);
+#else
+  return 0;
+#endif
 }
 
 LayerConfig DenseLayer::get_config() const {

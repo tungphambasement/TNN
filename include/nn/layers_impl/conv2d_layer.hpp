@@ -40,6 +40,8 @@ private:
   Tensor bias_gradients_;
 
 #ifdef USE_CUDNN
+  void build_graph(const Vec<size_t> &input_shape) const;
+
   template <typename IO_T, typename Param_T, typename Compute_T>
   std::unique_ptr<Task> conv2d_forward_task(cuda::cudnn_conv2d::feHandle_t *fe_handle,
                                             ConvolutionStats &stats, const ConstTensor &input,
@@ -66,9 +68,8 @@ private:
   void cudnn_forward(const ConstTensor &input, const Tensor &output, size_t mb_id);
   void cudnn_backward(const ConstTensor &current_gradient, const Tensor &grad_input, size_t mb_id);
 
-  std::unordered_map<size_t, cuda::cudnn_conv2d::feHandle_t *> fe_handle_cache;
-  std::unordered_map<size_t, ConvolutionStats> stats_cache;
-  size_t get_shape_hash(size_t n, size_t c, size_t h, size_t w) const;
+  mutable std::unordered_map<size_t, cuda::cudnn_conv2d::feHandle_t *> fe_handle_cache;
+  mutable std::unordered_map<size_t, ConvolutionStats> stats_cache;
 #endif
 
   void def_forward(const ConstTensor &input, const Tensor &output, size_t mb_id);
@@ -112,6 +113,8 @@ public:
   std::string type() const override { return TYPE_NAME; }
   LayerConfig get_config() const override;
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
+  size_t fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
+  size_t bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
 
   static std::unique_ptr<Conv2DLayer> create_from_config(const LayerConfig &config);
 };

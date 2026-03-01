@@ -42,11 +42,12 @@ private:
   Tensor dummy_mean_gradients_;
   Tensor dummy_var_gradients_;
 
-  std::unordered_map<size_t, BatchNormStats> stats_cache;
-  size_t get_shape_hash(size_t n, size_t c, size_t h, size_t w) const;
+  mutable std::unordered_map<size_t, BatchNormStats> stats_cache;
 
 #ifdef USE_CUDNN
-  std::unordered_map<size_t, cuda::cudnn_batchnorm::feHandle_t *> fe_handle_cache;
+  void build_graph(const Vec<size_t> &input_shape) const;
+
+  mutable std::unordered_map<size_t, cuda::cudnn_batchnorm::feHandle_t *> fe_handle_cache;
   template <typename IO_T, typename Param_T, typename Compute_T>
   std::unique_ptr<Task> forward_training_task(
       cuda::cudnn_batchnorm::feHandle_t *fe_handle, BatchNormStats &stats, const ConstTensor &input,
@@ -126,6 +127,8 @@ public:
 
   std::string type() const override { return TYPE_NAME; }
   LayerConfig get_config() const override;
+  size_t fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
+  size_t bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
   static std::unique_ptr<BatchNormLayer> create_from_config(const LayerConfig &config);
 
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
