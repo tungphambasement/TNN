@@ -170,11 +170,7 @@ std::unique_ptr<Task> AttentionBlock::compute_attention_forward(
                        L, static_cast<IO_T>(-INFINITY));
     }
 
-    auto context = dynamic_cast<CUDAContext *>(this->device().context());
-    if (!context) {
-      throw std::runtime_error("AttentionBlock requires CUDAContext for CUDA operations.");
-    }
-    auto cudnn_handle = context->getCudnnHandle();
+    auto cudnn_handle = CUDAContext::getCudnnHandle();
 
     create_cuda_task(handle, cuda::softmax_forward<IO_T>, cudnn_handle, scores->data_as<IO_T>(),
                      scores->data_as<IO_T>(), batch_count * L, L);
@@ -256,11 +252,7 @@ std::unique_ptr<Task> AttentionBlock::compute_attention_backward(
                        L, static_cast<IO_T>(-INFINITY));
     }
 
-    CUDAContext *context = dynamic_cast<CUDAContext *>(this->device().context());
-    if (!context) {
-      throw std::runtime_error("AttentionBlock requires CUDAContext for CUDA operations.");
-    }
-    auto cudnn_handle = context->getCudnnHandle();
+    auto cudnn_handle = CUDAContext::getCudnnHandle();
 
     create_cuda_task(handle, cuda::softmax_forward<IO_T>, cudnn_handle, scores->data_as<IO_T>(),
                      scores->data_as<IO_T>(), batch_count * L, L);
@@ -353,6 +345,39 @@ size_t AttentionBlock::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const
   Vec<size_t> proj_input = {batch_size, seq_len, embed_dim_};
   if (q_proj_) {
     proj_input_shape_bytes = q_proj_->fwd_workspace({{proj_input}});
+  }
+
+  return outer_bytes + inner_bytes + proj_input_shape_bytes;
+}
+
+size_t AttentionBlock::inf_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  return fwd_workspace(input_shapes);
+}
+
+size_t AttentionBlock::bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  const auto &shape = input_shapes[0];
+  size_t batch_size = shape[0], seq_len = shape[1];
+  size_t dtype_size = get_dtype_size(io_dtype_);
+
+  // Outer backward buffers: dq, dk, dv (3 * [B, L, E])
+  size_t outer_bytes = 3 * batch_size * seq_len * embed_dim_ * dtype_size;
+
+  // Inner buffers in compute_attention_backward:
+  //   q_heads, k_heads, v_heads: 3 * [B, H, L, D]
+  //   scores: [B*H, L, L]
+  //   dattn: [B*H, L, L]
+  //   dq_heads, dk_heads: 2 * [B, H, L, D]
+  size_t inner_qkv_heads = 3 * batch_size * num_heads_ * seq_len * head_dim_ * dtype_size;
+  size_t inner_scores = batch_size * num_heads_ * seq_len * seq_len * dtype_size;
+  size_t inner_dattn = batch_size * num_heads_ * seq_len * seq_len * dtype_size;
+  size_t inner_dqdk_heads = 2 * batch_size * num_heads_ * seq_len * head_dim_ * dtype_size;
+  size_t inner_bytes = inner_qkv_heads + inner_scores + inner_dattn + inner_dqdk_heads;
+
+  // Sub-layer (dense proj) workspace — max of q/k/v/out proj workspace
+  size_t proj_input_shape_bytes = 0;
+  Vec<size_t> proj_input = {batch_size, seq_len, embed_dim_};
+  if (out_proj_) {
+    proj_input_shape_bytes = out_proj_->bwd_workspace({{proj_input}});
   }
 
   return outer_bytes + inner_bytes + proj_input_shape_bytes;

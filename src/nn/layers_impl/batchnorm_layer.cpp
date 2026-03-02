@@ -107,11 +107,7 @@ void BatchNormLayer::build_graph(const Vec<size_t> &input_shape) const {
     BatchNormStats new_stats;
     init_batchnorm_stats(new_stats, batch_size, height, width, channels, epsilon_, momentum_,
                          use_relu_);
-    auto cuda_context = dynamic_cast<CUDAContext *>(this->device().context());
-    if (!cuda_context) {
-      throw std::runtime_error("BatchNormLayer requires CUDAContext for cuDNN operations");
-    }
-    cudnnHandle_t shared_handle = cuda_context->getCudnnHandle();
+    cudnnHandle_t shared_handle = CUDAContext::getCudnnHandle();
     cudnnDataType_t io_data_type = cuda::cudnn_batchnorm::get_cudnn_data_type(io_dtype_);
     cudnnDataType_t compute_data_type = cuda::cudnn_batchnorm::get_cudnn_data_type(compute_dtype_);
     fe_handle_cache[shape_key] = cuda::cudnn_batchnorm::initialize_fe_handle(
@@ -129,6 +125,8 @@ void BatchNormLayer::cudnn_forward(const ConstTensor &input, const Tensor &outpu
   }
 
   output->ensure(input->shape());
+
+  build_graph(input->shape());
 
   size_t shape_key = get_shape_hash(input->shape());
 
@@ -300,6 +298,21 @@ size_t BatchNormLayer::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const
 #else
   return 0;
 #endif
+}
+
+size_t BatchNormLayer::inf_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  auto &shape = input_shapes[0];
+  if (shape.empty() || shape.size() < 4) return 0;
+#ifdef USE_CUDNN
+  if (!allocator_ || allocator_->device().device_type() != DeviceType::GPU) return 0;
+  size_t shape_key = get_shape_hash(shape);
+  build_graph(shape);
+  BatchNormStats stats = stats_cache.at(shape_key);
+  round_workspace_size(stats);
+  return stats.inf_workspace_size;
+#else
+  return 0;
+#endif  // USE_CUDNN
 }
 
 size_t BatchNormLayer::bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {

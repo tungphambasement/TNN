@@ -257,11 +257,7 @@ void LegacyConv2DLayer::build_graph(const Vec<size_t> &input_shape) const {
     ConvolutionStats new_stats;
     init_convolution_stats(new_stats, batch_size, input_h, input_w, in_channels_, out_channels_,
                            kernel_h_, kernel_w_, stride_h_, stride_w_, pad_h_, pad_w_, use_bias_);
-    CUDAContext *cuda_context = dynamic_cast<CUDAContext *>(this->device().context());
-    if (!cuda_context) {
-      throw std::runtime_error("Conv2DLayer requires CUDAContext for cuDNN operations");
-    }
-    cudnnHandle_t shared_handle = cuda_context->getCudnnHandle();
+    cudnnHandle_t shared_handle = CUDAContext::getCudnnHandle();
 
     convolution_handle_cache[shape_key] =
         cuda::cudnn_conv2d::initialize_convolution_handle(shared_handle, new_stats, 0);
@@ -675,6 +671,21 @@ std::unique_ptr<LegacyConv2DLayer> LegacyConv2DLayer::create_from_config(
 }
 
 size_t LegacyConv2DLayer::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  auto &shape = input_shapes[0];
+  if (shape.empty() || shape.size() < 4) return 0;
+#ifdef USE_CUDNN
+  if (!allocator_ || allocator_->device().device_type() != DeviceType::GPU) return 0;
+  build_graph(shape);
+  size_t shape_key = get_shape_hash(shape);
+
+  ConvolutionStats stats = stats_cache.at(shape_key);
+  return stats.fwd_workspace_size;
+#else
+  return 0;
+#endif
+}
+
+size_t LegacyConv2DLayer::inf_workspace(const Vec<Vec<size_t>> &input_shapes) const {
   auto &shape = input_shapes[0];
   if (shape.empty() || shape.size() < 4) return 0;
 #ifdef USE_CUDNN

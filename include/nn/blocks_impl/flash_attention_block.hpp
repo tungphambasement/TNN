@@ -35,6 +35,7 @@ private:
   std::unique_ptr<DenseLayer> out_proj_;
 
 #ifdef USE_CUDNN
+  void build_graph(const Vec<size_t> &input_shape) const;
   template <typename IO_T, typename Param_T, typename Compute_T>
   std::unique_ptr<Task> flash_attention_forward_task(
       cuda::cudnn_flash_attention::feHandle_t *fe_handle, AttentionStats &stats,
@@ -79,6 +80,7 @@ public:
   LayerConfig get_config() const override;
   Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shapes) const override;
   size_t fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
+  size_t inf_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
   size_t bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
   static std::unique_ptr<FlashAttentionBlock> create_from_config(const LayerConfig &config);
 };

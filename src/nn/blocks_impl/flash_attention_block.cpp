@@ -82,6 +82,27 @@ void FlashAttentionBlock::forward(const Vec<ConstTensor> &inputs, const Vec<Tens
 }
 
 #ifdef USE_CUDNN
+void FlashAttentionBlock::build_graph(const Vec<size_t> &input_shape) const {
+  size_t batch_size = input_shape[0];
+  size_t seq_len = input_shape[1];
+  size_t shape_key = get_shape_hash({batch_size, num_heads_, seq_len, head_dim_});
+
+  if (fe_handle_cache.find(shape_key) == fe_handle_cache.end()) {
+    AttentionStats stats;
+    float attn_scale = static_cast<float>(1.0 / std::sqrt(static_cast<double>(head_dim_)));
+    init_attention_stats(stats, batch_size, num_heads_, seq_len, head_dim_, attn_scale, is_causal_);
+
+    auto cudnn_handle = CUDAContext::getCudnnHandle();
+
+    cudnnDataType_t io_dtype = cuda::cudnn::to_cudnn_datatype(DType_t::FP16);
+    cudnnDataType_t compute_dtype = cuda::cudnn::to_cudnn_datatype(DType_t::FP32);
+
+    fe_handle_cache[shape_key] = cuda::cudnn_flash_attention::initialize_fe_handle(
+        cudnn_handle, io_dtype, compute_dtype, stats);
+    stats_cache[shape_key] = stats;
+  }
+}
+
 template <typename IO_T, typename Param_T, typename Compute_T>
 std::unique_ptr<Task> FlashAttentionBlock::flash_attention_forward_task(
     cuda::cudnn_flash_attention::feHandle_t *fe_handle, AttentionStats &stats,
@@ -115,24 +136,7 @@ void FlashAttentionBlock::cudnn_forward(const ConstTensor &input, const Tensor &
 
   size_t shape_key = get_shape_hash({batch_size, num_heads_, seq_len, head_dim_});
 
-  if (stats_cache.find(shape_key) == stats_cache.end()) {
-    AttentionStats stats;
-    float attn_scale = static_cast<float>(1.0 / std::sqrt(static_cast<double>(head_dim_)));
-    init_attention_stats(stats, batch_size, num_heads_, seq_len, head_dim_, attn_scale, is_causal_);
-
-    auto *cuda_context = dynamic_cast<CUDAContext *>(this->device().context());
-    if (!cuda_context) {
-      throw std::runtime_error("FlashAttentionBlock requires CUDAContext");
-    }
-    cudnnHandle_t cudnn_handle = cuda_context->getCudnnHandle();
-
-    cudnnDataType_t io_dtype = cuda::cudnn::to_cudnn_datatype(DType_t::FP16);
-    cudnnDataType_t compute_dtype = cuda::cudnn::to_cudnn_datatype(DType_t::FP32);
-
-    fe_handle_cache[shape_key] = cuda::cudnn_flash_attention::initialize_fe_handle(
-        cudnn_handle, io_dtype, compute_dtype, stats);
-    stats_cache[shape_key] = stats;
-  }
+  build_graph(input_shape);
 
   auto *fe_handle = fe_handle_cache[shape_key];
   auto &stats = stats_cache[shape_key];
@@ -347,25 +351,9 @@ size_t FlashAttentionBlock::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) 
   size_t cudnn_ws_bytes = 0;
 #ifdef USE_CUDNN
   if (allocator_ && allocator_->device().device_type() == DeviceType::GPU) {
+    build_graph(shape);
     size_t shape_key = get_shape_hash({batch_size, num_heads_, seq_len, head_dim_});
-    if (stats_cache.find(shape_key) == stats_cache.end()) {
-      AttentionStats stats;
-      float attn_scale = static_cast<float>(1.0 / std::sqrt(static_cast<double>(head_dim_)));
-      init_attention_stats(stats, batch_size, num_heads_, seq_len, head_dim_, attn_scale,
-                           is_causal_);
-      auto *cuda_context = dynamic_cast<CUDAContext *>(this->device().context());
-      if (cuda_context) {
-        cudnnHandle_t cudnn_handle = cuda_context->getCudnnHandle();
-        cudnnDataType_t io_dtype = cuda::cudnn::to_cudnn_datatype(DType_t::FP16);
-        cudnnDataType_t compute_dtype = cuda::cudnn::to_cudnn_datatype(DType_t::FP32);
-        fe_handle_cache[shape_key] = cuda::cudnn_flash_attention::initialize_fe_handle(
-            cudnn_handle, io_dtype, compute_dtype, stats);
-        stats_cache[shape_key] = stats;
-      }
-    }
-    if (stats_cache.count(shape_key)) {
-      cudnn_ws_bytes = stats_cache.at(shape_key).fwd_workspace_size;
-    }
+    cudnn_ws_bytes = stats_cache.at(shape_key).fwd_workspace_size;
   }
 #endif
 
@@ -376,6 +364,10 @@ size_t FlashAttentionBlock::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) 
   }
 
   return qkv_bytes + qkv_heads_bytes + attn_heads_bytes + cudnn_ws_bytes + proj_ws;
+}
+
+size_t FlashAttentionBlock::inf_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  return fwd_workspace(input_shapes);
 }
 
 size_t FlashAttentionBlock::bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
@@ -399,25 +391,9 @@ size_t FlashAttentionBlock::bwd_workspace(const Vec<Vec<size_t>> &input_shapes) 
 #ifdef USE_CUDNN
   if (allocator_ && allocator_->device().device_type() == DeviceType::GPU) {
     size_t shape_key = get_shape_hash({batch_size, num_heads_, seq_len, head_dim_});
-    if (stats_cache.find(shape_key) == stats_cache.end()) {
-      AttentionStats stats;
-      float attn_scale = static_cast<float>(1.0 / std::sqrt(static_cast<double>(head_dim_)));
-      init_attention_stats(stats, batch_size, num_heads_, seq_len, head_dim_, attn_scale,
-                           is_causal_);
-      auto *cuda_context = dynamic_cast<CUDAContext *>(this->device().context());
-      if (cuda_context) {
-        cudnnHandle_t cudnn_handle = cuda_context->getCudnnHandle();
-        cudnnDataType_t io_dtype = cuda::cudnn::to_cudnn_datatype(DType_t::FP16);
-        cudnnDataType_t compute_dtype = cuda::cudnn::to_cudnn_datatype(DType_t::FP32);
-        fe_handle_cache[shape_key] = cuda::cudnn_flash_attention::initialize_fe_handle(
-            cudnn_handle, io_dtype, compute_dtype, stats);
-        stats_cache[shape_key] = stats;
-      }
-    }
-    if (stats_cache.count(shape_key)) {
-      const AttentionStats &stats = stats_cache.at(shape_key);
-      cudnn_ws_bytes = stats.bwd_workspace_size;
-    }
+    build_graph(shape);
+    const AttentionStats &stats = stats_cache.at(shape_key);
+    cudnn_ws_bytes = stats.bwd_workspace_size;
   }
 #endif
 

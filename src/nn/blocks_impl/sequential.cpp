@@ -8,6 +8,8 @@
 #include "nn/blocks_impl/sequential.hpp"
 
 #include <fmt/core.h>
+#include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #include <cstddef>
 #include <iomanip>
@@ -75,6 +77,13 @@ void Sequential::forward(const Vec<ConstTensor> &inputs, const Vec<Tensor> &outp
       } else {
         current_output = output;
       }
+      std::cout << fmt::format(
+                       "Forwarding through layer {} with type {}: input shape {}, output shape {}, "
+                       "workspace size {} bytes",
+                       i, layers_[i]->type(), fmt::join(current_input->shape(), "x"),
+                       current_output->shape(),
+                       layers_[i]->fwd_workspace({{current_input->shape()}}))
+                << std::endl;
       layers_[i]->forward({current_input}, {current_output}, mb_id);
       current_input = current_output;
     }
@@ -135,9 +144,9 @@ void Sequential::backward(const Vec<ConstTensor> &grad_outputs, const Vec<Tensor
   for (int i = static_cast<int>(layers_.size()) - 1; i >= 0; --i) {
     // no need to renew buffer since backward doesn't cache inputs
     if (i > 0) {
-      size_t offset = side ? m_b - m[i] : 0;
+      size_t offset = side ? m_b - m[i - 1] : 0;
       Vec<size_t> grad_input_shape = out_shapes[i - 1];
-      dptr grad_input_ptr = buffer.span(offset, m[i]);
+      dptr grad_input_ptr = buffer.span(offset, m[i - 1]);
       current_grad_input = make_tensor(*allocator_, grad_output->data_type(), grad_input_shape,
                                        std::move(grad_input_ptr));
       layers_[i]->backward({current_gradient}, {current_grad_input}, mb_id);
@@ -171,9 +180,23 @@ Vec<Vec<size_t>> Sequential::output_shape(const Vec<Vec<size_t>> &input_shapes) 
 size_t Sequential::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
   if (layers_.empty()) return 0;
   const auto &input_shape = input_shapes[0];
+  size_t total_ws = 0;
+  Vec<size_t> current_shape = input_shape;
+  // total = all inputs + all layers' fwd workspace
+  for (const auto &layer : layers_) {
+    total_ws += layer->fwd_workspace({{current_shape}});
+    total_ws += std::accumulate(current_shape.begin(), current_shape.end(),
+                                get_dtype_size(io_dtype_), std::multiplies<size_t>());
+    current_shape = layer->output_shape({current_shape})[0];
+  }
+  return total_ws;
+}
+
+size_t Sequential::inf_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  if (layers_.empty()) return 0;
+  const auto &input_shape = input_shapes[0];
   size_t dtype_size = get_dtype_size(io_dtype_);
 
-  // Compute each layer's output size (in bytes) and its own workspace requirement
   Vec<size_t> out_bytes;
   Vec<size_t> sub_ws;
   Vec<size_t> cur = input_shape;
@@ -181,20 +204,38 @@ size_t Sequential::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
     Vec<size_t> out = layer->output_shape({cur})[0];
     size_t bytes = std::accumulate(out.begin(), out.end(), dtype_size, std::multiplies<size_t>());
     out_bytes.push_back(bytes);
-    sub_ws.push_back(layer->fwd_workspace({{cur}}));
+    sub_ws.push_back(layer->inf_workspace({{cur}}));
     cur = out;
   }
 
-  // Peak intermediate buffer: max consecutive pair of output sizes (layers 0..n-2)
-  // The last layer writes to the pre-provided output tensor, so only n-1 intermediate buffers
-  size_t max_pair = 0;
-  for (size_t i = 0; i + 1 < out_bytes.size(); ++i) {
-    max_pair = std::max(max_pair, out_bytes[i] + out_bytes[i + 1]);
+  size_t m_b = 0;
+  for (size_t i = 0; i < out_bytes.size() - 1; ++i) {
+    m_b = std::max(m_b, out_bytes[i] + out_bytes[i + 1] + sub_ws[i]);
+  }
+  return m_b;
+}
+
+size_t Sequential::bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  if (layers_.empty()) return 0;
+  const auto &input_shape = input_shapes[0];
+  size_t dtype_size = get_dtype_size(io_dtype_);
+
+  Vec<size_t> out_bytes;
+  Vec<size_t> sub_ws;
+  Vec<size_t> cur = input_shape;
+  for (const auto &layer : layers_) {
+    Vec<size_t> out = layer->output_shape({cur})[0];
+    size_t bytes = std::accumulate(out.begin(), out.end(), dtype_size, std::multiplies<size_t>());
+    out_bytes.push_back(bytes);
+    sub_ws.push_back(layer->bwd_workspace({{cur}}));
+    cur = out;
   }
 
-  size_t max_sub = 0;
-  for (const auto &ws : sub_ws) max_sub = std::max(max_sub, ws);
-  return max_pair + max_sub;
+  size_t m_b = 0;
+  for (size_t i = 0; i < out_bytes.size() - 1; ++i) {
+    m_b = std::max(m_b, out_bytes[i] + out_bytes[i + 1] + sub_ws[i]);
+  }
+  return m_b;
 }
 
 void Sequential::print_summary(const std::vector<size_t> &input_shape) const {

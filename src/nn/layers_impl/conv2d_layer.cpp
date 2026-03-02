@@ -270,12 +270,13 @@ void Conv2DLayer::build_graph(const Vec<size_t> &input_shape) const {
   size_t shape_key = get_shape_hash(input_shape);
   if (fe_handle_cache.find(shape_key) == fe_handle_cache.end()) {
     ConvolutionStats new_stats;
-    init_convolution_stats(new_stats, input_shape[0], input_shape[3], input_shape[1],
-                           input_shape[2], out_channels_, kernel_h_, kernel_w_, stride_h_,
-                           stride_w_, pad_h_, pad_w_, use_bias_);
-    auto cuda_context = dynamic_cast<CUDAContext *>(this->device().context());
-    if (!cuda_context) return;
-    cudnnHandle_t shared_handle = cuda_context->getCudnnHandle();
+    size_t batch_size = input_shape[0];
+    size_t input_h = input_shape[1];
+    size_t input_w = input_shape[2];
+    size_t in_channels = input_shape[3];
+    init_convolution_stats(new_stats, batch_size, input_h, input_w, in_channels, out_channels_,
+                           kernel_h_, kernel_w_, stride_h_, stride_w_, pad_h_, pad_w_, use_bias_);
+    cudnnHandle_t shared_handle = CUDAContext::getCudnnHandle();
     auto io_data_type = cuda::cudnn::to_cudnn_datatype(io_dtype_);
     auto compute_type = cuda::cudnn::to_cudnn_datatype(compute_dtype_);
     fe_handle_cache[shape_key] = cuda::cudnn_conv2d::initialize_fe_handle(
@@ -296,19 +297,13 @@ void Conv2DLayer::cudnn_forward(const ConstTensor &input, const Tensor &output, 
 
   size_t shape_key = get_shape_hash(input->shape());
 
-  cuda::cudnn_conv2d::feHandle_t *fe_handle = nullptr;
-  size_t io_dtype_size = get_dtype_size(io_dtype_);
-
   build_graph(input->shape());
 
-  fe_handle = fe_handle_cache.at(shape_key);
+  cuda::cudnn_conv2d::feHandle_t *fe_handle = fe_handle_cache.at(shape_key);
   ConvolutionStats &current_stats = stats_cache.at(shape_key);
 
-  size_t max_workspace_size =
-      std::max({current_stats.fwd_workspace_size, current_stats.wgrad_workspace_size,
-                current_stats.dgrad_workspace_size, current_stats.bgrad_workspace_size});
-  size_t workspace_elements = (max_workspace_size + io_dtype_size - 1) / io_dtype_size;
-  Tensor cudnn_workspace = this->get_buffer({workspace_elements});
+  size_t ws_bytes = current_stats.fwd_workspace_size;
+  Tensor cudnn_workspace = this->get_buffer({ws_bytes}, DType_t::INT64_T);
 
   if (this->is_training_) {
     ConstTensor &cached_input = this->get_cached_tensor(mb_id, "input");
@@ -407,6 +402,19 @@ std::unique_ptr<Conv2DLayer> Conv2DLayer::create_from_config(const LayerConfig &
 size_t Conv2DLayer::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
   auto &shape = input_shapes[0];
 #ifdef USE_CUDNN
+  build_graph(shape);
+  const size_t shape_key = get_shape_hash(shape);
+  const ConvolutionStats &stats = stats_cache.at(shape_key);
+  return stats.fwd_workspace_size;
+#else
+  return 0;
+#endif
+}
+
+size_t Conv2DLayer::inf_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  auto &shape = input_shapes[0];
+#ifdef USE_CUDNN
+  if (!allocator_ || allocator_->device().device_type() != DeviceType::GPU) return 0;
   build_graph(shape);
   const size_t shape_key = get_shape_hash(shape);
   const ConvolutionStats &stats = stats_cache.at(shape_key);

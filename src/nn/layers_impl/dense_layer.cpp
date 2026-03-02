@@ -119,10 +119,7 @@ void DenseLayer::build_graph(const Vec<size_t> &input_shape) const {
     cudnnDataType_t io_dtype = cuda::cudnn::to_cudnn_datatype(io_dtype_);
     cudnnDataType_t param_dtype = cuda::cudnn::to_cudnn_datatype(param_dtype_);
     cudnnDataType_t compute_dtype = cuda::cudnn::to_cudnn_datatype(compute_dtype_);
-
-    CUDAContext *context = dynamic_cast<CUDAContext *>(this->device().context());
-    cudnnHandle_t cudnn_handle = context->getCudnnHandle();
-
+    cudnnHandle_t cudnn_handle = CUDAContext::getCudnnHandle();
     GemmStats stats;
 
     init_gemm_stats(stats, batch_size, output_features_, input_features_);
@@ -286,6 +283,10 @@ size_t DenseLayer::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
 #else
   return 0;
 #endif
+}
+
+size_t DenseLayer::inf_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  return fwd_workspace(input_shapes);
 }
 
 size_t DenseLayer::bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {

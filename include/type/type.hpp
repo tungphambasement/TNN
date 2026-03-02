@@ -60,6 +60,7 @@ struct TypeTraits<fp64> {
 };
 
 enum class DType_t : uint32_t {
+  BYTE,
   UINT8_T,
   BOOL,
   FP16,
@@ -77,8 +78,8 @@ constexpr DType_t dtype_of() {
   return DType_t::UNKNOWN;
 }
 template <>
-constexpr DType_t dtype_of<uint8_t>() {
-  return DType_t::UINT8_T;
+constexpr DType_t dtype_of<uchar>() {
+  return DType_t::BYTE;
 }
 template <>
 constexpr DType_t dtype_of<bool>() {
@@ -132,6 +133,8 @@ inline float dtype_eps(DType_t dtype) {
 
 inline size_t get_dtype_size(DType_t dtype) {
   switch (dtype) {
+    case DType_t::BYTE:
+      return sizeof(uchar);
     case DType_t::UINT8_T:
       return sizeof(uint8_t);
     case DType_t::BOOL:
@@ -157,8 +160,10 @@ inline size_t get_dtype_size(DType_t dtype) {
 
 inline std::string dtype_to_string(DType_t dtype) {
   switch (dtype) {
-    case DType_t::UINT8_T:
+    case DType_t::BYTE:
       return "BYTE";
+    case DType_t::UINT8_T:
+      return "UINT8_T";
     case DType_t::BOOL:
       return "BOOL";
     case DType_t::FP16:

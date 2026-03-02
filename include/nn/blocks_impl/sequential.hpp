@@ -53,6 +53,8 @@ public:
 
   Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shapes) const override;
   size_t fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
+  size_t inf_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
+  size_t bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
   void print_summary(const std::vector<size_t> &input_shape) const;
   std::vector<Layer *> get_layers();
   LayerConfig get_config() const override;

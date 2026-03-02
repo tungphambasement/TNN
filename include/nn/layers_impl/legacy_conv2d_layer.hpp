@@ -160,6 +160,7 @@ public:
 
   std::vector<size_t> compute_output_shape(const std::vector<size_t> &input_shape) const override;
   size_t fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
+  size_t inf_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
   size_t bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
 
   static std::unique_ptr<LegacyConv2DLayer> create_from_config(const LayerConfig &config);

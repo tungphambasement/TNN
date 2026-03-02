@@ -142,11 +142,7 @@ void LayerNormLayer::build_graph(const Vec<size_t> &input_shape) const {
     LayerNormStats new_stats;
     init_layer_norm_stats(new_stats, batch_size, channels, affine_, epsilon_);
 
-    auto cuda_context = dynamic_cast<CUDAContext *>(this->device().context());
-    if (!cuda_context) {
-      throw std::runtime_error("LayerNormLayer requires CUDAContext for cuDNN operations");
-    }
-    cudnnHandle_t shared_handle = cuda_context->getCudnnHandle();
+    cudnnHandle_t shared_handle = CUDAContext::getCudnnHandle();
     auto io_data_type = cuda::cudnn::to_cudnn_datatype(io_dtype_);
     auto compute_type = cuda::cudnn::to_cudnn_datatype(compute_dtype_);
     fe_handle_cache[shape_key] = cuda::cudnn_layer_norm::initialize_fe_handle(
@@ -362,6 +358,10 @@ size_t LayerNormLayer::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const
 #else
   return 0;
 #endif
+}
+
+size_t LayerNormLayer::inf_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  return fwd_workspace(input_shapes);
 }
 
 size_t LayerNormLayer::bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {

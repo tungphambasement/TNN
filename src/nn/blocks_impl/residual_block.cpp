@@ -198,52 +198,203 @@ std::unique_ptr<ResidualBlock> ResidualBlock::create_from_config(const LayerConf
 }
 
 size_t ResidualBlock::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
-  if (input_shapes.empty() || input_shapes[0].empty()) return 0;
-  const auto &in_shape = input_shapes[0];
+  if (main_path_.empty()) return 0;
+  const auto &input_shape = input_shapes[0];
+  size_t total_ws = 0;
   size_t dtype_size = get_dtype_size(io_dtype_);
 
-  auto path_peak = [&](const std::vector<std::unique_ptr<Layer>> &path) -> size_t {
-    size_t peak = 0;
-    Vec<size_t> cur = in_shape;
-    size_t prev_bytes = 0;
+  // Main path workspace
+  Vec<size_t> main_shape = input_shape;
+  for (const auto &layer : main_path_) {
+    total_ws += layer->fwd_workspace({{main_shape}});
+    total_ws += std::accumulate(main_shape.begin(), main_shape.end(), dtype_size,
+                                std::multiplies<size_t>());
+    main_shape = layer->output_shape({main_shape})[0];
+  }
+
+  // Shortcut path workspace
+  Vec<size_t> shortcut_shape = input_shape;
+  for (const auto &layer : shortcut_path_) {
+    total_ws += layer->fwd_workspace({{shortcut_shape}});
+    total_ws += std::accumulate(shortcut_shape.begin(), shortcut_shape.end(), dtype_size,
+                                std::multiplies<size_t>());
+    shortcut_shape = layer->output_shape({shortcut_shape})[0];
+  }
+
+  // Pre-activation buffer if final activation exists
+  if (final_activation_) {
+    total_ws += std::accumulate(main_shape.begin(), main_shape.end(), dtype_size,
+                                std::multiplies<size_t>());
+  }
+
+  return total_ws;
+}
+
+size_t ResidualBlock::inf_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  if (main_path_.empty()) return 0;
+  const auto &input_shape = input_shapes[0];
+  size_t dtype_size = get_dtype_size(io_dtype_);
+
+  // Helper lambda to compute buffer cycling workspace for a path (SISO sequence)
+  auto compute_path_workspace = [dtype_size](const std::vector<std::unique_ptr<Layer>> &path,
+                                             const Vec<size_t> &input_shape) -> size_t {
+    if (path.empty()) return 0;
+    Vec<size_t> out_bytes;
+    Vec<size_t> sub_ws;
+    Vec<size_t> cur = input_shape;
     for (const auto &layer : path) {
       Vec<size_t> out = layer->output_shape({cur})[0];
-      size_t out_bytes =
+      size_t bytes =
           std::accumulate(out.begin(), out.end(), dtype_size, std::multiplies<size_t>());
-      if (prev_bytes > 0) peak = std::max(peak, prev_bytes + out_bytes);
-      prev_bytes = out_bytes;
+      out_bytes.push_back(bytes);
+      sub_ws.push_back(layer->inf_workspace({{cur}}));
       cur = out;
     }
-    return peak;
-  };
-
-  auto path_last_bytes = [&](const std::vector<std::unique_ptr<Layer>> &path) -> size_t {
-    Vec<size_t> cur = in_shape;
-    for (const auto &layer : path) cur = layer->output_shape({cur})[0];
-    return std::accumulate(cur.begin(), cur.end(), dtype_size, std::multiplies<size_t>());
-  };
-
-  auto path_sub_ws = [&](const std::vector<std::unique_ptr<Layer>> &path) -> size_t {
-    size_t max_ws = 0;
-    Vec<size_t> cur = in_shape;
-    for (const auto &layer : path) {
-      max_ws = std::max(max_ws, layer->fwd_workspace({{cur}}));
-      cur = layer->output_shape({cur})[0];
+    size_t m_b = 0;
+    for (size_t i = 0; i < out_bytes.size() - 1; ++i) {
+      m_b = std::max(m_b, out_bytes[i] + out_bytes[i + 1] + sub_ws[i]);
     }
-    return max_ws;
+    // Don't forget the last layer's workspace
+    if (!out_bytes.empty() && !sub_ws.empty()) {
+      m_b = std::max(m_b, out_bytes.back() + sub_ws.back());
+    }
+    return m_b;
   };
 
-  size_t main_peak_bytes = path_peak(main_path_);
-  size_t main_last = path_last_bytes(main_path_);
-  size_t shortcut_last = shortcut_path_.empty() ? main_last : path_last_bytes(shortcut_path_);
-  size_t pre_act_bytes = final_activation_ ? main_last : 0;
+  // Compute O_i (terminal output size) for each path
+  Vec<size_t> main_output_shape = input_shape;
+  for (const auto &layer : main_path_) {
+    main_output_shape = layer->output_shape({main_output_shape})[0];
+  }
+  size_t main_output_bytes =
+      std::accumulate(main_output_shape.begin(), main_output_shape.end(), dtype_size,
+                      std::multiplies<size_t>());
 
-  // Peak when adding main + shortcut (both final outputs are simultaneously alive)
-  size_t addition_peak = main_last + shortcut_last + pre_act_bytes;
+  Vec<size_t> shortcut_output_shape = input_shape;
+  for (const auto &layer : shortcut_path_) {
+    shortcut_output_shape = layer->output_shape({shortcut_output_shape})[0];
+  }
+  size_t shortcut_output_bytes =
+      std::accumulate(shortcut_output_shape.begin(), shortcut_output_shape.end(), dtype_size,
+                      std::multiplies<size_t>());
 
-  size_t max_sub_ws = std::max(path_sub_ws(main_path_), path_sub_ws(shortcut_path_));
+  // Compute M_b,i (buffer cycling workspace) for each path
+  size_t main_workspace = compute_path_workspace(main_path_, input_shape);
+  size_t shortcut_workspace = compute_path_workspace(shortcut_path_, input_shape);
 
-  return std::max({main_peak_bytes, path_peak(shortcut_path_), addition_peak}) + max_sub_ws;
+  // Apply Algorithm 2 from paper (MISO joining)
+  // We have 2 sequences with (a_i, b_i) = (M_b,i, O_i)
+  // Sort by (a_i - b_i) descending to find optimal order
+  struct PathInfo {
+    size_t workspace;      // a_i
+    size_t output_bytes;   // b_i
+    size_t priority;       // a_i - b_i
+  };
+
+  PathInfo main_info{main_workspace, main_output_bytes, main_workspace - main_output_bytes};
+  PathInfo shortcut_info{shortcut_workspace, shortcut_output_bytes,
+                         shortcut_workspace - shortcut_output_bytes};
+
+  // Execute in optimal order and compute peak memory
+  size_t k = 0;
+  if (main_info.priority >= shortcut_info.priority) {
+    // Execute main first, then shortcut
+    k = std::max(main_info.workspace, shortcut_info.workspace + main_info.output_bytes);
+  } else {
+    // Execute shortcut first, then main
+    k = std::max(shortcut_info.workspace, main_info.workspace + shortcut_info.output_bytes);
+  }
+
+  // Add space for the join operation (add + optional activation)
+  size_t join_output_bytes =
+      std::accumulate(main_output_shape.begin(), main_output_shape.end(), dtype_size,
+                      std::multiplies<size_t>());
+  k = std::max(k, main_output_bytes + shortcut_output_bytes + join_output_bytes);
+
+  return k;
+}
+
+size_t ResidualBlock::bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  if (main_path_.empty()) return 0;
+  const auto &input_shape = input_shapes[0];
+  size_t dtype_size = get_dtype_size(io_dtype_);
+
+  // Helper lambda to compute buffer cycling workspace for a path (SISO sequence)
+  auto compute_path_workspace = [dtype_size](const std::vector<std::unique_ptr<Layer>> &path,
+                                             const Vec<size_t> &input_shape) -> size_t {
+    if (path.empty()) return 0;
+    Vec<size_t> out_bytes;
+    Vec<size_t> sub_ws;
+    Vec<size_t> cur = input_shape;
+    for (const auto &layer : path) {
+      Vec<size_t> out = layer->output_shape({cur})[0];
+      size_t bytes =
+          std::accumulate(out.begin(), out.end(), dtype_size, std::multiplies<size_t>());
+      out_bytes.push_back(bytes);
+      sub_ws.push_back(layer->bwd_workspace({{cur}}));
+      cur = out;
+    }
+    size_t m_b = 0;
+    for (size_t i = 0; i < out_bytes.size() - 1; ++i) {
+      m_b = std::max(m_b, out_bytes[i] + out_bytes[i + 1] + sub_ws[i]);
+    }
+    // Don't forget the last layer's workspace
+    if (!out_bytes.empty() && !sub_ws.empty()) {
+      m_b = std::max(m_b, out_bytes.back() + sub_ws.back());
+    }
+    return m_b;
+  };
+
+  // Compute O_i (terminal output size) for each path
+  Vec<size_t> main_output_shape = input_shape;
+  for (const auto &layer : main_path_) {
+    main_output_shape = layer->output_shape({main_output_shape})[0];
+  }
+  size_t main_output_bytes =
+      std::accumulate(main_output_shape.begin(), main_output_shape.end(), dtype_size,
+                      std::multiplies<size_t>());
+
+  Vec<size_t> shortcut_output_shape = input_shape;
+  for (const auto &layer : shortcut_path_) {
+    shortcut_output_shape = layer->output_shape({shortcut_output_shape})[0];
+  }
+  size_t shortcut_output_bytes =
+      std::accumulate(shortcut_output_shape.begin(), shortcut_output_shape.end(), dtype_size,
+                      std::multiplies<size_t>());
+
+  // Compute M_b,i (buffer cycling workspace) for each path
+  size_t main_workspace = compute_path_workspace(main_path_, input_shape);
+  size_t shortcut_workspace = compute_path_workspace(shortcut_path_, input_shape);
+
+  // Apply Algorithm 2 from paper (MISO joining)
+  // We have 2 sequences with (a_i, b_i) = (M_b,i, O_i)
+  // Sort by (a_i - b_i) descending to find optimal order
+  struct PathInfo {
+    size_t workspace;      // a_i
+    size_t output_bytes;   // b_i
+    size_t priority;       // a_i - b_i
+  };
+
+  PathInfo main_info{main_workspace, main_output_bytes, main_workspace - main_output_bytes};
+  PathInfo shortcut_info{shortcut_workspace, shortcut_output_bytes,
+                         shortcut_workspace - shortcut_output_bytes};
+
+  // Execute in optimal order and compute peak memory
+  size_t k = 0;
+  if (main_info.priority >= shortcut_info.priority) {
+    // Execute main first, then shortcut
+    k = std::max(main_info.workspace, shortcut_info.workspace + main_info.output_bytes);
+  } else {
+    // Execute shortcut first, then main
+    k = std::max(shortcut_info.workspace, main_info.workspace + shortcut_info.output_bytes);
+  }
+
+  // Add space for the backward through join operation
+  size_t grad_input_bytes =
+      std::accumulate(input_shape.begin(), input_shape.end(), dtype_size, std::multiplies<size_t>());
+  k = std::max(k, main_output_bytes + shortcut_output_bytes + grad_input_bytes);
+
+  return k;
 }
 
 }  // namespace tnn
