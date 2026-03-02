@@ -53,12 +53,22 @@ public:
     return dptr(storage, 0, size);
   }
 
-  void clear() {
+  void clear() override {
     std::lock_guard<std::mutex> lock(mutex_);
-    for (auto &pair : free_blocks_) {
-      delete pair.second;
+    for (auto &[size, storage] : free_blocks_) {
+      if (storage) {
+        device_.deallocateAlignedMemory(storage->data());
+        delete storage;
+      }
     }
     free_blocks_.clear();
+  }
+
+  void reserve(size_t size) override {
+    // pre-allocate a block of memory to be used in future allocate() calls
+    device_storage *ptr = allocate_storage(size);
+    std::lock_guard<std::mutex> lock(mutex_);
+    free_blocks_.emplace(ptr->capacity(), ptr);  // add to free blocks for future reuse
   }
 
   size_t size() const {
@@ -85,7 +95,7 @@ private:
 
   device_storage *allocate_storage(size_t size) {
     if (size == 0) {
-      return new device_storage(device_);
+      return new device_storage(device_, nullptr, 0, DEFAULT_ALIGNMENT);
     }
     std::lock_guard<std::mutex> lock(mutex_);
     auto it = free_blocks_.lower_bound(size);

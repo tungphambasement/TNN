@@ -19,6 +19,13 @@ public:
   // allocate a ptr with capacity == size
   virtual dptr allocate(size_t size) = 0;
 
+  // clear all cached memory blocks in the allocator
+  virtual void clear() = 0;
+
+  // reserve some memory for future use, so that subsequent allocate() can reuse them without going
+  // through device allocation path. This is optional and can be a no-op for some allocators.
+  virtual void reserve(size_t size) = 0;
+
   virtual const Device &device() const = 0;
 };
 }  // namespace tnn

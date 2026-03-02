@@ -125,11 +125,15 @@ public:
     return create_dptr(offset, size);
   }
 
-  void clear() {
+  void clear() override {
     std::lock_guard<std::mutex> lock(mutex_);
     free_blocks_.clear();
     free_blocks_.emplace(slab_size_, 0);
     allocated_ = 0;
+  }
+
+  void reserve(size_t size) override {
+    return;  // no op
   }
 
   size_t size() const {

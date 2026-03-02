@@ -25,20 +25,11 @@ private:
   size_t alignment_;
 
 public:
-  device_storage(csref<Device> device, void *ptr = nullptr, size_t capacity = 0,
-                 size_t alignment = DEFAULT_ALIGNMENT)
+  device_storage(csref<Device> device, void *ptr, size_t capacity, size_t alignment)
       : device_(device),
         ptr_(ptr),
         capacity_(capacity),
         alignment_(alignment) {}
-
-  ~device_storage() {
-    if (ptr_) {
-      device_->deallocateAlignedMemory(static_cast<void *>(ptr_));
-    }
-    ptr_ = nullptr;
-    capacity_ = 0;
-  }
 
   csref<Device> device() const { return device_; }
   void *data() const { return ptr_; }
