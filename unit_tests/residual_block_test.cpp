@@ -153,7 +153,7 @@ TEST_F(ResidualBlockTest, IdentityShortcutForward) {
     input_data[i] = 1.0f;
   }
 
-  std::vector<size_t> output_shape = residual->output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = residual->output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   residual->forward({input}, {output});
 
@@ -184,7 +184,7 @@ TEST_F(ResidualBlockTest, IdentityShortcutForwardWithReLU) {
     input_data[i] = 1.0f;
   }
 
-  std::vector<size_t> output_shape = residual->output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = residual->output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   residual->forward({input}, {output});
 
@@ -213,7 +213,7 @@ TEST_F(ResidualBlockTest, IdentityShortcutMultiChannel) {
     input_data[i] = 2.0f;
   }
 
-  std::vector<size_t> output_shape = residual->output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = residual->output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   residual->forward({input}, {output});
 
@@ -249,7 +249,7 @@ TEST_F(ResidualBlockTest, IdentityShortcutMultiBatch) {
     input_data[i] = static_cast<float>(i + 1);
   }
 
-  std::vector<size_t> output_shape = residual->output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = residual->output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   residual->forward({input}, {output});
 
@@ -287,7 +287,7 @@ TEST_F(ResidualBlockTest, ProjectionShortcutForward) {
     input_data[i] = 4.0f;
   }
 
-  std::vector<size_t> output_shape = residual->output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = residual->output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   residual->forward({input}, {output});
 
@@ -318,7 +318,7 @@ TEST_F(ResidualBlockTest, ProjectionShortcutWithReLU) {
     input_data[i] = 2.0f;
   }
 
-  std::vector<size_t> output_shape = residual->output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = residual->output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   residual->forward({input}, {output});
 
@@ -349,7 +349,7 @@ TEST_F(ResidualBlockTest, IdentityShortcutBackward) {
     input_data[i] = 1.0f;
   }
 
-  std::vector<size_t> output_shape = residual->output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = residual->output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   residual->forward({input}, {output});
 
@@ -416,7 +416,7 @@ TEST_F(ResidualBlockTest, ComputeOutputShape) {
   ResidualBlock *residual = residual_layer.get();
 
   std::vector<size_t> input_shape = {1, 3, 32, 32};
-  std::vector<size_t> output_shape = residual->output_shape({input_shape})[0];
+  std::vector<size_t> output_shape = residual->output_shapes({input_shape})[0];
 
   // Since main path is just scaling, output shape should match input
   EXPECT_EQ(output_shape, input_shape);
@@ -439,7 +439,7 @@ TEST_F(ResidualBlockTest, EdgeCaseZeroGradient) {
   Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
   input->fill(1.0f);
 
-  std::vector<size_t> output_shape = residual->output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = residual->output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   residual->forward({input}, {output});
 
@@ -472,7 +472,7 @@ TEST_F(ResidualBlockTest, EdgeCaseLargeValues) {
     input_data[i] = 1e6f;
   }
 
-  std::vector<size_t> output_shape = residual->output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = residual->output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   residual->forward({input}, {output});
 
@@ -501,7 +501,7 @@ TEST_F(ResidualBlockTest, EdgeCaseNegativeValues) {
     input_data[i] = -2.0f;
   }
 
-  std::vector<size_t> output_shape = residual->output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = residual->output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   residual->forward({input}, {output});
 
@@ -530,7 +530,7 @@ TEST_F(ResidualBlockTest, NumericalStabilitySmallValues) {
     input_data[i] = 1e-6f;
   }
 
-  std::vector<size_t> output_shape = residual->output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = residual->output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   residual->forward({input}, {output});
 
@@ -556,7 +556,7 @@ TEST_F(ResidualBlockTest, NumericalStabilityBackward) {
   Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
   input->fill(1e-6f);
 
-  std::vector<size_t> output_shape = residual->output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = residual->output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   residual->forward({input}, {output});
 
@@ -596,7 +596,7 @@ TEST_F(ResidualBlockTest, MultiLayerMainPath) {
     input_data[i] = 2.0f;
   }
 
-  std::vector<size_t> output_shape = residual->output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = residual->output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   residual->forward({input}, {output});
 
@@ -625,7 +625,7 @@ TEST_F(ResidualBlockTest, MultiLayerMainPathBackward) {
   Tensor input = make_tensor<float>({1, 1, 2, 2}, getHost());
   input->fill(1.0f);
 
-  std::vector<size_t> output_shape = residual->output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = residual->output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   residual->forward({input}, {output});
 
@@ -662,7 +662,7 @@ TEST_F(ResidualBlockTest, ReLUNegativeInputSuppressionForward) {
     input_data[i] = -1.0f;
   }
 
-  std::vector<size_t> output_shape = residual->output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = residual->output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   residual->forward({input}, {output});
 
@@ -691,7 +691,7 @@ TEST_F(ResidualBlockTest, ReLUNegativeInputSuppressionBackward) {
     input_data[i] = -1.0f;
   }
 
-  std::vector<size_t> output_shape = residual->output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = residual->output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   residual->forward({input}, {output});
 

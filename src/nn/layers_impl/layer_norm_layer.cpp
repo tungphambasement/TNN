@@ -214,16 +214,16 @@ void LayerNormLayer::cudnn_forward(const ConstTensor &input, const Tensor &outpu
 
   size_t workspace_size = current_stats.fwd_workspace_size;
   size_t workspace_elements = (workspace_size + io_dtype_size - 1) / io_dtype_size;
-  Tensor cudnn_workspace = this->get_buffer({workspace_elements});
+  Tensor cudnn_workspace = this->get_workspace({workspace_elements});
 
   // Cache mean and inv_variance for backward pass (like batch norm)
   Tensor &batch_mean = this->get_mutable_tensor(mb_id, "batch_mean");
   Tensor &batch_invar = this->get_mutable_tensor(mb_id, "batch_invar");
   if (batch_mean == nullptr) {
-    batch_mean = this->get_buffer({batch_size}, compute_dtype_);
+    batch_mean = this->get_workspace({batch_size}, compute_dtype_);
   }
   if (batch_invar == nullptr) {
-    batch_invar = this->get_buffer({batch_size}, compute_dtype_);
+    batch_invar = this->get_workspace({batch_size}, compute_dtype_);
   }
 
   if (this->is_training_) {
@@ -260,7 +260,7 @@ void LayerNormLayer::cudnn_backward(const ConstTensor &grad_output, const Tensor
   size_t io_dtype_size = get_dtype_size(io_dtype_);
   size_t workspace_size = current_stats.bwd_workspace_size;
   size_t workspace_elements = (workspace_size + io_dtype_size - 1) / io_dtype_size;
-  Tensor cudnn_workspace = this->get_buffer({workspace_elements});
+  Tensor cudnn_workspace = this->get_workspace({workspace_elements});
 
   // Retrieve cached mean and inv_variance from forward pass (like batch norm)
   const Tensor &batch_mean = this->get_mutable_tensor(mb_id, "batch_mean");

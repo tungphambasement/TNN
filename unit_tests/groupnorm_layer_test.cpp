@@ -174,7 +174,7 @@ TEST_F(GroupNormLayerTest, BasicForwardPass) {
     data[i] = static_cast<float>(i % 10);
   }
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
   verify_output_shape(input, output);
@@ -204,7 +204,7 @@ TEST_F(GroupNormLayerTest, ForwardPassWithAffine) {
     data[i] = static_cast<float>(i % 10) + 1.0f;
   }
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
   verify_output_shape(input, output);
@@ -239,7 +239,7 @@ TEST_F(GroupNormLayerTest, SingleGroup) {
     data[i] = static_cast<float>(i) + 1.0f;
   }
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
   verify_output_shape(input, output);
@@ -269,7 +269,7 @@ TEST_F(GroupNormLayerTest, ChannelsEqualsGroups) {
     data[i] = static_cast<float>((i * 3) % 7) + 0.5f;
   }
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
   verify_output_shape(input, output);
@@ -299,7 +299,7 @@ TEST_F(GroupNormLayerTest, BackwardPassGradientFlow) {
     data[i] = static_cast<float>(i % 10) + 1.0f;
   }
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
 

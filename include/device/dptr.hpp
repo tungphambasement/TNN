@@ -15,7 +15,7 @@
 
 namespace tnn {
 
-constexpr size_t DEFAULT_ALIGNMENT = 64;
+constexpr size_t DEFAULT_ALIGNMENT = 256;
 
 struct device_storage {
 private:
@@ -150,7 +150,11 @@ inline dptr make_dptr(csref<Device> device, size_t byte_size,
   if (!ptr) {
     throw std::runtime_error("Bad Alloc");
   }
-  auto storage = std::make_shared<device_storage>(device, ptr, byte_size, alignment);
+  auto storage = std::shared_ptr<device_storage>(
+      new device_storage(device, ptr, byte_size, alignment), [device](device_storage *s) {
+        device->deallocateAlignedMemory(s->data());
+        delete s;
+      });
   return dptr(storage, 0, byte_size);
 }
 

@@ -146,7 +146,7 @@ protected:
         const Job &forward_job = message.get<Job>();
         IAllocator &out_allocator = communicator_->out_allocator();
         DType_t input_dtype = forward_job.data->data_type();
-        auto output_shapes = this->model_->output_shape({forward_job.data->shape()});
+        auto output_shapes = this->model_->output_shapes({forward_job.data->shape()});
         auto output_shape = output_shapes[0];
         Tensor output_tensor = make_tensor(out_allocator, input_dtype, output_shape);
         this->model_->forward({forward_job.data}, {output_tensor}, forward_job.mb_id);

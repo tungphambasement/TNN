@@ -78,7 +78,7 @@ public:
 
   std::string type() const override { return TYPE_NAME; }
   LayerConfig get_config() const override;
-  Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shapes) const override;
+  Vec<Vec<size_t>> output_shapes(const Vec<Vec<size_t>> &input_shapes) const override;
   size_t fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
   size_t inf_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
   size_t bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;

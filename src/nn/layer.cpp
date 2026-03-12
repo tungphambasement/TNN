@@ -9,6 +9,8 @@
 
 #include <numeric>
 
+#include "device/flow.hpp"
+#include "device/pool_allocator.hpp"
 #include "type/type.hpp"
 
 namespace tnn {
@@ -124,7 +126,12 @@ Tensor &Layer::get_mutable_tensor(size_t mb_id, const std::string &key) {
   return mutable_tensors_[{mb_id, key}];
 }
 
-Tensor Layer::get_buffer(const std::vector<size_t> &shape, DType_t dtype) {
+Tensor Layer::get_tensor(const std::vector<size_t> &shape, DType_t dtype) {
+  auto &allocator = PoolAllocator::instance(device(), flow_handle_);
+  return make_tensor(allocator, dtype, shape);
+}
+
+Tensor Layer::get_workspace(const std::vector<size_t> &shape, DType_t dtype) {
   if (!allocator_) {
     throw std::runtime_error("Allocator is not set");
   }
@@ -132,6 +139,11 @@ Tensor Layer::get_buffer(const std::vector<size_t> &shape, DType_t dtype) {
                    get_dtype_size(dtype);
   dptr buffer = allocator_->allocate(byte_size);
   return make_tensor(*allocator_, dtype, shape, std::move(buffer));
+}
+
+Tensor Layer::get_act(const std::vector<size_t> &shape) {
+  auto &allocator = PoolAllocator::instance(device(), flow_handle_);
+  return make_tensor(allocator, io_dtype_, shape);
 }
 
 void Layer::clear_cache(size_t mb_id) {

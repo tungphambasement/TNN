@@ -63,7 +63,7 @@ public:
                 size_t mb_id = 0) override;
 
   LayerConfig get_config() const override;
-  Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shapes) const override;
+  Vec<Vec<size_t>> output_shapes(const Vec<Vec<size_t>> &input_shapes) const override;
   size_t fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
   size_t inf_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
   size_t bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;

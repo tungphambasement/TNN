@@ -43,8 +43,8 @@ public:
 
   void set_training(bool training) { layer_->set_training(training); }
 
-  Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shapes) const {
-    return layer_->output_shape(input_shapes);
+  Vec<Vec<size_t>> output_shapes(const Vec<Vec<size_t>> &input_shapes) const {
+    return layer_->output_shapes(input_shapes);
   }
 
   Vec<Tensor> parameters() { return layer_->parameters(); }

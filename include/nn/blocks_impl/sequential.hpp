@@ -23,9 +23,7 @@ namespace tnn {
 class Sequential : public Block {
 private:
   std::vector<std::unique_ptr<Layer>> layers_;
-  std::unordered_map<size_t, Vec<size_t>> input_shape_cache_;
-
-  Vec<size_t> out_sizes(const std::vector<size_t> &shape, DType_t dtype);
+  std::unordered_map<size_t, Vec<Vec<size_t>>> input_shapes_cache_;
 
   Vec<size_t> fwd_workspace_sizes(const std::vector<size_t> &shape);
   Vec<size_t> bwd_workspace_sizes(const std::vector<size_t> &shape);
@@ -51,7 +49,7 @@ public:
   void backward(const Vec<ConstTensor> &grad_outputs, const Vec<Tensor> &grad_inputs,
                 size_t mb_id) override;
 
-  Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shapes) const override;
+  Vec<Vec<size_t>> output_shapes(const Vec<Vec<size_t>> &input_shapes) const override;
   size_t fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
   size_t inf_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
   size_t bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;

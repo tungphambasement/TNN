@@ -157,7 +157,7 @@ TEST_F(LegacyBatchNormLayerTest, BasicForwardPassTraining) {
     input_data[i] = static_cast<float>(i % 10);
   }
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
 
@@ -185,7 +185,7 @@ TEST_F(LegacyBatchNormLayerTest, ForwardPassWithAffineTraining) {
     input_data[i] = static_cast<float>(i % 10);
   }
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
 
@@ -213,7 +213,7 @@ TEST_F(LegacyBatchNormLayerTest, ForwardPassSingleChannel) {
   Tensor input = make_tensor<float>({4, 1, 8, 8}, getHost());
   input->fill(2.5f);
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
 
@@ -242,7 +242,7 @@ TEST_F(LegacyBatchNormLayerTest, ForwardPassMultiBatch) {
     input_data[i] = static_cast<float>((i % 20) - 10);
   }
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
 
@@ -266,7 +266,7 @@ TEST_F(LegacyBatchNormLayerTest, ForwardPassLargeFeatures) {
     input_data[i] = static_cast<float>(i % 100) / 10.0f;
   }
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
 
@@ -291,7 +291,7 @@ TEST_F(LegacyBatchNormLayerTest, ForwardPassInference) {
     input_data[i] = static_cast<float>(i % 10);
   }
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
 
@@ -318,7 +318,7 @@ TEST_F(LegacyBatchNormLayerTest, ForwardPassInferenceWithAffine) {
   Tensor input = make_tensor<float>({1, 2, 4, 4}, getHost());
   input->fill(1.0f);
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
 
@@ -341,7 +341,7 @@ TEST_F(LegacyBatchNormLayerTest, BasicBackwardPass) {
     input_data[i] = static_cast<float>(i % 10);
   }
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
 
@@ -371,7 +371,7 @@ TEST_F(LegacyBatchNormLayerTest, BackwardPassWithAffine) {
     input_data[i] = static_cast<float>(i % 10);
   }
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
 
@@ -404,7 +404,7 @@ TEST_F(LegacyBatchNormLayerTest, BackwardPassMultiBatch) {
   Tensor input = make_tensor<float>({8, 2, 4, 4}, getHost());
   input->fill(1.0f);
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
 
@@ -433,7 +433,7 @@ TEST_F(LegacyBatchNormLayerTest, BackwardPassZeroGradient) {
   Tensor input = make_tensor<float>({2, 2, 4, 4}, getHost());
   input->fill(1.0f);
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
 
@@ -458,7 +458,7 @@ TEST_F(LegacyBatchNormLayerTest, ComputeOutputShape) {
   std::vector<size_t> input_shape = {4, 16, 32, 32};
   std::vector<size_t> expected_shape = {4, 16, 32, 32};
 
-  std::vector<size_t> output_shape = layer->output_shape({input_shape})[0];
+  std::vector<size_t> output_shape = layer->output_shapes({input_shape})[0];
 
   EXPECT_EQ(output_shape, expected_shape);
 }
@@ -564,7 +564,7 @@ TEST_F(LegacyBatchNormLayerTest, EdgeCaseSmallBatch) {
     input_data[i] = static_cast<float>(i % 10);
   }
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
 
@@ -585,7 +585,7 @@ TEST_F(LegacyBatchNormLayerTest, EdgeCaseLargeEpsilon) {
   Tensor input = make_tensor<float>({2, 2, 4, 4}, getHost());
   input->fill(1.0f);
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
 
@@ -609,7 +609,7 @@ TEST_F(LegacyBatchNormLayerTest, EdgeCaseSmallSpatialSize) {
     input_data[i] = static_cast<float>(i);
   }
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
 
@@ -632,7 +632,7 @@ TEST_F(LegacyBatchNormLayerTest, EdgeCaseLargeValues) {
   Tensor input = make_tensor<float>({2, 2, 4, 4}, getHost());
   input->fill(1e6f);
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
 
@@ -660,7 +660,7 @@ TEST_F(LegacyBatchNormLayerTest, EdgeCaseNegativeValues) {
     input_data[i] = -static_cast<float>(i + 1);
   }
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
 
@@ -681,7 +681,7 @@ TEST_F(LegacyBatchNormLayerTest, NumericalStabilitySmallValues) {
   Tensor input = make_tensor<float>({2, 2, 4, 4}, getHost());
   input->fill(1e-6f);
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
 
@@ -704,7 +704,7 @@ TEST_F(LegacyBatchNormLayerTest, NumericalStabilityMixedValues) {
     input_data[i] = (i % 2 == 0) ? 1e6f : 1e-6f;
   }
 
-  std::vector<size_t> output_shape = node.output_shape({input->shape()})[0];
+  std::vector<size_t> output_shape = node.output_shapes({input->shape()})[0];
   Tensor output = make_tensor<float>(output_shape, getHost());
   node.forward({input}, {output});
 

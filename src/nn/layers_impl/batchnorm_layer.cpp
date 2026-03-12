@@ -152,17 +152,17 @@ void BatchNormLayer::cudnn_forward(const ConstTensor &input, const Tensor &outpu
       batch_mean = this->make_io_tensor({num_features_});
     }
     if (use_relu_ && relu_mask == nullptr) {
-      relu_mask = make_tensor(*allocator_, DType_t::UINT8_T, input->shape());
+      relu_mask = this->get_tensor(input->shape(), DType_t::UINT8_T);
     }
     size_t workspace_elems = (current_stats.fwd_workspace_size + io_dtype_size - 1) / io_dtype_size;
-    Tensor workspace = this->get_buffer({workspace_elems}, io_dtype_);
+    Tensor workspace = this->get_workspace({workspace_elems}, io_dtype_);
     DISPATCH_ON_3_DTYPES_TO_METHOD(forward_training_task, fe_handle, current_stats, input, output,
                                    gamma_, beta_, running_mean_, running_var_, running_mean_,
                                    running_var_, batch_mean, batch_invar, relu_mask, workspace,
                                    this->flow_handle_);
   } else {
     size_t workspace_elems = (current_stats.inf_workspace_size + io_dtype_size - 1) / io_dtype_size;
-    Tensor workspace = this->get_buffer({workspace_elems}, io_dtype_);
+    Tensor workspace = this->get_workspace({workspace_elems}, io_dtype_);
     DISPATCH_ON_3_DTYPES_TO_METHOD(forward_inference_task, fe_handle, current_stats, input, output,
                                    gamma_, beta_, running_mean_, running_var_, workspace,
                                    this->flow_handle_);
@@ -193,7 +193,7 @@ void BatchNormLayer::cudnn_backward(const ConstTensor &grad_output, const Tensor
   BatchNormStats &current_stats = stats_cache.at(shape_key);
 
   size_t io_dtype_size = get_dtype_size(io_dtype_);
-  Tensor workspace = this->get_buffer(
+  Tensor workspace = this->get_workspace(
       {(current_stats.bwd_workspace_size + io_dtype_size - 1) / io_dtype_size}, io_dtype_);
   grad_input->ensure(grad_output->shape());
 

@@ -11,7 +11,7 @@ public:
                size_t mb_id = 0) override;
   void backward(const std::vector<ConstTensor> &gradients, const std::vector<Tensor> &grad_inputs,
                 size_t mb_id = 0) override;
-  Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shapes) const override;
+  Vec<Vec<size_t>> output_shapes(const Vec<Vec<size_t>> &input_shapes) const override;
 
 protected:
   virtual void forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id = 0) = 0;

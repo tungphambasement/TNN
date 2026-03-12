@@ -23,25 +23,11 @@
 #include "type/type.hpp"
 
 namespace tnn {
-
-// Compute M_i (i in [0, n))
-Vec<size_t> Sequential::out_sizes(const std::vector<size_t> &shape, DType_t dtype) {
-  Vec<size_t> buffer_size(layers_.size());
-  size_t element_size = get_dtype_size(dtype);
-  Vec<size_t> current_shape = shape;
-  for (size_t i = 0; i < layers_.size(); ++i) {
-    current_shape = layers_[i]->output_shape({current_shape})[0];
-    buffer_size[i] = std::accumulate(current_shape.begin(), current_shape.end(), element_size,
-                                     std::multiplies<size_t>());
-  }
-  return buffer_size;
-}
-
 Vec<size_t> Sequential::fwd_workspace_sizes(const std::vector<size_t> &shape) {
   Vec<size_t> workspace_sizes;
   Vec<size_t> current_shape = shape;
   for (size_t i = 0; i < layers_.size(); ++i) {
-    current_shape = layers_[i]->output_shape({current_shape})[0];
+    current_shape = layers_[i]->output_shapes({current_shape})[0];
     size_t ws = layers_[i]->fwd_workspace({{current_shape}});
     workspace_sizes.push_back(ws);
   }
@@ -52,7 +38,7 @@ Vec<size_t> Sequential::bwd_workspace_sizes(const std::vector<size_t> &shape) {
   Vec<size_t> workspace_sizes;
   Vec<size_t> current_shape = shape;
   for (size_t i = 0; i < layers_.size(); ++i) {
-    current_shape = layers_[i]->output_shape({current_shape})[0];
+    current_shape = layers_[i]->output_shapes({current_shape})[0];
     size_t ws = layers_[i]->bwd_workspace({{current_shape}});
     workspace_sizes.push_back(ws);
   }
@@ -63,52 +49,33 @@ void Sequential::forward(const Vec<ConstTensor> &inputs, const Vec<Tensor> &outp
   if (layers_.empty()) {
     throw std::runtime_error("Cannot forward through empty sequential model");
   }
-  const ConstTensor &input = inputs[0];
-  const Tensor &output = outputs[0];
-
-  input_shape_cache_[mb_id] = input->shape();
-  ConstTensor current_input = input;
-  Tensor current_output = nullptr;
-  if (is_training_) {
-    for (size_t i = 0; i < layers_.size(); ++i) {
-      if (i < layers_.size() - 1) {
-        current_output = this->get_buffer(layers_[i]->output_shape({current_input->shape()})[0],
-                                          input->data_type());
-      } else {
-        current_output = output;
+  Vec<Vec<size_t>> input_shapes(inputs.size());
+  for (size_t i = 0; i < inputs.size(); ++i) {
+    input_shapes[i] = inputs[i]->shape();
+  }
+  Vec<Vec<Vec<size_t>>> out_shapes(layers_.size());
+  out_shapes[0] = layers_[0]->output_shapes(input_shapes);
+  for (size_t i = 1; i < layers_.size(); ++i) {
+    out_shapes[i] = layers_[i]->output_shapes(out_shapes[i - 1]);
+  }
+  input_shapes_cache_[mb_id] = input_shapes;
+  Vec<ConstTensor> current_inputs = inputs;
+  for (size_t i = 0; i < layers_.size(); ++i) {
+    Vec<Tensor> current_outputs;
+    if (i == layers_.size() - 1) {
+      current_outputs = outputs;
+    } else {
+      current_outputs.resize(out_shapes[i].size());
+      for (size_t j = 0; j < out_shapes[i].size(); ++j) {
+        if (is_training_) {
+          current_outputs[j] = this->get_act(out_shapes[i][j]);
+        } else {
+          current_outputs[j] = this->get_workspace(out_shapes[i][j], io_dtype_);
+        }
       }
-      std::cout << fmt::format(
-                       "Forwarding through layer {} with type {}: input shape {}, output shape {}, "
-                       "workspace size {} bytes",
-                       i, layers_[i]->type(), fmt::join(current_input->shape(), "x"),
-                       current_output->shape(),
-                       layers_[i]->fwd_workspace({{current_input->shape()}}))
-                << std::endl;
-      layers_[i]->forward({current_input}, {current_output}, mb_id);
-      current_input = current_output;
     }
-  } else {
-    Vec<size_t> m = this->out_sizes(input->shape(), input->data_type());
-    size_t m_b = 0;
-    for (size_t i = 0; i < m.size() - 1; ++i) {
-      m_b = std::max(m_b, m[i] + m[i + 1]);
-    }
-    dptr buffer = allocator_->allocate(m_b);
-    int side = 0;
-    DType_t dtype = input->data_type();
-    for (size_t i = 0; i < layers_.size(); ++i) {
-      if (i < layers_.size() - 1) {
-        size_t offset = side ? m_b - m[i] : 0;
-        dptr out_ptr = buffer.span(offset, m[i]);
-        Vec<size_t> out_shape = layers_[i]->output_shape({current_input->shape()})[0];
-        current_output = make_tensor(*allocator_, dtype, out_shape, std::move(out_ptr));
-      } else {
-        current_output = output;
-      }
-      layers_[i]->forward({current_input}, {current_output}, mb_id);
-      side = 1 - side;
-      current_input = current_output;
-    }
+    layers_[i]->forward(current_inputs, current_outputs, mb_id);
+    current_inputs = Vec<ConstTensor>(current_outputs.begin(), current_outputs.end());
   }
   this->device().getFlow(this->flow_handle_)->synchronize();
 }
@@ -118,43 +85,30 @@ void Sequential::backward(const Vec<ConstTensor> &grad_outputs, const Vec<Tensor
   if (layers_.empty()) {
     throw std::runtime_error("Cannot backward through empty sequential model");
   }
-  const ConstTensor &grad_output = grad_outputs[0];
-  const Tensor &grad_input = grad_inputs[0];
-
-  auto it_input_shape = input_shape_cache_.find(mb_id);
-  if (it_input_shape == input_shape_cache_.end()) {
+  auto it_in_shapes = input_shapes_cache_.find(mb_id);
+  if (it_in_shapes == input_shapes_cache_.end()) {
     throw std::runtime_error("No cached input shape found for micro-batch ID: " +
                              std::to_string(mb_id));
   }
-  Vec<size_t> input_shape = it_input_shape->second;
-  Vec<size_t> m = this->out_sizes(input_shape, grad_output->data_type());
-  Vec<Vec<size_t>> out_shapes(layers_.size());
-  out_shapes[0] = layers_[0]->output_shape({input_shape})[0];
+  Vec<Vec<size_t>> input_shape = it_in_shapes->second;
+  Vec<Vec<Vec<size_t>>> out_shapes(layers_.size());
+  out_shapes[0] = layers_[0]->output_shapes(input_shape);
   for (size_t i = 1; i < layers_.size(); ++i) {
-    out_shapes[i] = layers_[i]->output_shape({out_shapes[i - 1]})[0];
+    out_shapes[i] = layers_[i]->output_shapes(out_shapes[i - 1]);
   }
-  size_t m_b = 0;
-  for (size_t i = 0; i < m.size() - 1; ++i) {
-    m_b = std::max(m_b, m[i] + m[i + 1]);
-  }
-  dptr buffer = allocator_->allocate(m_b);
-  ConstTensor current_gradient = grad_output;
-  Tensor current_grad_input = nullptr;
-  int side = 0;
+  Vec<ConstTensor> current_gradients = grad_outputs;
   for (int i = static_cast<int>(layers_.size()) - 1; i >= 0; --i) {
-    // no need to renew buffer since backward doesn't cache inputs
-    if (i > 0) {
-      size_t offset = side ? m_b - m[i - 1] : 0;
-      Vec<size_t> grad_input_shape = out_shapes[i - 1];
-      dptr grad_input_ptr = buffer.span(offset, m[i - 1]);
-      current_grad_input = make_tensor(*allocator_, grad_output->data_type(), grad_input_shape,
-                                       std::move(grad_input_ptr));
-      layers_[i]->backward({current_gradient}, {current_grad_input}, mb_id);
-      side = 1 - side;
-      current_gradient = current_grad_input;
+    Vec<Tensor> current_grad_input;
+    if (i == 0) {
+      current_grad_input = grad_inputs;
     } else {
-      layers_[i]->backward({current_gradient}, {grad_input}, mb_id);
+      current_grad_input.resize(out_shapes[i - 1].size());
+      for (size_t j = 0; j < out_shapes[i - 1].size(); ++j) {
+        current_grad_input[j] = this->get_workspace(out_shapes[i - 1][j], io_dtype_);
+      }
     }
+    layers_[i]->backward(current_gradients, current_grad_input, mb_id);
+    current_gradients = Vec<ConstTensor>(current_grad_input.begin(), current_grad_input.end());
   }
   this->device().getFlow(this->flow_handle_)->synchronize();
 }
@@ -164,14 +118,14 @@ Sequential::Sequential(std::vector<std::unique_ptr<Layer>> layers, const std::st
   layers_ = std::move(layers);
 }
 
-Vec<Vec<size_t>> Sequential::output_shape(const Vec<Vec<size_t>> &input_shapes) const {
+Vec<Vec<size_t>> Sequential::output_shapes(const Vec<Vec<size_t>> &input_shapes) const {
   if (layers_.empty()) {
     return input_shapes;
   }
 
   Vec<Vec<size_t>> current_shapes = input_shapes;
   for (const auto &layer : layers_) {
-    current_shapes[0] = layer->output_shape({current_shapes[0]})[0];
+    current_shapes = layer->output_shapes(current_shapes);
   }
 
   return current_shapes;
@@ -187,7 +141,7 @@ size_t Sequential::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
     total_ws += layer->fwd_workspace({{current_shape}});
     total_ws += std::accumulate(current_shape.begin(), current_shape.end(),
                                 get_dtype_size(io_dtype_), std::multiplies<size_t>());
-    current_shape = layer->output_shape({current_shape})[0];
+    current_shape = layer->output_shapes({current_shape})[0];
   }
   return total_ws;
 }
@@ -201,7 +155,7 @@ size_t Sequential::inf_workspace(const Vec<Vec<size_t>> &input_shapes) const {
   Vec<size_t> sub_ws;
   Vec<size_t> cur = input_shape;
   for (const auto &layer : layers_) {
-    Vec<size_t> out = layer->output_shape({cur})[0];
+    Vec<size_t> out = layer->output_shapes({cur})[0];
     size_t bytes = std::accumulate(out.begin(), out.end(), dtype_size, std::multiplies<size_t>());
     out_bytes.push_back(bytes);
     sub_ws.push_back(layer->inf_workspace({{cur}}));
@@ -224,7 +178,7 @@ size_t Sequential::bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
   Vec<size_t> sub_ws;
   Vec<size_t> cur = input_shape;
   for (const auto &layer : layers_) {
-    Vec<size_t> out = layer->output_shape({cur})[0];
+    Vec<size_t> out = layer->output_shapes({cur})[0];
     size_t bytes = std::accumulate(out.begin(), out.end(), dtype_size, std::multiplies<size_t>());
     out_bytes.push_back(bytes);
     sub_ws.push_back(layer->bwd_workspace({{cur}}));
@@ -268,9 +222,9 @@ void Sequential::print_summary(const std::vector<size_t> &input_shape) const {
 
     std::cout << std::setw(20) << format_shape(current_shape);
 
-    auto output_shape = layer->output_shape({current_shape})[0];
+    auto output_shape = layer->output_shapes({current_shape})[0];
     std::cout << std::setw(20) << format_shape(output_shape) << "\n";
-    current_shape = layer->output_shape({current_shape})[0];
+    current_shape = layer->output_shapes({current_shape})[0];
   }
   std::cout << std::string(100, '-') << "\n";
 }

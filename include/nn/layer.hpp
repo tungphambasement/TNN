@@ -55,7 +55,7 @@ public:
   Layer &set_training(bool training);
   bool is_training() const;
 
-  virtual Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shapes) const = 0;
+  virtual Vec<Vec<size_t>> output_shapes(const Vec<Vec<size_t>> &input_shapes) const = 0;
   virtual size_t fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const { return 0; }
   virtual size_t inf_workspace(const Vec<Vec<size_t>> &input_shapes) const { return 0; }
   virtual size_t bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const { return 0; }
@@ -104,7 +104,9 @@ protected:
   Tensor make_compute_tensor(std::vector<size_t> shape);
   ConstTensor &get_cached_tensor(size_t mb_id, const std::string &key);
   Tensor &get_mutable_tensor(size_t mb_id, const std::string &key);
-  Tensor get_buffer(const std::vector<size_t> &shape, DType_t dtype = DType_t::FP32);
+  Tensor get_workspace(const std::vector<size_t> &shape, DType_t dtype = DType_t::FP32);
+  Tensor get_tensor(const std::vector<size_t> &shape, DType_t dtype = DType_t::FP32);
+  Tensor get_act(const std::vector<size_t> &shape);
   void clear_cache(size_t mb_id);
 };
 

@@ -23,7 +23,7 @@ public:
   std::vector<size_t> get_current_shape() const {
     std::vector<size_t> current_shape = input_shape_;
     for (const auto &layer : layers_) {
-      current_shape = layer->output_shape({current_shape})[0];
+      current_shape = layer->output_shapes({current_shape})[0];
     }
     return current_shape;
   }

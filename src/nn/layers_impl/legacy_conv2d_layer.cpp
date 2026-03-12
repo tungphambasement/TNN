@@ -284,7 +284,7 @@ void LegacyConv2DLayer::cudnn_forward(const ConstTensor &input, const Tensor &ou
   size_t io_dtype_size = get_dtype_size(io_dtype_);
   size_t workspace_elements = (stats.fwd_workspace_size + io_dtype_size - 1) / io_dtype_size;
   std::cout << "Conv2D forward workspace size (bytes): " << stats.fwd_workspace_size << std::endl;
-  Tensor cudnn_workspace = this->get_buffer({workspace_elements});
+  Tensor cudnn_workspace = this->get_workspace({workspace_elements});
 
   if (this->is_training_) {
     ConstTensor &cached_input = this->get_cached_tensor(mb_id, "input");
@@ -321,7 +321,7 @@ void LegacyConv2DLayer::cudnn_backward(const ConstTensor &grad_output, const Ten
 
   size_t io_dtype_size = get_dtype_size(io_dtype_);
   size_t workspace_elements = (bwd_workspace + io_dtype_size - 1) / io_dtype_size;
-  Tensor cudnn_workspace = this->get_buffer({workspace_elements, 1, 1, 1});
+  Tensor cudnn_workspace = this->get_workspace({workspace_elements, 1, 1, 1});
 
   DISPATCH_ON_3_DTYPES_TO_METHOD(cudnn_backward_filter, input, grad_output, weight_gradients_,
                                  batch_size, input_h, input_w, output_h, output_w, cudnn_workspace,

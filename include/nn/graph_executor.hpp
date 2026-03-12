@@ -1,7 +1,11 @@
 #pragma once
 
+#include <cstddef>
+
+#include "device/del_allocator.hpp"
 #include "device/iallocator.hpp"
 #include "nn/graph.hpp"
+#include "type/type.hpp"
 
 namespace tnn {
 
@@ -16,6 +20,10 @@ public:
     // initialize node outputs
     for (auto& [uid, node] : graph_.io_nodes()) {
       node_outputs_[&node] = Output{nullptr, nullptr};
+    }
+    ws_allocator_ = DELAllocator::create(graph_.device(), defaultFlowHandle);
+    for (auto& op : graph_.ops()) {
+      op->layer()->set_allocator(*ws_allocator_);
     }
   }
 
@@ -68,7 +76,8 @@ public:
 
 private:
   Graph& graph_;
-  IAllocator& allocator_;
+  IAllocator& allocator_;                       // long lived tensors
+  std::shared_ptr<DELAllocator> ws_allocator_;  // workspace allocator. short lived tensors
 
   struct Output {
     Tensor act;
@@ -78,6 +87,7 @@ private:
   std::unordered_map<const IONode*, Output> node_outputs_;
 
   void forward(OpNode& node) {
+    Vec<Vec<size_t>> input_shapes;
     // gather inputs
     const std::vector<IONode*>& input_nodes = node.inputs();
     Vec<ConstTensor> inputs;
@@ -87,19 +97,14 @@ private:
         throw std::runtime_error("Null input while forwarding graph");
       }
       inputs.push_back(act);
+      input_shapes.push_back(act->shape());
     }
 
     // gather outputs
     const std::vector<IONode*>& output_nodes = node.outputs();
     Vec<Tensor> outputs;
-    auto out_shapes = inputs |
-                      std::views::transform([&](const ConstTensor& t) { return t->shape(); }) |
-                      std::views::transform(
-                          [&](const Vec<size_t>& shape) { return node.output_shape({shape})[0]; });
+    auto out_shapes = node.output_shapes(input_shapes);
     DType_t dtype = inputs[0]->data_type();
-    if (out_shapes.size() != output_nodes.size()) {
-      throw std::runtime_error("Num output shapes does not match num output nodes");
-    }
     for (size_t i = 0; i < output_nodes.size(); ++i) {
       IONode* output_node = output_nodes[i];
       Vec<size_t> out_shape = out_shapes[i];
@@ -112,6 +117,14 @@ private:
       outputs.push_back(act);
     }
 
+    size_t ws_bytes = node.layer()->is_training()
+                          ? std::max(node.layer()->fwd_workspace(input_shapes),
+                                     node.layer()->bwd_workspace(input_shapes))
+                          : node.layer()->inf_workspace(input_shapes);
+    std::cout << fmt::format("Forwarding node {} with type {}: workspace size {} bytes", node.uid(),
+                             node.type(), ws_bytes)
+              << std::endl;
+    ws_allocator_->reserve(ws_bytes);
     node.forward(inputs, outputs);
   }
 
@@ -128,6 +141,7 @@ private:
     }
 
     // gather downstream grad_output
+    Vec<Vec<size_t>> input_shapes;
     const std::vector<IONode*>& input_nodes = node.inputs();
     Vec<Tensor> grad_inputs;
     for (const auto& input_node : input_nodes) {
@@ -144,8 +158,13 @@ private:
         grad->ensure(input_act->shape());
       }
       grad_inputs.push_back(grad);
+      input_shapes.push_back(input_act->shape());
     }
 
+    size_t ws_bytes = node.layer()->bwd_workspace(input_shapes);
+    std::cout << fmt::format("Backwarding node {} with type {}: workspace size {} bytes",
+                             node.uid(), node.type(), ws_bytes)
+              << std::endl;
     node.backward(gradients, grad_inputs);
   }
 };

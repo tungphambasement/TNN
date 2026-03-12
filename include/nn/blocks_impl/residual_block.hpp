@@ -31,7 +31,7 @@ private:
   std::vector<std::unique_ptr<Layer>> shortcut_path_;
   std::unique_ptr<ActivationFunction> final_activation_;
   std::unordered_map<size_t, Tensor> pre_activation_cache_;
-  std::unordered_map<size_t, std::vector<size_t>> input_shape_cache_;
+  std::unordered_map<size_t, Vec<Vec<size_t>>> input_shape_cache_;
   std::string activation_type_;
 
   std::vector<Layer *> layers() override {
@@ -67,7 +67,7 @@ public:
   void backward(const Vec<ConstTensor> &grad_outputs, const Vec<Tensor> &grad_inputs,
                 size_t mb_id = 0) override;
 
-  Vec<Vec<size_t>> output_shape(const Vec<Vec<size_t>> &input_shapes) const override;
+  Vec<Vec<size_t>> output_shapes(const Vec<Vec<size_t>> &input_shapes) const override;
   size_t fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
   size_t inf_workspace(const Vec<Vec<size_t>> &input_shapes) const override;
   size_t bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const override;

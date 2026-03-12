@@ -6,14 +6,14 @@
 using namespace tnn;
 
 int main() {
-  DELAllocator alloc(getHost(), defaultFlowHandle);
-  alloc.reserve(100);
+  auto allocator = DELAllocator::create(getGPU(), defaultFlowHandle);
+  allocator->reserve(100);
 
-  auto ptr1 = alloc.allocate(10);
-  auto ptr2 = alloc.allocate(20);
-  alloc.flip();
-  auto ptr3 = alloc.allocate(15);
-  auto ptr4 = alloc.allocate(25);
+  auto ptr1 = allocator->allocate(10);
+  auto ptr2 = allocator->allocate(20);
+  allocator->flip();
+  auto ptr3 = allocator->allocate(15);
+  auto ptr4 = allocator->allocate(25);
 
   // ptr1 [0-10]
   // ptr2 [10-30]
@@ -29,7 +29,7 @@ int main() {
 
   ptr4 = nullptr;
 
-  auto ptrX = alloc.allocate(30);
+  auto ptrX = allocator->allocate(30);
 
   return 0;
 }

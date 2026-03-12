@@ -22,7 +22,7 @@ void SISOLayer::forward(const std::vector<ConstTensor> &inputs, const std::vecto
   ConstTensor current = inputs[0];
   Tensor device_input;
   if (inputs[0]->device() != this->device()) {
-    device_input = this->get_buffer(inputs[0]->shape(), inputs[0]->data_type());
+    device_input = this->get_act(inputs[0]->shape());
     inputs[0]->copy_to(device_input);
     current = device_input;
   }
@@ -58,7 +58,7 @@ void SISOLayer::backward(const std::vector<ConstTensor> &gradients,
   ConstTensor current_gradient = gradients[0];
   Tensor device_gradient;
   if (gradients[0]->device() != this->device()) {
-    device_gradient = this->get_buffer(gradients[0]->shape(), gradients[0]->data_type());
+    device_gradient = this->get_workspace(gradients[0]->shape(), gradients[0]->data_type());
     gradients[0]->copy_to(device_gradient);
     current_gradient = device_gradient;
   }
@@ -73,7 +73,7 @@ void SISOLayer::backward(const std::vector<ConstTensor> &gradients,
   clear_cache(mb_id);
 }
 
-Vec<Vec<size_t>> SISOLayer::output_shape(const Vec<Vec<size_t>> &input_shapes) const {
+Vec<Vec<size_t>> SISOLayer::output_shapes(const Vec<Vec<size_t>> &input_shapes) const {
   if (input_shapes.size() != 1) {
     throw std::runtime_error("Only single input supported in output_shape for SISO layers.");
   }
