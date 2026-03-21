@@ -204,10 +204,13 @@ private:
   dptr create_dptr(size_t offset, size_t size) {
     void *slice_ptr = static_cast<uint8_t *>(slab_ptr_) + offset;
 
-    // Tracking active pointers
+    std::cout << fmt::format(
+                     "DELAllocator: Allocated block of size {} bytes at offset {}, active "
+                     "allocations: {}",
+                     size, offset, active_allocations_ + 1)
+              << std::endl;
     active_allocations_++;
 
-    // FIX 4: Bind a strong reference so the allocator lives as long as the dptr
     auto self_shared = shared_from_this();
 
     auto storage = std::shared_ptr<device_storage>(
@@ -227,6 +230,11 @@ private:
     if (active_allocations_ > 0) {
       active_allocations_--;
     }
+    std::cout << fmt::format(
+                     "DELAllocator: Reclaimed block of size {} bytes at offset {}, active "
+                     "allocations: {}",
+                     size, offset, active_allocations_)
+              << std::endl;
 
     auto next_it = free_by_offset_.lower_bound(offset + size);
     if (next_it != free_by_offset_.end() && offset + size == next_it->first) {
