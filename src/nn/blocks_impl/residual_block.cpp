@@ -73,7 +73,7 @@ void ResidualBlock::forward_impl(const Vec<ConstTensor> &inputs, const Vec<Tenso
   Vec<Tensor> main_outputs(main_output_shapes.size());
   for (size_t j = 0; j < main_output_shapes.size(); ++j) {
     // will be discarded after forward, so no need to keep it for backward
-    main_outputs[j] = this->get_act();
+    main_outputs[j] = this->get_workspace({}, io_dtype_);
   }
   main_path_->forward(inputs, main_outputs, mb_id);
 
@@ -84,7 +84,7 @@ void ResidualBlock::forward_impl(const Vec<ConstTensor> &inputs, const Vec<Tenso
     Vec<Vec<size_t>> shortcut_output_shapes = shortcut_path_->output_shapes(input_shapes);
     Vec<Tensor> shortcut_output_tensors(shortcut_output_shapes.size());
     for (size_t j = 0; j < shortcut_output_shapes.size(); ++j) {
-      shortcut_output_tensors[j] = this->get_act();
+      shortcut_output_tensors[j] = this->get_workspace({}, io_dtype_);
     }
     shortcut_path_->forward(inputs, shortcut_output_tensors, mb_id);
     shortcut_outputs =
@@ -143,7 +143,7 @@ void ResidualBlock::backward_impl(const Vec<ConstTensor> &grad_outputs,
   // Backward through main path
   Vec<Tensor> main_grad_inputs(input_shapes.size());
   for (size_t j = 0; j < input_shapes.size(); ++j) {
-    main_grad_inputs[j] = this->get_act();
+    main_grad_inputs[j] = this->get_workspace({}, io_dtype_);
   }
   main_path_->backward(grads_to_propagate, main_grad_inputs, mb_id);
 
@@ -153,7 +153,7 @@ void ResidualBlock::backward_impl(const Vec<ConstTensor> &grad_outputs,
   if (shortcut_path_) {
     Vec<Tensor> shortcut_grad_input_tensors(input_shapes.size());
     for (size_t j = 0; j < input_shapes.size(); ++j) {
-      shortcut_grad_input_tensors[j] = this->get_act();
+      shortcut_grad_input_tensors[j] = this->get_workspace({}, io_dtype_);
       shortcut_grad_inputs[j] = shortcut_grad_input_tensors[j];
     }
     shortcut_path_->backward(grads_to_propagate, shortcut_grad_input_tensors, mb_id);

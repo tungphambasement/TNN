@@ -40,13 +40,17 @@ void Sequential::forward_impl(const Vec<ConstTensor> &inputs, const Vec<Tensor> 
   input_shapes_cache_[mb_id] = input_shapes;
   Vec<ConstTensor> current_inputs = inputs;
   for (size_t i = 0; i < layers_.size(); ++i) {
+    Vec<Vec<size_t>> current_input_shapes = (i == 0) ? input_shapes : out_shapes[i - 1];
     Vec<Tensor> current_outputs;
     if (i == layers_.size() - 1) {
       current_outputs = outputs;
     } else {
       current_outputs.resize(out_shapes[i].size());
       for (size_t j = 0; j < out_shapes[i].size(); ++j) {
-        current_outputs[j] = this->get_act();
+        if (layers_[i]->fwd_cache_bytes(current_input_shapes) > 0)
+          current_outputs[j] = this->get_act();
+        else
+          current_outputs[j] = this->get_workspace({}, io_dtype_);
       }
       if (!is_training_) {
         allocator_->flip();
@@ -82,7 +86,7 @@ void Sequential::backward_impl(const Vec<ConstTensor> &grad_outputs, const Vec<T
     } else {
       current_grad_inputs.resize(out_shapes[i - 1].size());
       for (size_t j = 0; j < out_shapes[i - 1].size(); ++j) {
-        current_grad_inputs[j] = this->get_act();
+        current_grad_inputs[j] = this->get_workspace({}, io_dtype_);
       }
       allocator_->flip();  // algorithm 1 definitely applies
     }
