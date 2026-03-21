@@ -26,6 +26,16 @@ struct ParamDescriptor {
   Tensor *grad_ptr;  // pointer to the actual grad_output
 };
 
+inline size_t get_shapes_bytes(const Vec<Vec<size_t>> &shapes, DType_t dtype) {
+  size_t total_bytes = 0;
+  size_t dtype_size = get_dtype_size(dtype);
+  for (const auto &shape : shapes) {
+    total_bytes +=
+        std::accumulate(shape.begin(), shape.end(), dtype_size, std::multiplies<size_t>());
+  }
+  return total_bytes;
+}
+
 // Single input/output layer interface. Can be easily extended to multiple inputs/outputs later if
 // needed.
 class Layer {
@@ -58,10 +68,17 @@ public:
   bool is_training() const;
 
   virtual Vec<Vec<size_t>> output_shapes(const Vec<Vec<size_t>> &input_shapes) const = 0;
-  virtual size_t fwd_cache_bytes(const Vec<Vec<size_t>> &input_shapes) const { return 0; }
-  virtual size_t fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const { return 0; }
-  virtual size_t inf_workspace(const Vec<Vec<size_t>> &input_shapes) const { return 0; }
-  virtual size_t bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const { return 0; }
+  // amount of cached bytes for forward pass (e.g., for input activations needed in backward)
+  virtual size_t fwd_cache_bytes(const Vec<Vec<size_t>> &input_shapes) const = 0;
+  // peak workspace that this layer needs to materialize in order to produce output in forward pass
+  // (e.g., can be workspace + output bytes)
+  virtual size_t fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const = 0;
+  // similar to fwd workspace but for inference (e.g., can be smaller if formula is less demanding)
+  virtual size_t inf_workspace(const Vec<Vec<size_t>> &input_shapes) const = 0;
+  // peak workspace that this layer needs to materialize in order to produce input gradients in
+  // backward pass
+  // (e.g., can be workspace + input bytes)
+  virtual size_t bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const = 0;
   std::string name() const { return name_; }
   void save_state(std::ofstream &file);
   virtual std::vector<ParamDescriptor> param_descriptors() { return {}; }
@@ -111,7 +128,7 @@ protected:
   Tensor make_compute_tensor(std::vector<size_t> shape);
   ConstTensor &get_cached_tensor(size_t mb_id, const std::string &key);
   Tensor &get_mutable_tensor(size_t mb_id, const std::string &key);
-  Tensor get_act(const std::vector<size_t> &shape);
+  Tensor get_act();
   Tensor get_workspace(const std::vector<size_t> &shape, DType_t dtype = DType_t::FP32);
   void clear_cache(size_t mb_id);
 };
