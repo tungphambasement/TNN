@@ -204,11 +204,6 @@ private:
   dptr create_dptr(size_t offset, size_t size) {
     void *slice_ptr = static_cast<uint8_t *>(slab_ptr_) + offset;
 
-    std::cout << fmt::format(
-                     "DELAllocator: Allocated block of size {} bytes at offset {}, active "
-                     "allocations: {}",
-                     size, offset, active_allocations_ + 1)
-              << std::endl;
     active_allocations_++;
 
     auto self_shared = shared_from_this();
@@ -226,15 +221,9 @@ private:
   void reclaim(size_t offset, size_t size) {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    // Un-track the pointer upon reclamation
     if (active_allocations_ > 0) {
       active_allocations_--;
     }
-    std::cout << fmt::format(
-                     "DELAllocator: Reclaimed block of size {} bytes at offset {}, active "
-                     "allocations: {}",
-                     size, offset, active_allocations_)
-              << std::endl;
 
     auto next_it = free_by_offset_.lower_bound(offset + size);
     if (next_it != free_by_offset_.end() && offset + size == next_it->first) {
