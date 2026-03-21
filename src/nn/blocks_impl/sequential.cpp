@@ -150,11 +150,37 @@ size_t Sequential::inf_workspace(const Vec<Vec<size_t>> &input_shapes) const {
   if (layers_.empty()) return 0;
 
   Vec<size_t> sub_ws;
-  Vec<size_t> out_bytes;
+  Vec<size_t> in_bytes;
   Vec<Vec<size_t>> cur = input_shapes;
   for (const auto &layer : layers_) {
     Vec<Vec<size_t>> out = layer->output_shapes(cur);
     sub_ws.push_back(layer->inf_workspace(cur));
+    in_bytes.push_back(get_shapes_bytes(cur, io_dtype_));
+    cur = out;
+  }
+
+  size_t m_b = 0;
+  if (layers_.size() == 1) {
+    m_b = sub_ws[0];
+  } else if (layers_.size() > 1) {
+    m_b = sub_ws[0];
+    for (size_t i = 1; i < layers_.size() - 1; ++i) {
+      m_b = std::max(m_b, sub_ws[i] + in_bytes[i]);
+    }
+    m_b = std::max(m_b, sub_ws[layers_.size() - 1]);
+  }
+  return m_b;
+}
+
+size_t Sequential::bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
+  if (layers_.empty()) return 0;
+
+  Vec<size_t> sub_ws;
+  Vec<size_t> out_bytes;
+  Vec<Vec<size_t>> cur = input_shapes;
+  for (const auto &layer : layers_) {
+    Vec<Vec<size_t>> out = layer->output_shapes(cur);
+    sub_ws.push_back(layer->bwd_workspace(cur));
     out_bytes.push_back(get_shapes_bytes(out, io_dtype_));
     cur = out;
   }
@@ -165,30 +191,11 @@ size_t Sequential::inf_workspace(const Vec<Vec<size_t>> &input_shapes) const {
   } else if (layers_.size() > 1) {
     m_b = sub_ws[0];
     for (size_t i = 1; i < layers_.size() - 1; ++i) {
-      m_b = std::max(m_b, sub_ws[i] + out_bytes[i - 1]);
+      m_b = std::max(m_b, sub_ws[i] + out_bytes[i]);  // layer bwd ws + grad output size
     }
     m_b = std::max(m_b, sub_ws[layers_.size() - 1]);
   }
   return m_b;
-}
-
-size_t Sequential::bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
-  if (layers_.empty()) return 0;
-  size_t ws_bytes = 0;
-  Vec<Vec<size_t>> current_shapes = input_shapes;
-  for (auto &layer : layers_) {
-    size_t layer_ws = layer->bwd_workspace(current_shapes);
-    ws_bytes = std::max(ws_bytes, layer_ws);
-    std::cout << "Layer " << layer->type() << " Input shapes: [";
-    for (const auto &shape : current_shapes) {
-      std::cout << fmt::format("{}", shape) << " ";
-    }
-    std::cout << "]";
-    std::cout << ", backward workspace: " << layer_ws << " bytes\n";
-    current_shapes = layer->output_shapes(current_shapes);
-  }
-
-  return ws_bytes;
 }
 
 void Sequential::print_summary(const std::vector<size_t> &input_shape) const {
