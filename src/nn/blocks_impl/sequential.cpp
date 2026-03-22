@@ -138,12 +138,6 @@ size_t Sequential::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
     const auto &layer = *it;
     size_t layer_ws = layer->fwd_workspace(current_shapes);
     total_ws = std::max(total_ws, layer_ws);
-    std::cout << "Layer " << layer->type() << " Input shapes: [";
-    for (const auto &shape : current_shapes) {
-      std::cout << fmt::format("{}", shape) << " ";
-    }
-    std::cout << "]";
-    std::cout << ", forward workspace: " << layer_ws << " bytes\n";
     current_shapes = layer->output_shapes(current_shapes);
   }
 

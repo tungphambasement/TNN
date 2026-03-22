@@ -68,17 +68,6 @@ public:
   size_t available_space() const { return right_offset - left_offset; }
 };
 
-struct Block {
-  Slab *slab;
-  size_t offset;
-  size_t size;
-
-  bool operator<(const Block &other) const {
-    if (slab != other.slab) return slab < other.slab;
-    return offset < other.offset;
-  }
-};
-
 // Double-ended List Allocator. Thread-safe, efficient workspace allocator that flips for
 // input/output allocation patterns, with fallback to coalescing free-lists.
 class DELAllocatorV2 : public IAllocator, public std::enable_shared_from_this<DELAllocatorV2> {
@@ -95,7 +84,14 @@ public:
     return std::shared_ptr<DELAllocatorV2>(new DELAllocatorV2(device, flow));
   }
 
-  ~DELAllocatorV2() {}
+  ~DELAllocatorV2() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (auto &slab : slabs_) {
+      device_.deallocateAlignedMemory(slab.ptr);
+    }
+    slabs_.clear();
+    free_by_size_.clear();
+  }
 
   DELAllocatorV2(const DELAllocatorV2 &) = delete;
   DELAllocatorV2 &operator=(const DELAllocatorV2 &) = delete;
@@ -197,6 +193,16 @@ public:
   const Device &device() const override { return device_; }
 
 private:
+  struct Block {
+    Slab *slab;
+    size_t offset;
+    size_t size;
+
+    bool operator<(const Block &other) const {
+      if (slab != other.slab) return slab < other.slab;
+      return offset < other.offset;
+    }
+  };
   const Device &device_;
   flowHandle_t flow_;
   std::mutex mutex_;
@@ -312,6 +318,11 @@ private:
     }
     Slab &slab = slabs_.emplace_back(slab_ptr, slab_size);
     // do not add to free_by_size_, let bump allocation use left/right offsets.
+
+#ifndef NDEBUG
+    std::cout << fmt::format("DELAllocatorV2: Allocated new slab of size {} bytes", slab_size)
+              << std::endl;
+#endif
     return slab;
   }
 

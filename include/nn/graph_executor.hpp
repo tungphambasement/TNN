@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-#include "device/del_allocator.hpp"
+#include "device/del_allocator_v2.hpp"
 #include "device/iallocator.hpp"
 #include "nn/graph.hpp"
 #include "type/type.hpp"
@@ -21,7 +21,7 @@ public:
     for (auto& [uid, node] : graph_.io_nodes()) {
       node_outputs_[&node] = Output{nullptr, nullptr};
     }
-    ws_allocator_ = DELAllocator::create(graph_.device(), defaultFlowHandle);
+    ws_allocator_ = DELAllocatorV2::create(graph_.device(), defaultFlowHandle);
     for (auto& edge : graph_.edges()) {
       edge.op_node().layer()->set_allocator(*ws_allocator_);
     }
@@ -76,8 +76,8 @@ public:
 
 private:
   Graph& graph_;
-  IAllocator& allocator_;                       // long lived tensors
-  std::shared_ptr<DELAllocator> ws_allocator_;  // workspace allocator. short lived tensors
+  IAllocator& allocator_;                         // long lived tensors
+  std::shared_ptr<DELAllocatorV2> ws_allocator_;  // workspace allocator. short lived tensors
 
   struct Output {
     Tensor act;

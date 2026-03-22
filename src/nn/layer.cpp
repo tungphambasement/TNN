@@ -51,13 +51,13 @@ void Layer::backward(const std::vector<ConstTensor> &grad_outputs,
   clear_cache(mb_id);
 }
 
-Layer &Layer::set_allocator(DELAllocator &allocator) {
+Layer &Layer::set_allocator(DELAllocatorV2 &allocator) {
   allocator_ = &allocator;
   on_set_allocator(allocator);
   return *this;
 }
 
-DELAllocator *Layer::get_allocator() const { return allocator_; }
+DELAllocatorV2 *Layer::get_allocator() const { return allocator_; }
 
 Layer &Layer::set_flow_handle(flowHandle_t handle) {
   flow_handle_ = handle;

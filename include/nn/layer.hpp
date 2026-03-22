@@ -12,7 +12,7 @@
 #include <cstring>
 
 #include "common/config.hpp"
-#include "device/del_allocator.hpp"
+#include "device/del_allocator_v2.hpp"
 #include "tensor/tensor.hpp"
 #include "type/type.hpp"
 
@@ -53,8 +53,8 @@ public:
                 const std::vector<Tensor> &grad_inputs, size_t mb_id = 0);
 
   // Note: have to call init again after changing param dtype
-  Layer &set_allocator(DELAllocator &allocator);
-  DELAllocator *get_allocator() const;
+  Layer &set_allocator(DELAllocatorV2 &allocator);
+  DELAllocatorV2 *get_allocator() const;
   Layer &set_flow_handle(flowHandle_t handle);
   flowHandle_t get_flow_handle() const;
   Layer &set_seed(unsigned long long seed);
@@ -96,7 +96,7 @@ public:
 
 protected:
   virtual void init_impl() {}
-  virtual void on_set_allocator(DELAllocator &allocator) {}
+  virtual void on_set_allocator(DELAllocatorV2 &allocator) {}
   virtual void on_set_flow_handle(flowHandle_t handle) {}
   virtual void on_set_seed(unsigned long long seed) {}
   virtual void on_set_training(bool training) {}
@@ -110,7 +110,7 @@ protected:
 
 protected:
   bool initialized_ = false;
-  DELAllocator *allocator_ = nullptr;
+  DELAllocatorV2 *allocator_ = nullptr;
   bool is_training_ = true;
   bool use_seed_ = false;
   unsigned long long srand_seed_ = 0;
