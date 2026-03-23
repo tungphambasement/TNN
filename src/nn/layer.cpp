@@ -21,7 +21,7 @@ void Layer::init() {
   initialized_ = true;
 }
 
-void Layer::forward(const Vec<ConstTensor> &inputs, const Vec<Tensor> &outputs, size_t mb_id) {
+Vec<Tensor> Layer::forward(const Vec<ConstTensor> &inputs, size_t mb_id) {
   if (!initialized_) {
     throw std::runtime_error("Layer must be initialized before calling forward");
   }
@@ -33,11 +33,10 @@ void Layer::forward(const Vec<ConstTensor> &inputs, const Vec<Tensor> &outputs, 
     else
       current_inputs.push_back(input->to_device(this->device()));
   }
-  forward_impl(current_inputs, outputs, mb_id);
+  return forward_impl(current_inputs, mb_id);
 }
 
-void Layer::backward(const Vec<ConstTensor> &grad_outputs, const Vec<Tensor> &grad_inputs,
-                     size_t mb_id) {
+Vec<Tensor> Layer::backward(const Vec<ConstTensor> &grad_outputs, size_t mb_id) {
   if (!initialized_) {
     throw std::runtime_error("Layer must be initialized before calling backward");
   }
@@ -49,8 +48,9 @@ void Layer::backward(const Vec<ConstTensor> &grad_outputs, const Vec<Tensor> &gr
     else
       current_grad_outputs.push_back(grad->to_device(this->device()));
   }
-  backward_impl(current_grad_outputs, grad_inputs, mb_id);
+  auto grad_inputs = backward_impl(current_grad_outputs, mb_id);
   clear_cache(mb_id);
+  return grad_inputs;
 }
 
 Layer &Layer::set_allocator(DELAllocatorV2 &allocator) {
@@ -161,6 +161,16 @@ void Layer::set_mutable_cache(size_t mb_id, const std::string &key, Tensor value
 
 Tensor &Layer::get_mutable_cache(size_t mb_id, const std::string &key) {
   return mutable_cache_[{mb_id, key}];
+}
+
+Tensor Layer::get_output_tensor(const Vec<size_t> &shape) {
+  if (!allocator_) {
+    throw std::runtime_error("Allocator is not set");
+  }
+  if (is_training_ && is_fwd_) {
+    allocator_->set_side(0);
+  }
+  return make_tensor(*allocator_, io_dtype_, shape);
 }
 
 Tensor Layer::get_cache_tensor(const Vec<size_t> &shape, DType_t dtype) {

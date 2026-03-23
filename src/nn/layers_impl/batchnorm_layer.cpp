@@ -63,7 +63,7 @@ void BatchNormLayer::init_impl() {
  * @param output Tensor in NHWC format
  * @param mb_id Micro-batch identifier for caching
  */
-void BatchNormLayer::forward_impl(const ConstTensor &input, const Tensor &output, size_t mb_id) {
+Tensor BatchNormLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
   if (input->dims() < 4) {
     throw std::invalid_argument("BatchNorm: Input tensor must have at least 4 dimensions got " +
                                 std::to_string(input->dims()) + " dims");
@@ -76,7 +76,7 @@ void BatchNormLayer::forward_impl(const ConstTensor &input, const Tensor &output
 
 #ifdef USE_CUDNN
   if (this->device().device_type() == DeviceType::GPU) {
-    cudnn_forward(input, output, mb_id);
+    return cudnn_forward(input, mb_id);
   } else
 #endif
   {
@@ -84,11 +84,10 @@ void BatchNormLayer::forward_impl(const ConstTensor &input, const Tensor &output
   }
 }
 
-void BatchNormLayer::backward_impl(const ConstTensor &grad_output, const Tensor &grad_input,
-                                   size_t mb_id) {
+Tensor BatchNormLayer::backward_impl(const ConstTensor &grad_output, size_t mb_id) {
 #ifdef USE_CUDNN
   if (this->device().device_type() == DeviceType::GPU) {
-    cudnn_backward(grad_output, grad_input, mb_id);
+    return cudnn_backward(grad_output, mb_id);
   } else
 #endif
   {
@@ -116,7 +115,7 @@ void BatchNormLayer::build_graph(const Vec<size_t> &input_shape) const {
   }
 }
 
-void BatchNormLayer::cudnn_forward(const ConstTensor &input, const Tensor &output, size_t mb_id) {
+Tensor BatchNormLayer::cudnn_forward(const ConstTensor &input, size_t mb_id) {
   const size_t channels = input->dimension(3);
   if (num_features_ != channels) {
     throw std::invalid_argument("BatchNorm: Input channels must match num_features." +
@@ -124,7 +123,7 @@ void BatchNormLayer::cudnn_forward(const ConstTensor &input, const Tensor &outpu
                                 std::to_string(channels));
   }
 
-  output->ensure(input->shape());
+  Tensor output = get_output_tensor(input->shape());
 
   build_graph(input->shape());
 
@@ -160,10 +159,11 @@ void BatchNormLayer::cudnn_forward(const ConstTensor &input, const Tensor &outpu
                                    gamma_, beta_, running_mean_, running_var_, workspace,
                                    this->flow_handle_);
   }
+
+  return output;
 }
 
-void BatchNormLayer::cudnn_backward(const ConstTensor &grad_output, const Tensor &grad_input,
-                                    size_t mb_id) {
+Tensor BatchNormLayer::cudnn_backward(const ConstTensor &grad_output, size_t mb_id) {
   ConstTensor &input = this->get_immutable_cache(mb_id, "input");
 
   Tensor &batch_mean = this->get_mutable_cache(mb_id, "batch_mean");
@@ -176,7 +176,7 @@ void BatchNormLayer::cudnn_backward(const ConstTensor &grad_output, const Tensor
   cuda::cudnn_batchnorm::feHandle_t *fe_handle = fe_handle_cache.at(shape_key);
   BatchNormStats &current_stats = stats_cache.at(shape_key);
 
-  grad_input->ensure(grad_output->shape());
+  Tensor grad_input = get_output_tensor(grad_output->shape());
 
   Tensor workspace = this->get_workspace({current_stats.bwd_workspace_size}, DType_t::BYTE);
 
@@ -187,6 +187,8 @@ void BatchNormLayer::cudnn_backward(const ConstTensor &grad_output, const Tensor
   batch_mean = nullptr;
   batch_invar = nullptr;
   relu_mask = nullptr;
+
+  return grad_input;
 }
 
 template <typename IO_T, typename Param_T, typename Compute_T>
