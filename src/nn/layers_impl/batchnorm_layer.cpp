@@ -138,8 +138,8 @@ Tensor BatchNormLayer::cudnn_forward(const ConstTensor &input, size_t mb_id) {
   }
 
   if (this->is_training_) {
-    Tensor batch_invar = get_cache_tensor({num_features_}, io_dtype_);
-    Tensor batch_mean = get_cache_tensor({num_features_}, io_dtype_);
+    Tensor batch_invar = get_cache_tensor({num_features_}, DType_t::FP32);
+    Tensor batch_mean = get_cache_tensor({num_features_}, DType_t::FP32);
     set_mutable_cache(mb_id, "batch_invar", batch_invar);
     set_mutable_cache(mb_id, "batch_mean", batch_mean);
     Tensor relu_mask;
@@ -275,7 +275,13 @@ std::unique_ptr<Task> BatchNormLayer::backward_task(
 #endif
 
 size_t BatchNormLayer::fwd_cache_bytes(const Vec<Vec<size_t>> &input_shapes) const {
-  return get_shapes_bytes(input_shapes, io_dtype_);
+  size_t total_cache = 0;
+  total_cache += get_shapes_bytes(input_shapes, io_dtype_);       // cache input for backward
+  total_cache += affine_ ? 2 * num_features_ * sizeof(fp32) : 0;  // cache batch mean and invar
+  if (use_relu_) {
+    total_cache += get_shapes_bytes(input_shapes, DType_t::BOOL);  // cache ReLU mask
+  }
+  return total_cache;
 }
 
 size_t BatchNormLayer::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
@@ -288,7 +294,8 @@ size_t BatchNormLayer::fwd_workspace(const Vec<Vec<size_t>> &input_shapes) const
   BatchNormStats stats = stats_cache.at(shape_key);
   round_workspace_size(stats);
   auto output_shapes = this->output_shapes(input_shapes);
-  return stats.fwd_workspace_size + get_shapes_bytes(output_shapes, io_dtype_);
+  size_t total_workspace = stats.fwd_workspace_size + get_shapes_bytes(output_shapes, io_dtype_);
+  return total_workspace;
 #else
   return 0;
 #endif

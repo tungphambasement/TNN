@@ -170,8 +170,6 @@ static Result train_epoch(Graph &graph, unique_ptr<BaseDataLoader> &train_loader
 
     executor.forward(inputs, outputs);
 
-    std::cout << fmt::format("Output shape: {}", predictions->shape()) << std::endl;
-
     float loss;
     criterion->compute_loss(predictions, device_labels, loss);
     total_loss += loss;

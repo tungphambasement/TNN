@@ -84,15 +84,12 @@ Vec<Tensor> ResidualBlock::forward_impl(const Vec<ConstTensor> &inputs, size_t m
   for (size_t i = 0; i < outputs.size(); ++i) {
     if (final_activation_) {
       std::string pre_act_key = "pre_activation_" + std::to_string(i);
-      Tensor pre_act = this->get_output_tensor(main_outputs[i]->shape());
-      set_mutable_cache(mb_id, pre_act_key, pre_act);
+      Tensor pre_act = get_cache_tensor(main_outputs[i]->shape(), io_dtype_);
       DISPATCH_IO_DTYPE(ops::add, main_outputs[i]->data_ptr(), shortcut_outputs[i]->data_ptr(),
-                        pre_act->data_ptr(), pre_act->size());
-
-      outputs[i]->ensure(main_outputs[i]->shape());
+                        pre_act->data_ptr(), outputs[i]->size());
+      set_mutable_cache(mb_id, pre_act_key, pre_act);
       final_activation_->apply(pre_act, outputs[i]);
     } else {
-      outputs[i]->ensure(main_outputs[i]->shape());
       DISPATCH_IO_DTYPE(ops::add, main_outputs[i]->data_ptr(), shortcut_outputs[i]->data_ptr(),
                         outputs[i]->data_ptr(), outputs[i]->size());
     }

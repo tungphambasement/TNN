@@ -7,6 +7,8 @@
 
 #include "nn/layer.hpp"
 
+#include <fmt/ranges.h>
+
 #include "device/flow.hpp"
 #include "tensor/tensor.hpp"
 #include "type/type.hpp"
@@ -148,6 +150,9 @@ Tensor Layer::get_tensor(const Vec<size_t> &shape, DType_t dtype) {
 }
 
 void Layer::set_immutable_cache(size_t mb_id, const std::string &key, ConstTensor value) {
+  if (!is_training_) {
+    return;  // no need to cache in inference mode
+  }
   immutable_cache_[{mb_id, key}] = std::move(value);
 }
 
@@ -156,6 +161,9 @@ ConstTensor &Layer::get_immutable_cache(size_t mb_id, const std::string &key) {
 }
 
 void Layer::set_mutable_cache(size_t mb_id, const std::string &key, Tensor value) {
+  if (!is_training_) {
+    return;  // no need to cache in inference mode
+  }
   mutable_cache_[{mb_id, key}] = std::move(value);
 }
 
@@ -167,30 +175,34 @@ Tensor Layer::get_output_tensor(const Vec<size_t> &shape) {
   if (!allocator_) {
     throw std::runtime_error("Allocator is not set");
   }
-  if (is_training_ && is_fwd_) {
-    allocator_->set_side(0);
-  }
-  return make_tensor(*allocator_, io_dtype_, shape);
+  Tensor output_tensor = make_tensor(*allocator_, io_dtype_, shape);
+  return output_tensor;
 }
 
 Tensor Layer::get_cache_tensor(const Vec<size_t> &shape, DType_t dtype) {
   if (!allocator_) {
     throw std::runtime_error("Allocator is not set");
   }
+  int old_side = allocator_->side();
   if (is_training_ && is_fwd_) {
     allocator_->set_side(0);
   }
-  return make_tensor(*allocator_, dtype, shape);
+  Tensor cache_tensor = make_tensor(*allocator_, dtype, shape);
+  allocator_->set_side(old_side);  // reset to original side after allocation
+  return cache_tensor;
 }
 
 Tensor Layer::get_workspace(const Vec<size_t> &shape, DType_t dtype) {
   if (!allocator_) {
     throw std::runtime_error("Allocator is not set");
   }
+  int old_side = allocator_->side();
   if (is_training_ && is_fwd_) {
     allocator_->set_side(1);
   }
-  return make_tensor(*allocator_, dtype, shape);
+  Tensor workspace_tensor = make_tensor(*allocator_, dtype, shape);
+  allocator_->set_side(old_side);
+  return workspace_tensor;
 }
 
 void Layer::clear_cache(size_t mb_id) {

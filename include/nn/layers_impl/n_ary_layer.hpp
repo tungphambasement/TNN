@@ -17,6 +17,7 @@
 namespace tnn {
 
 // Base class for N-ary element-wise operations
+// TODO: dependent caching. Probably should move impl into individual layers for better control
 class NAryOpLayer : public virtual Layer {
 public:
   explicit NAryOpLayer(NAryOp op_type, const std::string &name = "")

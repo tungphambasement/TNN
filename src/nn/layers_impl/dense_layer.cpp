@@ -87,9 +87,9 @@ Tensor DenseLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
 #ifdef USE_CUDNN
   if (this->device().device_type() == DeviceType::GPU) {
     cudnn_forward(input, output, mb_id);
-    return output;
   }
 #endif
+
   return output;
 }
 

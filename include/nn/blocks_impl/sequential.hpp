@@ -12,7 +12,6 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <string>
-#include <unordered_map>
 
 #include "nn/block.hpp"
 #include "nn/layer.hpp"
@@ -22,7 +21,6 @@ namespace tnn {
 class Sequential : public Block {
 private:
   Vec<std::unique_ptr<Layer>> layers_;
-  std::unordered_map<size_t, Vec<Vec<size_t>>> input_shapes_cache_;
 
 protected:
   Vec<Layer *> layers() override {

@@ -27,16 +27,19 @@ Vec<Tensor> Sequential::forward_impl(const Vec<ConstTensor> &inputs, size_t mb_i
   if (layers_.empty()) {
     throw std::runtime_error("Cannot forward through empty sequential model");
   }
-  Vec<Vec<size_t>> input_shapes(inputs.size());
-  for (size_t i = 0; i < inputs.size(); ++i) {
-    input_shapes[i] = inputs[i]->shape();
-  }
-  input_shapes_cache_[mb_id] = input_shapes;
   Vec<ConstTensor> current_inputs = inputs;
   Vec<Tensor> current_outputs;
+  if (!is_training_ && layers_.size() % 2 == 0) {
+    // assuming we are on the reverse side of input, flip so output of last layer is always opposite
+    // side of input.
+    allocator_->flip();
+  }
   for (size_t i = 0; i < layers_.size(); ++i) {
     current_outputs = layers_[i]->forward(current_inputs, mb_id);
     current_inputs = Vec<ConstTensor>(current_outputs.begin(), current_outputs.end());
+    if (!is_training_ && i != layers_.size() - 1) {
+      allocator_->flip();
+    }
   }
   this->device().getFlow(this->flow_handle_)->synchronize();
   return current_outputs;
@@ -46,17 +49,18 @@ Vec<Tensor> Sequential::backward_impl(const Vec<ConstTensor> &grad_outputs, size
   if (layers_.empty()) {
     throw std::runtime_error("Cannot backward through empty sequential model");
   }
-  auto it_in_shapes = input_shapes_cache_.find(mb_id);
-  if (it_in_shapes == input_shapes_cache_.end()) {
-    throw std::runtime_error("No cached input shape found for micro-batch ID: " +
-                             std::to_string(mb_id));
-  }
   Vec<ConstTensor> current_gradients = grad_outputs;
   Vec<Tensor> grad_inputs;
+  if (layers_.size() % 2 == 0) {
+    // flip so grad output of last layer is always opposite side of input.
+    allocator_->flip();
+  }
   for (int i = static_cast<int>(layers_.size()) - 1; i >= 0; --i) {
-    allocator_->flip();  // algorithm 1 definitely applies
     grad_inputs = layers_[i]->backward(current_gradients, mb_id);
     current_gradients = Vec<ConstTensor>(grad_inputs.begin(), grad_inputs.end());
+    if (i != 0) {
+      allocator_->flip();  // algorithm 1 definitely applies
+    }
   }
   this->device().getFlow(this->flow_handle_)->synchronize();
   return grad_inputs;
@@ -155,7 +159,9 @@ size_t Sequential::bwd_workspace(const Vec<Vec<size_t>> &input_shapes) const {
   } else if (layers_.size() > 1) {
     m_b = sub_ws[0];
     for (size_t i = 1; i < layers_.size() - 1; ++i) {
-      m_b = std::max(m_b, sub_ws[i] + out_bytes[i]);  // layer bwd ws + grad output size
+      m_b = std::max(
+          m_b,
+          sub_ws[i] + out_bytes[i]);  // grad output size (input) + workspace (including output)
     }
     m_b = std::max(m_b, sub_ws[layers_.size() - 1]);
   }

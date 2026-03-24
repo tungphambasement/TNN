@@ -43,6 +43,7 @@ public:
     for (auto& [uid, tensor] : outputs) {
       const IONode& output_node = graph_.io_node(uid);
       *tensor = node_outputs_[&output_node].act;
+      node_outputs_[&output_node].act = nullptr;
     }
   }
 
@@ -94,11 +95,6 @@ private:
 
     // gather outputs
     const Vec<const IONode*>& output_nodes = edge.consumers();
-
-    size_t ws_bytes = layer->is_training() ? layer->fwd_cache_bytes(input_shapes) +
-                                                 layer->fwd_workspace(input_shapes)
-                                           : layer->inf_workspace(input_shapes);
-    ws_allocator_->reserve(ws_bytes);
 
     Vec<Tensor> outputs = layer->forward(inputs);
 
