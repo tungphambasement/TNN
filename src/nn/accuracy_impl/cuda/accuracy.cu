@@ -94,15 +94,13 @@ int compute_class_corrects(const T* predictions, const T* targets, const size_t 
   return h_correct_count;
 }
 
-#define INSTANTIATE_COMPUTE_CLASS_CORRECTS(T)                                               \
+#define INSTANTIATE(T)                                                                      \
   template int compute_class_corrects<T>(const T* predictions, const T* targets,            \
                                          const size_t batch_size, const size_t num_classes, \
                                          float threshold, cudaStream_t stream);
-INSTANTIATE_COMPUTE_CLASS_CORRECTS(bf16)
-INSTANTIATE_COMPUTE_CLASS_CORRECTS(fp16)
-INSTANTIATE_COMPUTE_CLASS_CORRECTS(float)
-INSTANTIATE_COMPUTE_CLASS_CORRECTS(double)
-#undef INSTANTIATE_COMPUTE_CLASS_CORRECTS
+#include "macros/floating_type_instantiation.hpp"
+
+#undef INSTANTIATE
 
 }  // namespace accuracy
 }  // namespace cuda
