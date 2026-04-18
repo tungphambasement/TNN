@@ -1,0 +1,34 @@
+#pragma once
+
+#include <cstdint>
+
+namespace tnn {
+enum Endianness : uint8_t { LITTLE = 0, BIG = 1 };
+
+inline Endianness get_host_endianness() {
+  union {
+    uint32_t i;
+    char c[4];
+  } u = {0x01020304};
+  return (u.c[0] == 1) ? Endianness::BIG : Endianness::LITTLE;
+}
+
+inline Endianness host_endianness = get_host_endianness();
+
+template <typename T>
+void bswap(T &value) {
+  if constexpr (sizeof(T) == 1) {
+    return;
+  } else if constexpr (sizeof(T) == 2) {
+    value = __builtin_bswap16(value);
+  } else if constexpr (sizeof(T) == 4) {
+    value = __builtin_bswap32(value);
+  } else if constexpr (sizeof(T) == 8) {
+    value = __builtin_bswap64(value);
+  } else {
+    static_assert(sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8,
+                  "bswap is only supported for 2, 4, or 8 byte types");
+  }
+}
+
+}  // namespace tnn

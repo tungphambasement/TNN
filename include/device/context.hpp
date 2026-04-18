@@ -1,0 +1,36 @@
+/*
+ * Copyright (c) 2025 Tung D. Pham
+ *
+ * This software is licensed under the MIT License. See the LICENSE file in the
+ * project root for the full license text.
+ */
+#pragma once
+
+#include <cstddef>
+#include <cstdlib>
+
+#include "common/endian.hpp"
+#include "device/engine.hpp"
+#include "flow.hpp"
+
+namespace tnn {
+class Context {
+public:
+  Context() = default;
+  virtual ~Context() = default;
+
+  virtual size_t getTotalMemory() const = 0;
+  virtual size_t getAvailableMemory() const = 0;
+  virtual size_t getUsedMemory() const { return getTotalMemory() - getAvailableMemory(); }
+  virtual void *allocateMemory(size_t size) = 0;
+  virtual void deallocateMemory(void *ptr) = 0;
+  virtual void *allocateAlignedMemory(size_t size, size_t alignment) = 0;
+  virtual void deallocateAlignedMemory(void *ptr) = 0;
+  virtual void copyToDevice(void *dest, const void *src, size_t size) = 0;
+  virtual void copyToHost(void *dest, const void *src, size_t size) = 0;
+  virtual void createFlow(flowHandle_t flow_id) = 0;
+  virtual Endianness get_endianness() const = 0;
+  virtual Flow *getFlow(flowHandle_t flow_id) = 0;
+  virtual EngineType get_engine() const = 0;
+};
+}  // namespace tnn

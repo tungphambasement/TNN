@@ -1,0 +1,103 @@
+services:
+  tnn-base:
+    build: .
+    image: tnn:latest
+    
+  worker-8001:
+    profiles:
+      - sync
+      - semi-async
+    image: tnn:latest
+    container_name: tnn-worker-8001
+    command: ["./bin/network_worker", "8001"]
+    hostname: worker-8001
+    ports:
+      - "8001:8001"
+    networks:
+      - tnn-network
+    cpuset: "0-3" # Assign first 4 CPU cores to this worker
+    volumes:
+      - .:/app
+    depends_on:
+      - tnn-base
+
+  worker-8002:
+    profiles:
+      - sync
+      - semi-async
+    image: tnn:latest
+    container_name: tnn-worker-8002
+    command: ["./bin/network_worker", "8002"]
+    hostname: worker-8002
+    ports:
+      - "8002:8002"
+    networks:
+      - tnn-network
+    cpuset: "4-7" # Assign next 4 CPU cores to this worker
+    volumes:
+      - .:/app
+    depends_on:
+      - tnn-base
+
+  sync-coordinator:
+    profiles:
+      - sync
+    image: tnn:latest
+    container_name: tnn-sync-coordinator
+    command: ["./bin/sync_pipeline_coordinator"]
+    hostname: coordinator
+    ports:
+      - "8000:8000"
+    networks:
+      - tnn-network
+    depends_on:
+      - tnn-base
+      - worker-8001
+      - worker-8002
+    environment:
+      - COORDINATOR_HOST=coordinator
+      - WORKER_HOST_8001=worker-8001
+      - WORKER_HOST_8002=worker-8002
+    cpuset: "0" # Assign CPU core 0 to the coordinator
+
+  semi-async-coordinator:
+    profiles:
+      - semi-async
+    image: tnn:latest
+    container_name: tnn-async-coordinator
+    command: ["./bin/semi_async_pipeline_coordinator"]
+    hostname: semi-async-coordinator
+    ports:
+      - "8000:8000"
+    networks:
+      - tnn-network
+    depends_on:
+      - tnn-base
+      - worker-8001
+      - worker-8002
+    volumes:
+      - .:/app
+    environment:
+      - COORDINATOR_HOST=semi-async-coordinator
+      - WORKER_HOST_8001=worker-8001
+      - WORKER_HOST_8002=worker-8002
+    cpuset: "0" # Assign CPU core 0 to the coordinator
+  
+  single-model:
+    profiles:
+      - single-model
+    image: tnn:latest
+    container_name: tnn-single-model
+    command: ["./bin/cifar10_cnn_trainer_v2"]
+    cpuset: "0-31" # Assign all CPU cores to this service
+    volumes:
+      - .:/app
+    depends_on:
+      - tnn-base
+
+networks:
+  tnn-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

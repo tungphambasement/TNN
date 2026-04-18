@@ -1,0 +1,80 @@
+#include "device/device.hpp"
+
+#include "common/endian.hpp"
+#include "device/context.hpp"
+#include "device/flow.hpp"
+
+namespace tnn {
+Device::Device(DeviceType type, int id, std::unique_ptr<Context> context)
+    : type_(type),
+      id_(id),
+      context_(std::move(context)) {}
+
+Device::~Device() = default;
+
+Device::Device(Device &&other) noexcept
+    : type_(other.type_),
+      id_(other.id_),
+      context_(std::move(other.context_)) {}
+
+Device &Device::operator=(Device &&other) noexcept {
+  if (this != &other) {
+    type_ = other.type_;
+    id_ = other.id_;
+    context_ = std::move(other.context_);
+  }
+  return *this;
+}
+
+const DeviceType &Device::device_type() const { return type_; }
+
+int Device::getID() const { return id_; }
+
+std::string Device::getName() const {
+  switch (type_) {
+    case DeviceType::CPU:
+      return "CPU Device " + std::to_string(id_);
+    case DeviceType::GPU:
+      return "GPU Device " + std::to_string(id_);
+    default:
+      return "Unknown Device";
+  }
+}
+
+bool Device::operator==(const Device &other) const {
+  return (type_ == other.type_) && (id_ == other.id_);
+}
+
+size_t Device::getTotalMemory() const { return context_->getTotalMemory(); }
+
+size_t Device::getAvailableMemory() const { return context_->getAvailableMemory(); }
+
+size_t Device::getUsedMemory() const { return context_->getUsedMemory(); }
+
+void *Device::allocateMemory(size_t size) const { return context_->allocateMemory(size); }
+
+void Device::deallocateMemory(void *ptr) const { context_->deallocateMemory(ptr); }
+
+void *Device::allocateAlignedMemory(size_t size, size_t alignment) const {
+  return context_->allocateAlignedMemory(size, alignment);
+}
+
+EngineType Device::get_engine() const { return context_->get_engine(); }
+
+void Device::deallocateAlignedMemory(void *ptr) const { context_->deallocateAlignedMemory(ptr); }
+
+void Device::copyToDevice(void *dest, const void *src, size_t size) const {
+  context_->copyToDevice(dest, src, size);
+}
+
+void Device::copyToHost(void *dest, const void *src, size_t size) const {
+  context_->copyToHost(dest, src, size);
+}
+
+Endianness Device::get_endianness() const { return context_->get_endianness(); }
+
+void Device::createFlow(flowHandle_t handle) const { context_->createFlow(handle); }
+
+Flow *Device::getFlow(flowHandle_t handle) const { return context_->getFlow(handle); }
+
+}  // namespace tnn

@@ -1,0 +1,45 @@
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# CMake temporary files
+_deps/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+build/
+
+# Virtual environment
+.venv/
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+
+
+# Temporary files
+*.tmp
+*.log
+
+# Docker files (don't include in the image itself)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Model snapshots (large files, mount if needed)
+model_snapshots/
+
+# Compressed files
+*.gz
+*.zip
+*.tar
+
+# OS generated files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,5 @@
+function(link_tbb visibility target_name)
+    if(ENABLE_TBB)
+        target_link_libraries(${target_name} ${visibility} TBB::tbb TBB::tbbmalloc)
+    endif()
+endfunction()

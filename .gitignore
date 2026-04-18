@@ -1,0 +1,101 @@
+# editor configs
+/.vscode/
+/.idea/
+/.vs/
+/.direnv/
+/.envrc
+/**/*.sln
+/**/*.user
+
+# environments
+/.env
+/.env.local
+/.env.development
+/.env.production
+/.env.test
+/.env.staging
+
+# large files
+/data/*
+
+# build directories
+/build/
+**/build/
+/lib/
+/bin/
+/_deps/
+
+# artifacts
+*.zip
+*.gz
+/profiles/
+**/*.pb.cc
+**/*.pb.h
+
+# CMake generated files (anywhere in the project)
+CMakeSettings.json
+CMakeCache.txt
+**/CMakeCache.txt
+CMakeFiles/
+**/CMakeFiles/
+cmake_install.cmake
+**/cmake_install.cmake
+Makefile
+**/Makefile
+compile_commands.json
+**/compile_commands.json
+CMakeLists.txt.user
+*.vcxproj
+*.vcxproj.filters
+*.dir
+x64/
+.cmake/
+
+# CMake testing
+Testing/
+**/Testing/
+CTestTestfile.cmake
+**/CTestTestfile.cmake
+DartConfiguration.tcl
+
+# Google Test generated files
+**/*[[]?[]]_include.cmake
+**/*[[]?[]]_tests.cmake
+**/*_include.cmake
+**/*_tests.cmake
+
+# CMake temporary and generated files
+*.cmake.in
+cmake_uninstall.cmake
+CMakeDoxyfile.in
+CMakeDoxygenDefaults.cmake
+install_manifest.txt
+
+# logs
+/logs/
+
+# temp files
+/temp/
+*.data
+*.data.old
+/output_images/
+
+# model snapshots
+/model_snapshots/
+
+# packages
+/.venv/
+/third_party/
+
+# Python generated files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# cache files
+.cache/
+
+# profiling artifacts
+/profile.json
+*.nsys-rep

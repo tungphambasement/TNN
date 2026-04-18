@@ -1,0 +1,92 @@
+/*
+ * Copyright (c) 2025 Tung D. Pham
+ *
+ * This software is licensed under the MIT License. See the LICENSE file in the
+ * project root for the full license text.
+ */
+#pragma once
+
+#include <tbb/concurrent_queue.h>
+#include <tbb/concurrent_unordered_map.h>
+
+#include "message.hpp"
+
+namespace tnn {
+
+class MessageMap {
+private:
+  std::atomic<size_t> total_message_count_{0};
+  tbb::concurrent_unordered_map<CommandType, tbb::concurrent_queue<Message>> queues_;
+
+public:
+  MessageMap() = default;
+
+  MessageMap(const MessageMap &other) = delete;
+  MessageMap &operator=(const MessageMap &other) = delete;
+
+  MessageMap(MessageMap &&other) noexcept
+      : queues_(std::move(other.queues_)) {}
+
+  MessageMap &operator=(MessageMap &&other) noexcept {
+    if (this != &other) {
+      clear();
+      queues_ = std::move(other.queues_);
+    }
+    return *this;
+  }
+
+  ~MessageMap() { clear(); }
+
+  void push(CommandType type, Message &&message) {
+    queues_[type].emplace(std::move(message));
+    total_message_count_.fetch_add(1, std::memory_order_relaxed);
+  }
+
+  bool pop(CommandType type, Message &message) {
+    auto it = queues_.find(type);
+    if (it != queues_.end()) {
+      if (it->second.try_pop(message)) {
+        total_message_count_.fetch_sub(1, std::memory_order_relaxed);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  size_t size(CommandType type) const {
+    auto it = queues_.find(type);
+    if (it != queues_.end()) {
+      return it->second.unsafe_size();
+    }
+    return 0;
+  }
+
+  size_t total_size() const { return total_message_count_.load(std::memory_order_relaxed); }
+
+  bool empty(CommandType type) const { return size(type) == 0; }
+
+  bool empty() const { return total_message_count_.load(std::memory_order_relaxed) == 0; }
+
+  Vec<Message> pop_all(CommandType type) {
+    Vec<Message> messages;
+    auto it = queues_.find(type);
+    if (it != queues_.end()) {
+      Message message;
+      while (it->second.try_pop(message)) {
+        messages.emplace_back(std::move(message));
+      }
+    }
+    return messages;
+  }
+
+  void clear() {
+    for (auto &pair : queues_) {
+      Message dummy;
+      while (pair.second.try_pop(dummy)) {
+      }
+    }
+    queues_.clear();
+  }
+};
+
+}  // namespace tnn

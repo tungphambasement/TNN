@@ -1,0 +1,53 @@
+#pragma once
+
+#include <chrono>
+#include <iostream>
+#include <numeric>
+#include <vector>
+
+namespace tnn {
+
+template <typename EnumType>
+constexpr Vec<EnumType> get_enum_vector() {
+  static_assert(std::is_enum_v<EnumType>, "Template parameter must be an enum type");
+  static_assert(std::is_same_v<decltype(EnumType::_COUNT), EnumType>,
+                "Enum type must have a _COUNT member to indicate the number of "
+                "enum values");
+  static_assert(std::is_same_v<decltype(EnumType::_START), EnumType>,
+                "Enum type must have a _START member to indicate the starting "
+                "enum value");
+  Vec<EnumType> values;
+  for (int i = static_cast<int>(EnumType::_START); i < static_cast<int>(EnumType::_COUNT); ++i) {
+    values.push_back(static_cast<EnumType>(i));
+  }
+  return values;
+}
+
+template <typename Func>
+void benchmark(const std::string &name, Func &&func, int bench_runs = 5) {
+  std::cout << "Benchmarking: " << name << std::endl;
+  Vec<double> times;
+  for (int i = 0; i < bench_runs; ++i) {
+    auto start = std::chrono::high_resolution_clock::now();
+    func();
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> duration = end - start;
+    times.push_back(duration.count());
+  }
+
+  double avg = std::accumulate(times.begin(), times.end(), 0.0) / times.size();
+  std::cout << name << " average time: " << avg << " ms" << std::endl;
+}
+
+inline size_t get_shape_hash(const Vec<size_t> &shape) {
+  size_t seed = 0;
+  auto hash_combine = [&](size_t v) {
+    seed ^= std::hash<size_t>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+  };
+  for (size_t i = 0; i < shape.size(); ++i) {
+    hash_combine(shape[i]);
+  }
+  return seed;
+}
+
+}  // namespace tnn
