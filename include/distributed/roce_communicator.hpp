@@ -304,7 +304,7 @@ private:
     if (wc->opcode & IBV_WC_RECV) {
       auto *buf = (dptr *)(wc->wr_id & ~3ULL);
 
-      channel->handle_recv_wc(wc, buf, [this](dptr *complete_buf) {
+      channel->handle_recv_wc(wc, buf, [this, channel](dptr *complete_buf) {
         Message msg;
         try {
           Reader reader(*complete_buf);
@@ -313,7 +313,7 @@ private:
         } catch (const std::exception &e) {
           std::cerr << "Deserialization error: " << e.what() << "\n";
         }
-        delete complete_buf;
+        channel->release_recv_payload_buffer(complete_buf);
       });
 
     } else if (wc->opcode == IBV_WC_SEND || wc->opcode == IBV_WC_RDMA_WRITE) {
