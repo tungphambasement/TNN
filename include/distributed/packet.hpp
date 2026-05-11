@@ -9,7 +9,7 @@ namespace tnn {
 
 enum class CompressionType : uint8_t { NONE = 0, ZSTD = 1, QUANTIZATION = 2 };
 
-enum class PacketType : uint8_t { DATA_FRAGMENT = 0, MSG_PREPARE = 1, MSG_READY_TO_WRITE = 2, SLOT_FREE = 3 };
+enum class PacketType : uint8_t { DATA_FRAGMENT = 0, MSG_PREPARE = 1, MSG_READY_TO_WRITE = 2 };
 
 // Fixed header at the start of each packet.
 struct PacketHeader {
