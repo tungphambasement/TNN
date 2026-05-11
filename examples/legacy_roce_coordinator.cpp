@@ -17,6 +17,19 @@ using namespace tnn;
 using namespace tnn::legacy;
 using namespace std;
 
+
+
+static std::string getenv_str(const char* name, const std::string& def = "") {
+  const char* v = std::getenv(name);
+  return (v && *v) ? std::string(v) : def;
+}
+
+static int getenv_int(const char* name, int def = -1) {
+  const char* v = std::getenv(name);
+  if (!v || !*v) return def;
+  return std::stoi(v);
+}
+
 struct Config {
   std::string device_name = "";
   int gid_index = -1;
@@ -124,7 +137,7 @@ int main(int argc, char *argv[]) {
   Env::get("LOCAL_WORKER_HOST", local_worker_host);
   Env::get("LOCAL_WORKER_PORT", local_worker_port);
   Endpoint local_worker_endpoint =
-      Endpoint::roce(local_worker_host, local_worker_port, cfg.device_name, cfg.gid_index);
+      Endpoint::roce(local_worker_host, local_worker_port, getenv_str("ROCE_LOCAL_WORKER_DEVICE", cfg.device_name), getenv_int("ROCE_LOCAL_WORKER_GID_INDEX", cfg.gid_index));
 
   int local_worker_position = 0;  // default to first
   std::string position_str = "first";
@@ -138,7 +151,7 @@ int main(int argc, char *argv[]) {
   Env::get("WORKER1_HOST", worker1_host);
   Env::get("WORKER1_PORT", worker1_port);
   Vec<Endpoint> endpoints = {
-      Endpoint::roce(worker1_host, worker1_port, "rocep131s0f0", -1),
+      Endpoint::roce(worker1_host, worker1_port, getenv_str("ROCE_WORKER1_DEVICE", cfg.device_name), getenv_int("ROCE_WORKER1_GID_INDEX", cfg.gid_index)),
   };
 
   if (local_worker_position) {
