@@ -26,3 +26,8 @@ create_executable(gpt2_inference.cpp LIBS tnn_nn)
 # Test executables
 create_executable(graph_test.cpp LIBS tnn_nn)
 create_executable(test_del.cpp LIBS tnn_device)
+add_executable(ucx_worker ucx_worker.cpp)
+target_link_libraries(ucx_worker PRIVATE tnn_lib ${UCX_LIBRARIES})
+
+add_executable(ucx_coordinator ucx_coordinator.cpp)
+target_link_libraries(ucx_coordinator PRIVATE tnn_lib ${UCX_LIBRARIES})

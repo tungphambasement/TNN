@@ -59,6 +59,12 @@ inline void ucx_recv_cb(void *request, ucs_status_t status, ucp_tag_recv_info_t 
   r->done = true;
 }
 
+struct UCXEndpointHash {
+  size_t operator()(const Endpoint &endpoint) const {
+    return endpoint.hash();
+  }
+};
+
 class UCXChannel {
 public:
   UCXChannel(ucp_worker_h worker, ucp_ep_h ep, Endpoint endpoint)
@@ -78,8 +84,16 @@ public:
     uint32_t num_io_threads = 4;
   };
 
+  static std::unique_ptr<UCXCommunicator> create(const Endpoint &endpoint,
+                                                Config config) {
+    auto &alloc = PoolAllocator::instance(getHost(), defaultFlowHandle);
+    auto comm = std::make_unique<UCXCommunicator>(endpoint, alloc, config);
+    comm->start_server();
+    return comm;
+  }
+
   explicit UCXCommunicator(const Endpoint &endpoint, IAllocator &out_allocator,
-                           Config config = Config())
+                           Config config)
       : Communicator(endpoint, config.num_io_threads),
         int_allocator_(PoolAllocator::instance(getHost(), defaultFlowHandle)),
         out_allocator_(out_allocator),
@@ -437,13 +451,13 @@ private:
   ucp_context_h context_ = nullptr;
   ucp_worker_h worker_ = nullptr;
 
-  asio::ip::tcp::acceptor &acceptor_;
+  asio::ip::tcp::acceptor acceptor_;
   std::atomic<bool> is_running_{false};
   std::thread io_thread_;
   std::thread progress_thread_;
 
   std::shared_mutex channels_mutex_;
-  std::unordered_map<Endpoint, std::shared_ptr<UCXChannel>, EndpointHash> channels_;
+  std::unordered_map<Endpoint, std::shared_ptr<UCXChannel>, UCXEndpointHash> channels_;
 };
 
 }  // namespace tnn
