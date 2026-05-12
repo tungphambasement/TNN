@@ -220,6 +220,15 @@ public:
     if (endpoint.type() == CommunicationType::IN_PROCESS) {
       return true;
     }
+
+    {
+      std::shared_lock<std::shared_mutex> lock(channels_mutex_);
+      if (channels_.find(endpoint) != channels_.end()) {
+        std::cout << "[UCX] already connected to " << endpoint.id() << std::endl;
+        return true;
+      }
+    }
+
     try {
       std::string host = endpoint.get_parameter<std::string>("host");
       int port = endpoint.get_parameter<int>("port");
