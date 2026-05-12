@@ -208,6 +208,9 @@ public:
   IAllocator &out_allocator() override { return out_allocator_; }
 
   bool connect_to_endpoint(const Endpoint &endpoint) override {
+    if (endpoint.type() == CommunicationType::IN_PROCESS) {
+      return true;
+    }
     try {
       std::string host = endpoint.get_parameter<std::string>("host");
       int port = endpoint.get_parameter<int>("port");
