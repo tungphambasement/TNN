@@ -67,12 +67,13 @@ struct UCXEndpointHash {
 
 class UCXChannel {
 public:
-  UCXChannel(ucp_worker_h worker, ucp_ep_h ep, Endpoint endpoint)
-      : worker(worker), ep(ep), endpoint(std::move(endpoint)) {}
+  UCXChannel(ucp_worker_h worker, ucp_ep_h ep, Endpoint endpoint, uint64_t tag_base)
+      : worker(worker), ep(ep), endpoint(std::move(endpoint)), tag_base(tag_base) {}
 
   ucp_worker_h worker = nullptr;
   ucp_ep_h ep = nullptr;
   Endpoint endpoint;
+  uint64_t tag_base = 0;
   std::atomic<uint64_t> send_seq{1};
   std::atomic<uint64_t> recv_seq{1};
   std::mutex send_mutex;
@@ -192,8 +193,8 @@ public:
 
       std::lock_guard<std::mutex> send_lock(ch->send_mutex);
 
-      send_blocking(ch, &len, sizeof(len), make_tag(seq, 0));
-      send_blocking(ch, buffer.get(), msg_size, make_tag(seq, 1));
+      send_blocking(ch, &len, sizeof(len), make_tag(ch->tag_base, seq, 0));
+      send_blocking(ch, buffer.get(), msg_size, make_tag(ch->tag_base, seq, 1));
 
       add_profile_data("ucx_send_msg_count", 1);
       add_profile_data("ucx_send_bytes", static_cast<int64_t>(msg_size));
@@ -289,8 +290,8 @@ private:
     }
   }
 
-  static uint64_t make_tag(uint64_t seq, uint64_t part) {
-    return (seq << 1) | (part & 1ULL);
+  static uint64_t make_tag(uint64_t tag_base, uint64_t seq, uint64_t part) {
+    return tag_base | ((seq & 0x00FFFFFFFFFFFFFFULL) << 1) | (part & 1ULL);
   }
 
   void progress_loop() {
@@ -417,7 +418,22 @@ private:
       throw std::runtime_error(std::string("ucp_ep_create failed: ") + ucs_status_string(st));
     }
 
-    return std::make_shared<UCXChannel>(worker_, ep, peer_endpoint);
+    uint64_t local_tag_id =
+        (static_cast<uint64_t>(endpoint_.get_parameter<int>("port")) << 32) ^
+        channel_id_counter_.fetch_add(1);
+
+    send_raw(sock, &local_tag_id, sizeof(local_tag_id));
+    uint64_t peer_tag_id = 0;
+    recv_raw(sock, &peer_tag_id, sizeof(peer_tag_id));
+
+    uint64_t tag_base = ((local_tag_id ^ peer_tag_id) & 0x7FULL) << 56;
+
+    std::cout << "[UCX] channel tag_base=0x"
+              << std::hex << tag_base << std::dec
+              << " peer=" << peer_endpoint.id()
+              << std::endl;
+
+    return std::make_shared<UCXChannel>(worker_, ep, peer_endpoint, tag_base);
   }
 
   asio::awaitable<void> accept_loop() {
@@ -455,14 +471,14 @@ private:
         uint64_t seq = ch->recv_seq.fetch_add(1);
         uint64_t len = 0;
 
-        recv_blocking(&len, sizeof(len), make_tag(seq, 0));
+        recv_blocking(&len, sizeof(len), make_tag(ch->tag_base, seq, 0));
         if (len == 0 || len > (2ULL << 30)) {
           std::cerr << "[UCX] invalid message length " << len << std::endl;
           continue;
         }
 
         dptr buf = int_allocator_.allocate(len);
-        recv_blocking(buf.get(), len, make_tag(seq, 1));
+        recv_blocking(buf.get(), len, make_tag(ch->tag_base, seq, 1));
 
         Reader reader(buf);
         Message msg;
@@ -504,6 +520,7 @@ private:
   std::thread io_thread_;
   std::thread progress_thread_;
 
+  std::atomic<uint64_t> channel_id_counter_{1};
   std::shared_mutex channels_mutex_;
   std::unordered_map<Endpoint, std::shared_ptr<UCXChannel>, UCXEndpointHash> channels_;
 };
