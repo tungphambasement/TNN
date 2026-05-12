@@ -1,10 +1,6 @@
 #pragma once
 
 #include <ucp/api/ucp.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
 
 #include <asio.hpp>
 #include <atomic>
@@ -27,6 +23,12 @@
 #include "message.hpp"
 
 namespace tnn {
+
+struct UCXEndpointHash {
+  size_t operator()(const Endpoint &endpoint) const {
+    return endpoint.hash();
+  }
+};
 
 struct UCXIdentityMessage {
   int32_t listening_port;
@@ -59,21 +61,13 @@ inline void ucx_recv_cb(void *request, ucs_status_t status, ucp_tag_recv_info_t 
   r->done = true;
 }
 
-struct UCXEndpointHash {
-  size_t operator()(const Endpoint &endpoint) const {
-    return endpoint.hash();
-  }
-};
-
 class UCXChannel {
 public:
-  UCXChannel(ucp_worker_h worker, ucp_ep_h ep, Endpoint endpoint, uint64_t tag_base)
-      : worker(worker), ep(ep), endpoint(std::move(endpoint)), tag_base(tag_base) {}
+  UCXChannel(ucp_ep_h ep, Endpoint endpoint)
+      : ep(ep), endpoint(std::move(endpoint)) {}
 
-  ucp_worker_h worker = nullptr;
   ucp_ep_h ep = nullptr;
   Endpoint endpoint;
-  uint64_t tag_base = 0;
   std::atomic<uint64_t> send_seq{1};
   std::atomic<uint64_t> recv_seq{1};
   std::mutex send_mutex;
@@ -82,11 +76,12 @@ public:
 class UCXCommunicator : public Communicator {
 public:
   struct Config {
-    uint32_t num_io_threads = 4;
+    uint32_t num_io_threads;
+    Config(uint32_t n = 4) : num_io_threads(n) {}
   };
 
   static std::unique_ptr<UCXCommunicator> create(const Endpoint &endpoint,
-                                                Config config) {
+                                                Config config = Config()) {
     auto &alloc = PoolAllocator::instance(getHost(), defaultFlowHandle);
     auto comm = std::make_unique<UCXCommunicator>(endpoint, alloc, config);
     comm->start_server();
@@ -94,33 +89,33 @@ public:
   }
 
   explicit UCXCommunicator(const Endpoint &endpoint, IAllocator &out_allocator,
-                           Config config)
+                           Config config = Config())
       : Communicator(endpoint, config.num_io_threads),
         int_allocator_(PoolAllocator::instance(getHost(), defaultFlowHandle)),
         out_allocator_(out_allocator),
         serializer_(int_allocator_),
         config_(config),
-        acceptor_(io_context_pool_.acceptor()) {
+        acceptor_(io_context_pool_.get()) {
     init_ucx();
   }
 
-  ~UCXCommunicator() override { stop(); }
+  ~UCXCommunicator() override {
+    stop();
+  }
 
   void start_server() {
     int port = endpoint_.get_parameter<int>("port");
 
-    asio::ip::tcp::endpoint ep(asio::ip::tcp::v4(), static_cast<asio::ip::port_type>(port));
+    asio::ip::tcp::endpoint ep(asio::ip::tcp::v4(),
+                               static_cast<asio::ip::port_type>(port));
     acceptor_.open(ep.protocol());
     acceptor_.set_option(asio::ip::tcp::acceptor::reuse_address(true));
     acceptor_.bind(ep);
     acceptor_.listen();
 
     is_running_.store(true, std::memory_order_release);
-
     asio::co_spawn(acceptor_.get_executor(), [this]() { return accept_loop(); }, asio::detached);
-
     io_thread_ = std::thread([this]() { io_context_pool_.run(); });
-    progress_thread_ = std::thread([this]() { progress_loop(); });
 
     std::cout << "[UCX] server started at " << endpoint_.id() << std::endl;
   }
@@ -134,11 +129,9 @@ public:
     {
       std::lock_guard<std::shared_mutex> lock(channels_mutex_);
       for (auto &kv : channels_) {
-        if (kv.second->ep) {
-          {
-            std::lock_guard<std::mutex> lk(ucx_mutex_);
-            ucp_ep_destroy(kv.second->ep);
-          }
+        if (kv.second && kv.second->ep) {
+          std::lock_guard<std::mutex> lk(ucx_mutex_);
+          ucp_ep_destroy(kv.second->ep);
           kv.second->ep = nullptr;
         }
       }
@@ -147,7 +140,6 @@ public:
 
     io_context_pool_.stop();
     if (io_thread_.joinable()) io_thread_.join();
-    if (progress_thread_.joinable()) progress_thread_.join();
 
     if (worker_) {
       ucp_worker_destroy(worker_);
@@ -160,47 +152,45 @@ public:
   }
 
   void send_impl(Message &&message, const Endpoint &endpoint) override {
-    try {
-      std::shared_ptr<UCXChannel> ch;
-      {
-        std::shared_lock<std::shared_mutex> lock(channels_mutex_);
-        auto it = channels_.find(endpoint);
-        if (it != channels_.end()) ch = it->second;
-      }
-      if (!ch) {
-        std::cerr << "[UCX] no channel to endpoint " << endpoint.id() << std::endl;
-        return;
-      }
-
-      auto dbg_cmd = message.header().command_type;
-
-      Sizer sizer;
-      sizer(message);
-      size_t msg_size = sizer.size();
-
-      std::cout << "[UCXDBG][send]"
-                << " to=" << endpoint.id()
-                << " cmd=" << static_cast<int>(dbg_cmd)
-                << " bytes=" << msg_size
-                << std::endl;
-
-      dptr buffer = int_allocator_.allocate(msg_size);
-      Writer writer(buffer);
-      writer(message);
-
-      uint64_t seq = ch->send_seq.fetch_add(1);
-      uint64_t len = msg_size;
-
-      std::lock_guard<std::mutex> send_lock(ch->send_mutex);
-
-      send_blocking(ch, &len, sizeof(len), make_tag(ch->tag_base, seq, 0));
-      send_blocking(ch, buffer.get(), msg_size, make_tag(ch->tag_base, seq, 1));
-
-      add_profile_data("ucx_send_msg_count", 1);
-      add_profile_data("ucx_send_bytes", static_cast<int64_t>(msg_size));
-    } catch (const std::exception &e) {
-      std::cerr << "[UCX] send error: " << e.what() << std::endl;
+    if (endpoint.type() == CommunicationType::IN_PROCESS) {
+      return;
     }
+
+    std::shared_ptr<UCXChannel> ch;
+    {
+      std::shared_lock<std::shared_mutex> lock(channels_mutex_);
+      auto it = channels_.find(endpoint);
+      if (it != channels_.end()) ch = it->second;
+    }
+
+    if (!ch) {
+      std::cerr << "[UCX] no channel to endpoint " << endpoint.id() << std::endl;
+      return;
+    }
+
+    auto dbg_cmd = message.header().command_type;
+
+    Sizer sizer;
+    sizer(message);
+    size_t msg_size = sizer.size();
+
+    dptr buffer = int_allocator_.allocate(msg_size);
+    Writer writer(buffer);
+    writer(message);
+
+    uint64_t seq = ch->send_seq.fetch_add(1);
+
+    {
+      std::lock_guard<std::mutex> send_lock(ch->send_mutex);
+      send_blocking(ch, &msg_size, sizeof(msg_size), make_tag(seq, 0));
+      send_blocking(ch, buffer.get(), msg_size, make_tag(seq, 1));
+    }
+
+    std::cout << "[UCXDBG][send]"
+              << " to=" << endpoint.id()
+              << " cmd=" << static_cast<int>(dbg_cmd)
+              << " bytes=" << msg_size
+              << std::endl;
   }
 
   void flush_output_messages() override {
@@ -214,17 +204,16 @@ public:
     }
   }
 
-  IAllocator &out_allocator() override { return out_allocator_; }
+  IAllocator &out_allocator() override {
+    return out_allocator_;
+  }
 
   bool connect_to_endpoint(const Endpoint &endpoint) override {
-    if (endpoint.type() == CommunicationType::IN_PROCESS) {
-      return true;
-    }
+    if (endpoint.type() == CommunicationType::IN_PROCESS) return true;
 
     {
       std::shared_lock<std::shared_mutex> lock(channels_mutex_);
       if (channels_.find(endpoint) != channels_.end()) {
-        std::cout << "[UCX] already connected to " << endpoint.id() << std::endl;
         return true;
       }
     }
@@ -241,7 +230,7 @@ public:
       UCXIdentityMessage identity{endpoint_.get_parameter<int>("port")};
       send_identity(sock, identity);
 
-      auto ch = create_channel_via_socket(sock, endpoint);
+      auto ch = create_channel(sock, endpoint);
 
       {
         std::lock_guard<std::shared_mutex> lock(channels_mutex_);
@@ -262,7 +251,7 @@ public:
     std::lock_guard<std::shared_mutex> lock(channels_mutex_);
     auto it = channels_.find(endpoint);
     if (it != channels_.end()) {
-      if (it->second->ep) {
+      if (it->second && it->second->ep) {
         std::lock_guard<std::mutex> lk(ucx_mutex_);
         ucp_ep_destroy(it->second->ep);
       }
@@ -299,19 +288,8 @@ private:
     }
   }
 
-  static uint64_t make_tag(uint64_t tag_base, uint64_t seq, uint64_t part) {
-    (void)tag_base;
-    return ((seq & 0x00FFFFFFFFFFFFFFULL) << 1) | (part & 1ULL);
-  }
-
-  void progress_loop() {
-    while (is_running_.load(std::memory_order_acquire)) {
-      {
-        std::lock_guard<std::mutex> lk(ucx_mutex_);
-        ucp_worker_progress(worker_);
-      }
-      std::this_thread::sleep_for(std::chrono::microseconds(50));
-    }
+  static uint64_t make_tag(uint64_t seq, uint64_t part) {
+    return ((seq & 0x7FFFFFFFFFFFFFFFULL) << 1) | (part & 1ULL);
   }
 
   void wait_req(void *req) {
@@ -321,7 +299,7 @@ private:
                                ucs_status_string(UCS_PTR_STATUS(req)));
     }
 
-    UCXReq *r = reinterpret_cast<UCXReq *>(req);
+    auto *r = reinterpret_cast<UCXReq *>(req);
     r->done = false;
     r->status = UCS_OK;
 
@@ -343,8 +321,8 @@ private:
     void *req = nullptr;
     {
       std::lock_guard<std::mutex> lk(ucx_mutex_);
-      req = ucp_tag_send_nb(ch->ep, const_cast<void *>(buf), bytes, ucp_dt_make_contig(1),
-                            tag, ucx_send_cb);
+      req = ucp_tag_send_nb(ch->ep, const_cast<void *>(buf), bytes,
+                            ucp_dt_make_contig(1), tag, ucx_send_cb);
     }
     wait_req(req);
   }
@@ -353,8 +331,8 @@ private:
     void *req = nullptr;
     {
       std::lock_guard<std::mutex> lk(ucx_mutex_);
-      req = ucp_tag_recv_nb(worker_, buf, bytes, ucp_dt_make_contig(1), tag, UINT64_MAX,
-                            ucx_recv_cb);
+      req = ucp_tag_recv_nb(worker_, buf, bytes, ucp_dt_make_contig(1),
+                            tag, UINT64_MAX, ucx_recv_cb);
     }
     wait_req(req);
   }
@@ -371,9 +349,11 @@ private:
     Sizer sizer;
     sizer(identity);
     size_t n = sizer.size();
+
     dptr buf = int_allocator_.allocate(n);
     Writer writer(buf);
     writer(identity);
+
     send_raw(sock, &n, sizeof(n));
     send_raw(sock, buf.get(), n);
   }
@@ -381,18 +361,21 @@ private:
   UCXIdentityMessage recv_identity(asio::ip::tcp::socket &sock) {
     size_t n = 0;
     recv_raw(sock, &n, sizeof(n));
+
     dptr buf = int_allocator_.allocate(n);
     recv_raw(sock, buf.get(), n);
+
     Reader reader(buf);
     UCXIdentityMessage identity;
     reader(identity);
     return identity;
   }
 
-  std::shared_ptr<UCXChannel> create_channel_via_socket(asio::ip::tcp::socket &sock,
-                                                        const Endpoint &peer_endpoint) {
+  std::shared_ptr<UCXChannel> create_channel(asio::ip::tcp::socket &sock,
+                                             const Endpoint &peer_endpoint) {
     ucp_address_t *local_addr = nullptr;
     size_t local_len = 0;
+
     {
       std::lock_guard<std::mutex> lk(ucx_mutex_);
       if (ucp_worker_get_address(worker_, &local_addr, &local_len) != UCS_OK) {
@@ -424,26 +407,12 @@ private:
       std::lock_guard<std::mutex> lk(ucx_mutex_);
       st = ucp_ep_create(worker_, &ep_params, &ep);
     }
+
     if (st != UCS_OK) {
       throw std::runtime_error(std::string("ucp_ep_create failed: ") + ucs_status_string(st));
     }
 
-    uint64_t local_tag_id =
-        (static_cast<uint64_t>(endpoint_.get_parameter<int>("port")) << 32) ^
-        channel_id_counter_.fetch_add(1);
-
-    send_raw(sock, &local_tag_id, sizeof(local_tag_id));
-    uint64_t peer_tag_id = 0;
-    recv_raw(sock, &peer_tag_id, sizeof(peer_tag_id));
-
-    uint64_t tag_base = ((local_tag_id ^ peer_tag_id) & 0x7FULL) << 56;
-
-    std::cout << "[UCX] channel tag_base=0x"
-              << std::hex << tag_base << std::dec
-              << " peer=" << peer_endpoint.id()
-              << std::endl;
-
-    return std::make_shared<UCXChannel>(worker_, ep, peer_endpoint, tag_base);
+    return std::make_shared<UCXChannel>(ep, peer_endpoint);
   }
 
   asio::awaitable<void> accept_loop() {
@@ -452,12 +421,20 @@ private:
         asio::ip::tcp::socket sock(co_await asio::this_coro::executor);
         co_await acceptor_.async_accept(sock, asio::use_awaitable);
 
-        auto identity = recv_identity(sock);
-
+        UCXIdentityMessage identity = recv_identity(sock);
         std::string host = sock.remote_endpoint().address().to_string();
         Endpoint peer = Endpoint::ucx(host, identity.listening_port);
 
-        auto ch = create_channel_via_socket(sock, peer);
+        {
+          std::shared_lock<std::shared_mutex> lock(channels_mutex_);
+          if (channels_.find(peer) != channels_.end()) {
+            std::cout << "[UCX] duplicate incoming channel ignored from " << peer.id()
+                      << std::endl;
+            continue;
+          }
+        }
+
+        auto ch = create_channel(sock, peer);
 
         {
           std::lock_guard<std::shared_mutex> lock(channels_mutex_);
@@ -479,16 +456,17 @@ private:
     while (is_running_.load(std::memory_order_acquire)) {
       try {
         uint64_t seq = ch->recv_seq.fetch_add(1);
-        uint64_t len = 0;
+        size_t len = 0;
 
-        recv_blocking(&len, sizeof(len), make_tag(ch->tag_base, seq, 0));
+        recv_blocking(&len, sizeof(len), make_tag(seq, 0));
+
         if (len == 0 || len > (2ULL << 30)) {
           std::cerr << "[UCX] invalid message length " << len << std::endl;
           continue;
         }
 
         dptr buf = int_allocator_.allocate(len);
-        recv_blocking(buf.get(), len, make_tag(ch->tag_base, seq, 1));
+        recv_blocking(buf.get(), len, make_tag(seq, 1));
 
         Reader reader(buf);
         Message msg;
@@ -502,13 +480,10 @@ private:
                   << std::endl;
 
         this->enqueue_input_message(std::move(msg));
-
-        add_profile_data("ucx_recv_msg_count", 1);
-        add_profile_data("ucx_recv_bytes", static_cast<int64_t>(len));
       } catch (const std::exception &e) {
         if (is_running_.load()) {
-          std::cerr << "[UCX] recv error from " << ch->endpoint.id() << ": " << e.what()
-                    << std::endl;
+          std::cerr << "[UCX] recv error from " << ch->endpoint.id()
+                    << ": " << e.what() << std::endl;
         }
         break;
       }
@@ -528,9 +503,7 @@ private:
   asio::ip::tcp::acceptor acceptor_;
   std::atomic<bool> is_running_{false};
   std::thread io_thread_;
-  std::thread progress_thread_;
 
-  std::atomic<uint64_t> channel_id_counter_{1};
   std::shared_mutex channels_mutex_;
   std::unordered_map<Endpoint, std::shared_ptr<UCXChannel>, UCXEndpointHash> channels_;
 };
