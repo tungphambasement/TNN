@@ -171,9 +171,17 @@ public:
         return;
       }
 
+      auto dbg_cmd = message.header().command_type;
+
       Sizer sizer;
       sizer(message);
       size_t msg_size = sizer.size();
+
+      std::cout << "[UCXDBG][send]"
+                << " to=" << endpoint.id()
+                << " cmd=" << static_cast<int>(dbg_cmd)
+                << " bytes=" << msg_size
+                << std::endl;
 
       dptr buffer = int_allocator_.allocate(msg_size);
       Writer writer(buffer);
@@ -459,6 +467,14 @@ private:
         Reader reader(buf);
         Message msg;
         serializer_.deserialize(reader, msg);
+
+        auto dbg_cmd = msg.header().command_type;
+        std::cout << "[UCXDBG][recv]"
+                  << " from=" << ch->endpoint.id()
+                  << " cmd=" << static_cast<int>(dbg_cmd)
+                  << " bytes=" << len
+                  << std::endl;
+
         this->enqueue_input_message(std::move(msg));
 
         add_profile_data("ucx_recv_msg_count", 1);
