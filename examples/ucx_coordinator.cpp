@@ -1,4 +1,5 @@
 #include "distributed/coordinator.hpp"
+#include "distributed/ucx_coordinator.hpp"
 
 #include <getopt.h>
 
@@ -8,6 +9,7 @@
 
 #include "data_loading/data_loader_factory.hpp"
 #include "distributed/coordinator.hpp"
+#include "distributed/ucx_coordinator.hpp"
 #include "distributed/ucx_worker.hpp"
 #include "distributed/train.hpp"
 #include "nn/example_models.hpp"
@@ -255,7 +257,7 @@ int main(int argc, char *argv[]) {
       ParallelMode_t::PIPELINE, std::move(graph),        std::move(optimizer), std::move(scheduler),
       std::move(partitioner),   std::move(local_worker), coordinator_endpoint, endpoints};
 
-  Coordinator coordinator(std::move(config));
+  UCXCoordinator coordinator(std::move(config));
 
   coordinator.initialize();
 
