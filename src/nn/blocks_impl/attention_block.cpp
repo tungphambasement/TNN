@@ -39,7 +39,7 @@ AttentionBlock::AttentionBlock(size_t embed_dim, size_t num_heads, bool is_causa
   out_proj_ = std::make_unique<DenseLayer>(embed_dim, embed_dim, true, name + "_out");
 }
 
-Vec<Tensor> AttentionBlock::forward_impl(const Vec<ConstTensor> &inputs, size_t mb_id) {
+Vec<Tensor> AttentionBlock::forward_impl(const Vec<ConstTensor> &inputs, size_t pid) {
   const ConstTensor &input = inputs[0];
   const auto &input_shape = input->shape();
 
@@ -47,37 +47,37 @@ Vec<Tensor> AttentionBlock::forward_impl(const Vec<ConstTensor> &inputs, size_t 
   size_t seq_len = input_shape[1];
 
   if (this->is_training_) {
-    ConstTensor &cached_input = this->get_immutable_cache(mb_id, "input");
+    ConstTensor &cached_input = this->get_immutable_cache(pid, "input");
     cached_input = input;
   }
 
-  Tensor q = q_proj_->forward({input}, mb_id)[0];
-  Tensor k = k_proj_->forward({input}, mb_id)[0];
-  Tensor v = v_proj_->forward({input}, mb_id)[0];
+  Tensor q = q_proj_->forward({input}, pid)[0];
+  Tensor k = k_proj_->forward({input}, pid)[0];
+  Tensor v = v_proj_->forward({input}, pid)[0];
 
   Tensor attn_out = this->get_workspace(input_shape, io_dtype_);
 
   DISPATCH_ON_3_DTYPES_TO_METHOD(compute_attention_forward, q, k, v, attn_out, batch_size, seq_len,
                                  defaultFlowHandle);
 
-  return out_proj_->forward({attn_out}, mb_id);
+  return out_proj_->forward({attn_out}, pid);
 }
 
-Vec<Tensor> AttentionBlock::backward_impl(const Vec<ConstTensor> &grad_outputs, size_t mb_id) {
+Vec<Tensor> AttentionBlock::backward_impl(const Vec<ConstTensor> &grad_outputs, size_t pid) {
   const ConstTensor &grad_output = grad_outputs[0];
-  ConstTensor &input = this->get_immutable_cache(mb_id, "input");
+  ConstTensor &input = this->get_immutable_cache(pid, "input");
   if (!input) {
-    throw std::runtime_error("No cached input found for micro-batch ID: " + std::to_string(mb_id));
+    throw std::runtime_error("No cached input found for micro-batch ID: " + std::to_string(pid));
   }
 
   size_t batch_size = input->dimension(0);
   size_t seq_len = input->dimension(1);
 
-  Tensor q = q_proj_->forward({input}, mb_id)[0];
-  Tensor k = k_proj_->forward({input}, mb_id)[0];
-  Tensor v = v_proj_->forward({input}, mb_id)[0];
+  Tensor q = q_proj_->forward({input}, pid)[0];
+  Tensor k = k_proj_->forward({input}, pid)[0];
+  Tensor v = v_proj_->forward({input}, pid)[0];
 
-  Tensor d_attn_out = out_proj_->backward({grad_output}, mb_id)[0];
+  Tensor d_attn_out = out_proj_->backward({grad_output}, pid)[0];
 
   Tensor dq = this->get_workspace(q->shape(), io_dtype_);
   Tensor dk = this->get_workspace(k->shape(), io_dtype_);
@@ -86,9 +86,9 @@ Vec<Tensor> AttentionBlock::backward_impl(const Vec<ConstTensor> &grad_outputs, 
   DISPATCH_ON_3_DTYPES_TO_METHOD(compute_attention_backward, q, k, v, d_attn_out, dq, dk, dv,
                                  batch_size, seq_len, defaultFlowHandle);
 
-  Tensor dq_in = q_proj_->backward({dq}, mb_id)[0];
-  Tensor dk_in = k_proj_->backward({dk}, mb_id)[0];
-  Tensor dv_in = v_proj_->backward({dv}, mb_id)[0];
+  Tensor dq_in = q_proj_->backward({dq}, pid)[0];
+  Tensor dk_in = k_proj_->backward({dk}, pid)[0];
+  Tensor dv_in = v_proj_->backward({dv}, pid)[0];
 
   Tensor grad_input = this->get_output_tensor(input->shape());
   size_t size = dq_in->size();

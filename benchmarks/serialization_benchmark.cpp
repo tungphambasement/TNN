@@ -21,7 +21,7 @@ signed main() {
   Tensor tensor = make_tensor<float>({data_size});
   tensor->fill_random_normal(0.0, 0.5);
   Job job;
-  job.mb_id = microbatch_id;
+  job.pid = microbatch_id;
   job.data = tensor->clone();
   Message message(CommandType::FORWARD_JOB, std::move(job));
 

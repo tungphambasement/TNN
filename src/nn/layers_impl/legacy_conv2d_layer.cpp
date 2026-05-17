@@ -87,10 +87,10 @@ void LegacyConv2DLayer::init_impl() {
  * @tparam T I/O data type
  * @param input input tensor in NCHW format
  * @param output input tensor in NCHW format
- * @param mb_id micro batch id for caching input
+ * @param pid micro batch id for caching input
  */
 
-Tensor LegacyConv2DLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
+Tensor LegacyConv2DLayer::forward_impl(const ConstTensor &input, size_t pid) {
   if (input->dims() != 4) {
     throw std::invalid_argument("Conv2D: Input tensor must be 4-dimensional (NCHW)");
   }
@@ -105,14 +105,14 @@ Tensor LegacyConv2DLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
 
 #ifdef USE_CUDNN
   if (get_engine_type() == EngineType::CUDA) {
-    return cudnn_forward(input, mb_id);
+    return cudnn_forward(input, pid);
   }
 #endif
 
-  return def_forward(input, mb_id);
+  return def_forward(input, pid);
 }
 
-Tensor LegacyConv2DLayer::backward_impl(const ConstTensor &grad_output, size_t mb_id) {
+Tensor LegacyConv2DLayer::backward_impl(const ConstTensor &grad_output, size_t pid) {
   if (grad_output->dims() != 4) {
     throw std::invalid_argument("Conv2D: Input tensor must be 4-dimensional (NCHW)");
   }
@@ -127,14 +127,14 @@ Tensor LegacyConv2DLayer::backward_impl(const ConstTensor &grad_output, size_t m
 
 #ifdef USE_CUDNN
   if (get_engine_type() == EngineType::CUDA) {
-    return cudnn_backward(grad_output, mb_id);
+    return cudnn_backward(grad_output, pid);
   }
 #endif
 
-  return def_backward(grad_output, mb_id);
+  return def_backward(grad_output, pid);
 }
 
-Tensor LegacyConv2DLayer::def_forward(const ConstTensor &input, size_t mb_id) {
+Tensor LegacyConv2DLayer::def_forward(const ConstTensor &input, size_t pid) {
   if (input->dims() != 4) {
     throw std::invalid_argument("Conv2D: Input tensor must be 4-dimensional (NCHW)");
   }
@@ -145,7 +145,7 @@ Tensor LegacyConv2DLayer::def_forward(const ConstTensor &input, size_t mb_id) {
   const size_t output_h = (input_h + 2 * pad_h_ - kernel_h_) / stride_h_ + 1;
   const size_t output_w = (input_w + 2 * pad_w_ - kernel_w_) / stride_w_ + 1;
 
-  micro_batch_input_shapes_[mb_id] = input->shape();
+  micro_batch_input_shapes_[pid] = input->shape();
   Tensor output = get_output_tensor({batch_size, out_channels_, output_h, output_w});
 
   size_t kernel_size = in_channels_ * kernel_h_ * kernel_w_;
@@ -153,7 +153,7 @@ Tensor LegacyConv2DLayer::def_forward(const ConstTensor &input, size_t mb_id) {
   size_t col_matrix_size = kernel_size * output_size;
 
   Tensor col_buffer = get_cache_tensor({col_matrix_size}, io_dtype_);
-  set_mutable_cache(mb_id, "col_buffer", col_buffer);
+  set_mutable_cache(pid, "col_buffer", col_buffer);
 
   size_t output_buffer_size = out_channels_ * output_size;
   Tensor temp_output_buffer = get_workspace({output_buffer_size}, io_dtype_);
@@ -175,12 +175,12 @@ Tensor LegacyConv2DLayer::def_forward(const ConstTensor &input, size_t mb_id) {
   return output;
 }
 
-Tensor LegacyConv2DLayer::def_backward(const ConstTensor &grad_output, size_t mb_id) {
-  auto it_input_shape = micro_batch_input_shapes_.find(mb_id);
+Tensor LegacyConv2DLayer::def_backward(const ConstTensor &grad_output, size_t pid) {
+  auto it_input_shape = micro_batch_input_shapes_.find(pid);
 
   if (it_input_shape == micro_batch_input_shapes_.end()) {
     throw std::runtime_error("No cached input shape found for micro-batch ID: " +
-                             std::to_string(mb_id));
+                             std::to_string(pid));
   }
 
   const auto &input_shape = it_input_shape->second;
@@ -193,7 +193,7 @@ Tensor LegacyConv2DLayer::def_backward(const ConstTensor &grad_output, size_t mb
   Tensor grad_input = get_output_tensor(input_shape);
   grad_input->fill(0);  // col2im accumulates, so we need to zero first
 
-  ConstTensor col_buffer = this->get_mutable_cache(mb_id, "col_buffer");
+  ConstTensor col_buffer = this->get_mutable_cache(pid, "col_buffer");
 
   size_t kernel_size = in_channels_ * kernel_h_ * kernel_w_;
   size_t output_size = batch_size * output_h * output_w;
@@ -252,7 +252,7 @@ void LegacyConv2DLayer::build_graph(const Vec<size_t> &input_shape) const {
   }
 }
 
-Tensor LegacyConv2DLayer::cudnn_forward(const ConstTensor &input, size_t mb_id) {
+Tensor LegacyConv2DLayer::cudnn_forward(const ConstTensor &input, size_t pid) {
   const auto &shape = input->shape();
   const size_t batch_size = shape[0];
   const size_t input_h = shape[2];
@@ -271,7 +271,7 @@ Tensor LegacyConv2DLayer::cudnn_forward(const ConstTensor &input, size_t mb_id) 
   Tensor cudnn_workspace = this->get_workspace({stats.fwd_workspace_size}, DType_t::BYTE);
 
   if (this->is_training_) {
-    this->set_immutable_cache(mb_id, "input", input);
+    this->set_immutable_cache(pid, "input", input);
   }
 
   DISPATCH_ON_3_DTYPES_TO_METHOD(cudnn_run_forward, input, weights_, bias_, output, batch_size,
@@ -281,10 +281,10 @@ Tensor LegacyConv2DLayer::cudnn_forward(const ConstTensor &input, size_t mb_id) 
   return output;
 }
 
-Tensor LegacyConv2DLayer::cudnn_backward(const ConstTensor &grad_output, size_t mb_id) {
-  ConstTensor &input = this->get_immutable_cache(mb_id, "input");
+Tensor LegacyConv2DLayer::cudnn_backward(const ConstTensor &grad_output, size_t pid) {
+  ConstTensor &input = this->get_immutable_cache(pid, "input");
   if (!input) {
-    throw std::runtime_error("No cached input found for micro-batch ID: " + std::to_string(mb_id));
+    throw std::runtime_error("No cached input found for micro-batch ID: " + std::to_string(pid));
   }
 
   const auto &input_shape = input->shape();

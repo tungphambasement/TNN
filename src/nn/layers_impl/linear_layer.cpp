@@ -14,14 +14,14 @@ LinearLayer::LinearLayer(const std::string &name)
     : StatelessLayer(name),
       activation_(std::make_unique<Linear>()) {}
 
-Tensor LinearLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
+Tensor LinearLayer::forward_impl(const ConstTensor &input, size_t pid) {
   // Linear activation is identity, just copy the input
   Tensor output = get_output_tensor(input->shape());
   output->share_from(input);
   return output;
 }
 
-Tensor LinearLayer::backward_impl(const ConstTensor &grad_output, size_t mb_id) {
+Tensor LinearLayer::backward_impl(const ConstTensor &grad_output, size_t pid) {
   // Gradient of identity is identity, just copy grad_output
   Tensor grad_input = get_output_tensor(grad_output->shape());
   grad_input->share_from(grad_output);

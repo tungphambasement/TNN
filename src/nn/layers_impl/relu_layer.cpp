@@ -21,13 +21,13 @@ ReLULayer::ReLULayer(const std::string &name)
     : StatelessLayer(name),
       activation_(std::make_unique<ReLU>()) {}
 
-Tensor ReLULayer::forward_impl(const ConstTensor &input, size_t mb_id) {
+Tensor ReLULayer::forward_impl(const ConstTensor &input, size_t pid) {
   Tensor output = get_output_tensor(input->shape());
   const size_t num_elements = input->size();
 
   if (this->is_training_) {
     Tensor mask = this->get_cache_tensor(input->shape(), DType_t::UINT8_T);
-    set_mutable_cache(mb_id, "mask", mask);
+    set_mutable_cache(pid, "mask", mask);
 
     // Fused kernel: compute ReLU and mask in a single pass
     if (input->device_type() == DeviceType::CPU) {
@@ -57,8 +57,8 @@ Tensor ReLULayer::forward_impl(const ConstTensor &input, size_t mb_id) {
   return output;
 }
 
-Tensor ReLULayer::backward_impl(const ConstTensor &grad_output, size_t mb_id) {
-  const ConstTensor &mask = this->get_mutable_cache(mb_id, "mask");
+Tensor ReLULayer::backward_impl(const ConstTensor &grad_output, size_t pid) {
+  const ConstTensor &mask = this->get_mutable_cache(pid, "mask");
   if (!mask) {
     throw std::runtime_error("No cached mask found for backward pass in ReLULayer");
   }

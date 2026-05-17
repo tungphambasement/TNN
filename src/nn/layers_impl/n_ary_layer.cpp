@@ -17,7 +17,7 @@
 
 namespace tnn {
 
-Vec<Tensor> NAryOpLayer::forward_impl(const Vec<ConstTensor> &inputs, size_t mb_id) {
+Vec<Tensor> NAryOpLayer::forward_impl(const Vec<ConstTensor> &inputs, size_t pid) {
   if (inputs.size() < 2) {
     throw std::runtime_error("NAryOpLayer requires at least 2 inputs");
   }
@@ -33,7 +33,7 @@ Vec<Tensor> NAryOpLayer::forward_impl(const Vec<ConstTensor> &inputs, size_t mb_
 
   for (size_t i = 0; i < inputs.size(); ++i) {
     auto key = std::string("fwd_input_") + std::to_string(i);
-    auto &cached = get_immutable_cache(mb_id, key);
+    auto &cached = get_immutable_cache(pid, key);
     cached = inputs[i];
   }
 
@@ -41,7 +41,7 @@ Vec<Tensor> NAryOpLayer::forward_impl(const Vec<ConstTensor> &inputs, size_t mb_
   return {output};
 }
 
-Vec<Tensor> NAryOpLayer::backward_impl(const Vec<ConstTensor> &grad_outputs, size_t mb_id) {
+Vec<Tensor> NAryOpLayer::backward_impl(const Vec<ConstTensor> &grad_outputs, size_t pid) {
   if (grad_outputs.size() != 1) {
     throw std::runtime_error("NAryOpLayer backward: expects 1 grad output");
   }
@@ -53,7 +53,7 @@ Vec<Tensor> NAryOpLayer::backward_impl(const Vec<ConstTensor> &grad_outputs, siz
   for (size_t i = 0;; ++i) {
     auto key = std::string("fwd_input_") + std::to_string(i);
     try {
-      fwd_inputs.push_back(get_immutable_cache(mb_id, key));
+      fwd_inputs.push_back(get_immutable_cache(pid, key));
       num_inputs = i + 1;
     } catch (...) {
       break;

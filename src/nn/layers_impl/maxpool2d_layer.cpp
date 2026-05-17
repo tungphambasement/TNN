@@ -50,7 +50,7 @@ MaxPool2DLayer::~MaxPool2DLayer() {
 #endif
 }
 
-Tensor MaxPool2DLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
+Tensor MaxPool2DLayer::forward_impl(const ConstTensor &input, size_t pid) {
   const auto &shape = input->shape();
   if (shape.size() != 4) {
     throw std::runtime_error("MaxPool2DLayer: input must be 4D (NHWC format)");
@@ -60,21 +60,21 @@ Tensor MaxPool2DLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
   const size_t input_w = shape[2];
   const size_t channels = shape[3];
 
-  micro_batch_input_shapes_[mb_id] = {batch_size, input_h, input_w, channels};
+  micro_batch_input_shapes_[pid] = {batch_size, input_h, input_w, channels};
 
   const size_t output_h = (input_h + 2 * pad_h_ - pool_h_) / stride_h_ + 1;
   const size_t output_w = (input_w + 2 * pad_w_ - pool_w_) / stride_w_ + 1;
 
 #ifdef USE_DNNL
   if (get_engine_type() == EngineType::CPU) {
-    return dnnl_forward(input, mb_id);
+    return dnnl_forward(input, pid);
   }
 #endif
 
   if (is_training_) {
     Tensor mask_indices =
         this->get_cache_tensor({batch_size, output_h, output_w, channels}, DType_t::INT32_T);
-    set_mutable_cache(mb_id, "mask_indices", mask_indices);
+    set_mutable_cache(pid, "mask_indices", mask_indices);
 
     Tensor output = get_output_tensor({batch_size, output_h, output_w, channels});
 
@@ -95,15 +95,15 @@ Tensor MaxPool2DLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
   }
 }
 
-Tensor MaxPool2DLayer::backward_impl(const ConstTensor &grad_output, size_t mb_id) {
+Tensor MaxPool2DLayer::backward_impl(const ConstTensor &grad_output, size_t pid) {
 #ifdef USE_DNNL
   if (get_engine_type() == EngineType::CPU) {
-    return dnnl_backward(grad_output, mb_id);
+    return dnnl_backward(grad_output, pid);
   }
 #endif
 
-  const ConstTensor &mask_indices = this->get_mutable_cache(mb_id, "mask_indices");
-  const Vec<size_t> &input_shape = micro_batch_input_shapes_[mb_id];
+  const ConstTensor &mask_indices = this->get_mutable_cache(pid, "mask_indices");
+  const Vec<size_t> &input_shape = micro_batch_input_shapes_[pid];
 
   const size_t batch_size = input_shape[0];
   const size_t input_h = input_shape[1];
@@ -257,7 +257,7 @@ void MaxPool2DLayer::build_dnnl_handle(const Vec<size_t> &input_shape) const {
   }
 }
 
-Tensor MaxPool2DLayer::dnnl_forward(const ConstTensor &input, size_t mb_id) {
+Tensor MaxPool2DLayer::dnnl_forward(const ConstTensor &input, size_t pid) {
   build_dnnl_handle(input->shape());
   const size_t shape_key = get_shape_hash(input->shape());
   cpu::dnnl_maxpool::dnnlMaxPoolHandle_t *dnnl_handle = dnnl_handle_cache.at(shape_key);
@@ -268,7 +268,7 @@ Tensor MaxPool2DLayer::dnnl_forward(const ConstTensor &input, size_t mb_id) {
 
   if (this->is_training_) {
     Tensor pool_ws = get_cache_tensor({current_stats.pool_workspace_size}, DType_t::BYTE);
-    set_mutable_cache(mb_id, "dnnl_pool_ws", pool_ws);
+    set_mutable_cache(pid, "dnnl_pool_ws", pool_ws);
 
     create_cpu_task(this->flow_handle_, cpu::dnnl_maxpool::run_forward, dnnl_handle, current_stats,
                     input->data(), output->data(), pool_ws->data(), nullptr);
@@ -280,8 +280,8 @@ Tensor MaxPool2DLayer::dnnl_forward(const ConstTensor &input, size_t mb_id) {
   return output;
 }
 
-Tensor MaxPool2DLayer::dnnl_backward(const ConstTensor &grad_output, size_t mb_id) {
-  const Vec<size_t> &input_shape = micro_batch_input_shapes_[mb_id];
+Tensor MaxPool2DLayer::dnnl_backward(const ConstTensor &grad_output, size_t pid) {
+  const Vec<size_t> &input_shape = micro_batch_input_shapes_[pid];
 
   build_dnnl_handle(input_shape);
   const size_t shape_key = get_shape_hash(input_shape);
@@ -289,7 +289,7 @@ Tensor MaxPool2DLayer::dnnl_backward(const ConstTensor &grad_output, size_t mb_i
   const MaxPoolStats &current_stats = dnnl_stats_cache.at(shape_key);
 
   Tensor grad_input = get_output_tensor(input_shape);
-  Tensor &pool_ws = this->get_mutable_cache(mb_id, "dnnl_pool_ws");
+  Tensor &pool_ws = this->get_mutable_cache(pid, "dnnl_pool_ws");
 
   create_cpu_task(this->flow_handle_, cpu::dnnl_maxpool::run_backward, dnnl_handle, current_stats,
                   grad_output->data(), grad_input->data(), pool_ws->data(), nullptr);

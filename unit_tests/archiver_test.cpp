@@ -179,7 +179,7 @@ TEST_F(ArchiverTest, TestTensorArchiver) {
 
 TEST_F(ArchiverTest, TestJobArchiver) {
   Job job;
-  job.mb_id = 123;
+  job.pid = 123;
   job.data = make_tensor(DType_t::FP32, {64, 256});
   job.data->fill_random_normal(0.0f, 1.0f);
   Sizer sizer;
@@ -194,7 +194,7 @@ TEST_F(ArchiverTest, TestJobArchiver) {
   BinarySerializer bserializer(allocator_);
   bserializer.deserialize(reader, deserialized_job);
 
-  EXPECT_EQ(deserialized_job.mb_id, job.mb_id);
+  EXPECT_EQ(deserialized_job.pid, job.pid);
   EXPECT_EQ(deserialized_job.data->shape(), job.data->shape());
   EXPECT_EQ(deserialized_job.data->data_type(), job.data->data_type());
   EXPECT_EQ(deserialized_job.data->device(), job.data->device());

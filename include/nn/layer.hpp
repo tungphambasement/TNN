@@ -53,8 +53,8 @@ public:
   EngineType get_engine_type() const;
 
   void init();
-  Vec<Tensor> forward(const Vec<ConstTensor> &inputs, size_t mb_id = 0);
-  Vec<Tensor> backward(const Vec<ConstTensor> &grad_outputs, size_t mb_id = 0);
+  Vec<Tensor> forward(const Vec<ConstTensor> &inputs, size_t pid = 0);
+  Vec<Tensor> backward(const Vec<ConstTensor> &grad_outputs, size_t pid = 0);
 
   // Note: have to call init again after changing param dtype
   Layer &set_allocator(DELAllocatorV2 &allocator);
@@ -80,7 +80,7 @@ public:
 
   Vec<Tensor> parameters();
   Vec<Tensor> gradients();
-  void clear_cache(size_t mb_id);
+  void clear_cache(size_t pid);
 
   const Device &device() const {
     if (!allocator_) {
@@ -99,8 +99,8 @@ protected:
   virtual void on_set_io_dtype(DType_t dtype) {}
   virtual void on_set_param_dtype(DType_t dtype) {}
   virtual void on_set_compute_dtype(DType_t dtype) {}
-  virtual Vec<Tensor> forward_impl(const Vec<ConstTensor> &inputs, size_t mb_id) = 0;
-  virtual Vec<Tensor> backward_impl(const Vec<ConstTensor> &grad_outputs, size_t mb_id) = 0;
+  virtual Vec<Tensor> forward_impl(const Vec<ConstTensor> &inputs, size_t pid) = 0;
+  virtual Vec<Tensor> backward_impl(const Vec<ConstTensor> &grad_outputs, size_t pid) = 0;
 
 protected:
   bool initialized_ = false;
@@ -119,10 +119,10 @@ protected:
   DType_t compute_dtype_ = DType_t::FP32;  // data type for internal computations
 
   // helpers
-  void set_immutable_cache(size_t mb_id, const std::string &key, ConstTensor value);
-  ConstTensor &get_immutable_cache(size_t mb_id, const std::string &key);
-  void set_mutable_cache(size_t mb_id, const std::string &key, Tensor value);
-  Tensor &get_mutable_cache(size_t mb_id, const std::string &key);
+  void set_immutable_cache(size_t pid, const std::string &key, ConstTensor value);
+  ConstTensor &get_immutable_cache(size_t pid, const std::string &key);
+  void set_mutable_cache(size_t pid, const std::string &key, Tensor value);
+  Tensor &get_mutable_cache(size_t pid, const std::string &key);
   Tensor get_tensor(const Vec<size_t> &shape, DType_t dtype);
   Tensor get_output_tensor(const Vec<size_t> &shape);
   Tensor get_cache_tensor(const Vec<size_t> &shape = {}, DType_t dtype = DType_t::FP32);

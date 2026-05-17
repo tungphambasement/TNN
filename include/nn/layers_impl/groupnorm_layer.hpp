@@ -64,8 +64,8 @@ private:
   }
 
   void init_impl() override;
-  Tensor forward_impl(const ConstTensor &input, size_t mb_id = 0) override;
-  Tensor backward_impl(const ConstTensor &grad_output, size_t mb_id = 0) override;
+  Tensor forward_impl(const ConstTensor &input, size_t pid = 0) override;
+  Tensor backward_impl(const ConstTensor &grad_output, size_t pid = 0) override;
 
 public:
   GroupNormLayer(size_t num_groups, size_t num_channels, float epsilon = 1e-5f, bool affine = true,

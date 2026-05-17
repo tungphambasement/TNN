@@ -23,7 +23,7 @@
 #include "type/type.hpp"
 
 namespace tnn {
-Vec<Tensor> Sequential::forward_impl(const Vec<ConstTensor> &inputs, size_t mb_id) {
+Vec<Tensor> Sequential::forward_impl(const Vec<ConstTensor> &inputs, size_t pid) {
   if (layers_.empty()) {
     throw std::runtime_error("Cannot forward through empty sequential model");
   }
@@ -35,7 +35,7 @@ Vec<Tensor> Sequential::forward_impl(const Vec<ConstTensor> &inputs, size_t mb_i
     allocator_->flip();
   }
   for (size_t i = 0; i < layers_.size(); ++i) {
-    current_outputs = layers_[i]->forward(current_inputs, mb_id);
+    current_outputs = layers_[i]->forward(current_inputs, pid);
     current_inputs = Vec<ConstTensor>(current_outputs.begin(), current_outputs.end());
     if (i != layers_.size() - 1) {
       allocator_->flip();
@@ -44,7 +44,7 @@ Vec<Tensor> Sequential::forward_impl(const Vec<ConstTensor> &inputs, size_t mb_i
   return current_outputs;
 }
 
-Vec<Tensor> Sequential::backward_impl(const Vec<ConstTensor> &grad_outputs, size_t mb_id) {
+Vec<Tensor> Sequential::backward_impl(const Vec<ConstTensor> &grad_outputs, size_t pid) {
   if (layers_.empty()) {
     throw std::runtime_error("Cannot backward through empty sequential model");
   }
@@ -55,7 +55,7 @@ Vec<Tensor> Sequential::backward_impl(const Vec<ConstTensor> &grad_outputs, size
     allocator_->flip();
   }
   for (int i = static_cast<int>(layers_.size()) - 1; i >= 0; --i) {
-    grad_inputs = layers_[i]->backward(current_gradients, mb_id);
+    grad_inputs = layers_[i]->backward(current_gradients, pid);
     current_gradients = Vec<ConstTensor>(grad_inputs.begin(), grad_inputs.end());
     if (i != 0) {
       allocator_->flip();  // algorithm 1 definitely applies

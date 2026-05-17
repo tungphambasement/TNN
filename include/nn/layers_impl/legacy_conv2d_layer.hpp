@@ -36,12 +36,12 @@ private:
   Tensor weight_gradients_;
   Tensor bias_gradients_;
 
-  Tensor def_forward(const ConstTensor &input, size_t mb_id);
-  Tensor def_backward(const ConstTensor &current_gradient, size_t mb_id);
+  Tensor def_forward(const ConstTensor &input, size_t pid);
+  Tensor def_backward(const ConstTensor &current_gradient, size_t pid);
 
 #ifdef USE_CUDNN
-  Tensor cudnn_forward(const ConstTensor &input, size_t mb_id);
-  Tensor cudnn_backward(const ConstTensor &grad_output, size_t mb_id);
+  Tensor cudnn_forward(const ConstTensor &input, size_t pid);
+  Tensor cudnn_backward(const ConstTensor &grad_output, size_t pid);
 #endif
 
   std::unordered_map<size_t, Vec<size_t>> micro_batch_input_shapes_;
@@ -134,8 +134,8 @@ private:
                                         size_t out_channels, flowHandle_t handle);
 #endif
 
-  Tensor forward_impl(const ConstTensor &input, size_t mb_id = 0) override;
-  Tensor backward_impl(const ConstTensor &grad_output, size_t mb_id = 0) override;
+  Tensor forward_impl(const ConstTensor &input, size_t pid = 0) override;
+  Tensor backward_impl(const ConstTensor &grad_output, size_t pid = 0) override;
 
 public:
   LegacyConv2DLayer(size_t in_channels, size_t out_channels, size_t kernel_h, size_t kernel_w,

@@ -40,9 +40,9 @@ private:
 
   std::unordered_map<size_t, Vec<Vec<size_t>>> input_shapes_cache_;
 
-  Vec<size_t> compute_execution_order(const Vec<ConstTensor> &inputs, size_t mb_id);
+  Vec<size_t> compute_execution_order(const Vec<ConstTensor> &inputs, size_t pid);
 
-  SequenceMemInfo measure_sequence_memory(size_t seq_idx, ConstTensor input, size_t mb_id);
+  SequenceMemInfo measure_sequence_memory(size_t seq_idx, ConstTensor input, size_t pid);
 
 protected:
   Vec<Layer *> layers() override {
@@ -56,8 +56,8 @@ protected:
     return layers;
   }
 
-  Vec<Tensor> forward_impl(const Vec<ConstTensor> &inputs, size_t mb_id) override;
-  Vec<Tensor> backward_impl(const Vec<ConstTensor> &grad_outputs, size_t mb_id) override;
+  Vec<Tensor> forward_impl(const Vec<ConstTensor> &inputs, size_t pid) override;
+  Vec<Tensor> backward_impl(const Vec<ConstTensor> &grad_outputs, size_t pid) override;
 
 public:
   /**

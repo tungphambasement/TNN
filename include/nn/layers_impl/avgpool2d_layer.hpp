@@ -40,8 +40,8 @@ private:
                                      size_t input_h, size_t input_w, size_t channels,
                                      size_t output_h, size_t output_w, flowHandle_t handle) const;
 
-  Tensor forward_impl(const ConstTensor &input, size_t mb_id = 0) override;
-  Tensor backward_impl(const ConstTensor &grad_output, size_t mb_id = 0) override;
+  Tensor forward_impl(const ConstTensor &input, size_t pid = 0) override;
+  Tensor backward_impl(const ConstTensor &grad_output, size_t pid = 0) override;
 
 public:
   static constexpr const char *TYPE_NAME = "avgpool2d";

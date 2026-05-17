@@ -17,7 +17,7 @@ private:
     // no-op
   }
 
-  Vec<Tensor> forward_impl(const Vec<ConstTensor> &inputs, size_t mb_id = 0) override {
+  Vec<Tensor> forward_impl(const Vec<ConstTensor> &inputs, size_t pid = 0) override {
     Vec<Tensor> outputs;
     outputs.reserve(m_);
     // Broadcast single input to all outputs
@@ -29,7 +29,7 @@ private:
     return outputs;
   }
 
-  Vec<Tensor> backward_impl(const Vec<ConstTensor> &grad_outputs, size_t mb_id = 0) override {
+  Vec<Tensor> backward_impl(const Vec<ConstTensor> &grad_outputs, size_t pid = 0) override {
     const auto &output_shape = grad_outputs[0]->shape();
     Tensor grad_input = get_output_tensor(output_shape);
     DISPATCH_IO_DTYPE(compute_backward, grad_outputs, grad_input);

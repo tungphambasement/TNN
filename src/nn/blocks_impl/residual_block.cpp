@@ -60,21 +60,21 @@ ResidualBlock::ResidualBlock(std::unique_ptr<Sequential> main_path,
   }
 }
 
-Vec<Tensor> ResidualBlock::forward_impl(const Vec<ConstTensor> &inputs, size_t mb_id) {
+Vec<Tensor> ResidualBlock::forward_impl(const Vec<ConstTensor> &inputs, size_t pid) {
   // Cache input shapes
   Vec<Vec<size_t>> input_shapes(inputs.size());
   for (size_t i = 0; i < inputs.size(); ++i) {
     input_shapes[i] = inputs[i]->shape();
   }
-  input_shape_cache_[mb_id] = input_shapes;
+  input_shape_cache_[pid] = input_shapes;
 
   // Forward through main path
-  Vec<Tensor> main_outputs = main_path_->forward(inputs, mb_id);
+  Vec<Tensor> main_outputs = main_path_->forward(inputs, pid);
 
   // Forward through shortcut path
   Vec<ConstTensor> shortcut_outputs = inputs;
   if (shortcut_path_) {
-    Vec<Tensor> shortcut_outputs_vec = shortcut_path_->forward(inputs, mb_id);
+    Vec<Tensor> shortcut_outputs_vec = shortcut_path_->forward(inputs, pid);
     for (size_t i = 0; i < shortcut_outputs_vec.size(); ++i) {
       shortcut_outputs[i] = shortcut_outputs_vec[i];
     }
@@ -89,7 +89,7 @@ Vec<Tensor> ResidualBlock::forward_impl(const Vec<ConstTensor> &inputs, size_t m
       Tensor pre_act = get_cache_tensor(main_outputs[i]->shape(), io_dtype_);
       DISPATCH_IO_DTYPE(ops::add, main_outputs[i]->data_ptr(), shortcut_outputs[i]->data_ptr(),
                         pre_act->data_ptr(), outputs[i]->size());
-      set_mutable_cache(mb_id, pre_act_key, pre_act);
+      set_mutable_cache(pid, pre_act_key, pre_act);
       final_activation_->apply(pre_act, outputs[i]);
     } else {
       DISPATCH_IO_DTYPE(ops::add, main_outputs[i]->data_ptr(), shortcut_outputs[i]->data_ptr(),
@@ -99,11 +99,11 @@ Vec<Tensor> ResidualBlock::forward_impl(const Vec<ConstTensor> &inputs, size_t m
   return outputs;
 }
 
-Vec<Tensor> ResidualBlock::backward_impl(const Vec<ConstTensor> &grad_outputs, size_t mb_id) {
-  auto it_input_shapes = input_shape_cache_.find(mb_id);
+Vec<Tensor> ResidualBlock::backward_impl(const Vec<ConstTensor> &grad_outputs, size_t pid) {
+  auto it_input_shapes = input_shape_cache_.find(pid);
   if (it_input_shapes == input_shape_cache_.end()) {
     throw std::runtime_error("No cached input shapes found for micro-batch ID: " +
-                             std::to_string(mb_id));
+                             std::to_string(pid));
   }
   Vec<Vec<size_t>> input_shapes = it_input_shapes->second;
 
@@ -112,7 +112,7 @@ Vec<Tensor> ResidualBlock::backward_impl(const Vec<ConstTensor> &grad_outputs, s
   if (final_activation_) {
     for (size_t i = 0; i < grad_outputs.size(); ++i) {
       std::string pre_act_key = "pre_activation_" + std::to_string(i);
-      Tensor &pre_act = this->get_mutable_cache(mb_id, pre_act_key);
+      Tensor &pre_act = this->get_mutable_cache(pid, pre_act_key);
       Tensor grad_pre_act = this->get_workspace(pre_act->shape());
       final_activation_->compute_gradient(pre_act, grad_outputs[i], grad_pre_act);
       pre_act = nullptr;  // free pre-activation cache after backward
@@ -122,12 +122,12 @@ Vec<Tensor> ResidualBlock::backward_impl(const Vec<ConstTensor> &grad_outputs, s
   }
 
   // Backward through main path
-  Vec<Tensor> main_grad_inputs = main_path_->backward(grads_to_propagate, mb_id);
+  Vec<Tensor> main_grad_inputs = main_path_->backward(grads_to_propagate, pid);
 
   // Backward through shortcut path
   Vec<ConstTensor> shortcut_grad_inputs = grads_to_propagate;
   if (shortcut_path_) {
-    auto temp = shortcut_path_->backward(grads_to_propagate, mb_id);
+    auto temp = shortcut_path_->backward(grads_to_propagate, pid);
     shortcut_grad_inputs = Vec<ConstTensor>(temp.begin(), temp.end());
   }
 

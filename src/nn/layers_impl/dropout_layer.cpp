@@ -27,7 +27,7 @@ DropoutLayer::DropoutLayer(float dropout_rate, const std::string &name)
   }
 }
 
-Tensor DropoutLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
+Tensor DropoutLayer::forward_impl(const ConstTensor &input, size_t pid) {
   if (!this->is_training_) {
     Tensor output = get_output_tensor(input->shape());
     output->share_from(input);
@@ -35,7 +35,7 @@ Tensor DropoutLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
   }
 
   Tensor mask = this->get_cache_tensor(input->shape(), DType_t::BOOL);
-  set_mutable_cache(mb_id, "mask", mask);
+  set_mutable_cache(pid, "mask", mask);
 
   Tensor output = get_output_tensor(input->shape());
 
@@ -43,11 +43,11 @@ Tensor DropoutLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
   return output;
 }
 
-Tensor DropoutLayer::backward_impl(const ConstTensor &grad_output, size_t mb_id) {
-  const ConstTensor &mask = this->get_mutable_cache(mb_id, "mask");
+Tensor DropoutLayer::backward_impl(const ConstTensor &grad_output, size_t pid) {
+  const ConstTensor &mask = this->get_mutable_cache(pid, "mask");
   if (mask == nullptr) {
     throw std::runtime_error("No cached mask found for micro-batch ID in DropoutLayer: " +
-                             std::to_string(mb_id));
+                             std::to_string(pid));
   }
 
   Tensor grad_input = get_output_tensor(grad_output->shape());

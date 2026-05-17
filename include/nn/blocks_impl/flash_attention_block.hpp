@@ -50,8 +50,8 @@ private:
       const ConstTensor &stats_tensor, const Tensor &grad_q_heads, const Tensor &grad_k_heads,
       const Tensor &grad_v_heads, const Tensor &workspace, flowHandle_t handle) const;
 
-  Tensor cudnn_forward(const ConstTensor &input, size_t mb_id);
-  Tensor cudnn_backward(const ConstTensor &grad_output, size_t mb_id);
+  Tensor cudnn_forward(const ConstTensor &input, size_t pid);
+  Tensor cudnn_backward(const ConstTensor &grad_output, size_t pid);
 
   mutable std::unordered_map<size_t, cuda::cudnn_flash_attention::feHandle_t *> fe_handle_cache;
 #endif
@@ -62,8 +62,8 @@ private:
   }
 
   // Expects input: [batch_size, seq_len, embed_dim], output: [batch_size, seq_len, embed_dim]
-  Vec<Tensor> forward_impl(const Vec<ConstTensor> &inputs, size_t mb_id = 0) override;
-  Vec<Tensor> backward_impl(const Vec<ConstTensor> &grad_outputs, size_t mb_id = 0) override;
+  Vec<Tensor> forward_impl(const Vec<ConstTensor> &inputs, size_t pid = 0) override;
+  Vec<Tensor> backward_impl(const Vec<ConstTensor> &grad_outputs, size_t pid = 0) override;
 
 public:
   FlashAttentionBlock(size_t embed_dim, size_t num_heads, bool is_causal = true,

@@ -31,8 +31,8 @@ protected:
     return layers;
   }
 
-  Vec<Tensor> forward_impl(const Vec<ConstTensor> &inputs, size_t mb_id) override;
-  Vec<Tensor> backward_impl(const Vec<ConstTensor> &grad_outputs, size_t mb_id) override;
+  Vec<Tensor> forward_impl(const Vec<ConstTensor> &inputs, size_t pid) override;
+  Vec<Tensor> backward_impl(const Vec<ConstTensor> &grad_outputs, size_t pid) override;
 
 public:
   explicit Sequential(Vec<std::unique_ptr<Layer>> layers = {},

@@ -67,8 +67,8 @@ private:
       const Tensor &workspace, size_t batch_size, size_t input_h, size_t input_w, size_t output_h,
       size_t output_w, flowHandle_t handle) const;
 
-  Tensor cudnn_forward(const ConstTensor &input, size_t mb_id);
-  Tensor cudnn_backward(const ConstTensor &current_gradient, size_t mb_id);
+  Tensor cudnn_forward(const ConstTensor &input, size_t pid);
+  Tensor cudnn_backward(const ConstTensor &current_gradient, size_t pid);
 
   mutable std::unordered_map<size_t, cuda::cudnn_conv2d::feHandle_t *> fe_handle_cache;
   mutable std::unordered_map<size_t, ConvolutionStats> stats_cache;
@@ -76,15 +76,15 @@ private:
 
 #ifdef USE_DNNL
   void build_dnnl_handle(const Vec<size_t> &input_shape) const;
-  Tensor dnnl_forward(const ConstTensor &input, size_t mb_id);
-  Tensor dnnl_backward(const ConstTensor &grad_output, size_t mb_id);
+  Tensor dnnl_forward(const ConstTensor &input, size_t pid);
+  Tensor dnnl_backward(const ConstTensor &grad_output, size_t pid);
 
   mutable std::unordered_map<size_t, cpu::dnnl_conv2d::dnnlHandle_t *> dnnl_handle_cache;
   mutable std::unordered_map<size_t, ConvolutionStats> dnnl_stats_cache;
 #endif
 
-  Tensor def_forward(const ConstTensor &input, size_t mb_id);
-  Tensor def_backward(const ConstTensor &grad_output, size_t mb_id);
+  Tensor def_forward(const ConstTensor &input, size_t pid);
+  Tensor def_backward(const ConstTensor &grad_output, size_t pid);
 
   Vec<ParamDescriptor> param_descriptors() override {
     Vec<ParamDescriptor> descriptors;
@@ -108,8 +108,8 @@ private:
   }
 
   void init_impl() override;
-  Tensor forward_impl(const ConstTensor &input, size_t mb_id = 0) override;
-  Tensor backward_impl(const ConstTensor &grad_output, size_t mb_id = 0) override;
+  Tensor forward_impl(const ConstTensor &input, size_t pid = 0) override;
+  Tensor backward_impl(const ConstTensor &grad_output, size_t pid = 0) override;
 
 public:
   static constexpr const char *TYPE_NAME = "conv2d";

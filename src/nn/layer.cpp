@@ -33,7 +33,7 @@ void Layer::init() {
   initialized_ = true;
 }
 
-Vec<Tensor> Layer::forward(const Vec<ConstTensor> &inputs, size_t mb_id) {
+Vec<Tensor> Layer::forward(const Vec<ConstTensor> &inputs, size_t pid) {
   if (!initialized_) {
     throw std::runtime_error("Layer must be initialized before calling forward");
   }
@@ -45,14 +45,14 @@ Vec<Tensor> Layer::forward(const Vec<ConstTensor> &inputs, size_t mb_id) {
     else
       current_inputs.push_back(input->to_device(this->device()));
   }
-  Vec<Tensor> outputs = forward_impl(current_inputs, mb_id);
+  Vec<Tensor> outputs = forward_impl(current_inputs, pid);
 #ifndef NDEBUG
   this->device().getFlow(flow_handle_)->synchronize();
 #endif
   return outputs;
 }
 
-Vec<Tensor> Layer::backward(const Vec<ConstTensor> &grad_outputs, size_t mb_id) {
+Vec<Tensor> Layer::backward(const Vec<ConstTensor> &grad_outputs, size_t pid) {
   if (!initialized_) {
     throw std::runtime_error("Layer must be initialized before calling backward");
   }
@@ -64,8 +64,8 @@ Vec<Tensor> Layer::backward(const Vec<ConstTensor> &grad_outputs, size_t mb_id) 
     else
       current_grad_outputs.push_back(grad->to_device(this->device()));
   }
-  auto grad_inputs = backward_impl(current_grad_outputs, mb_id);
-  clear_cache(mb_id);
+  auto grad_inputs = backward_impl(current_grad_outputs, pid);
+  clear_cache(pid);
 #ifndef NDEBUG
   this->device().getFlow(flow_handle_)->synchronize();
 #endif
@@ -166,26 +166,26 @@ Tensor Layer::get_tensor(const Vec<size_t> &shape, DType_t dtype) {
   return make_tensor(dtype, shape, device());
 }
 
-void Layer::set_immutable_cache(size_t mb_id, const std::string &key, ConstTensor value) {
+void Layer::set_immutable_cache(size_t pid, const std::string &key, ConstTensor value) {
   if (!is_training_) {
     return;  // no need to cache in inference mode
   }
-  immutable_cache_[{mb_id, key}] = std::move(value);
+  immutable_cache_[{pid, key}] = std::move(value);
 }
 
-ConstTensor &Layer::get_immutable_cache(size_t mb_id, const std::string &key) {
-  return immutable_cache_[{mb_id, key}];
+ConstTensor &Layer::get_immutable_cache(size_t pid, const std::string &key) {
+  return immutable_cache_[{pid, key}];
 }
 
-void Layer::set_mutable_cache(size_t mb_id, const std::string &key, Tensor value) {
+void Layer::set_mutable_cache(size_t pid, const std::string &key, Tensor value) {
   if (!is_training_) {
     return;  // no need to cache in inference mode
   }
-  mutable_cache_[{mb_id, key}] = std::move(value);
+  mutable_cache_[{pid, key}] = std::move(value);
 }
 
-Tensor &Layer::get_mutable_cache(size_t mb_id, const std::string &key) {
-  return mutable_cache_[{mb_id, key}];
+Tensor &Layer::get_mutable_cache(size_t pid, const std::string &key) {
+  return mutable_cache_[{pid, key}];
 }
 
 Tensor Layer::get_output_tensor(const Vec<size_t> &shape) {
@@ -212,16 +212,16 @@ Tensor Layer::get_workspace(const Vec<size_t> &shape, DType_t dtype) {
   return workspace_tensor;
 }
 
-void Layer::clear_cache(size_t mb_id) {
+void Layer::clear_cache(size_t pid) {
   for (auto it = immutable_cache_.begin(); it != immutable_cache_.end();) {
-    if (it->first.first == mb_id) {
+    if (it->first.first == pid) {
       it = immutable_cache_.erase(it);
     } else {
       ++it;
     }
   }
   for (auto it = mutable_cache_.begin(); it != mutable_cache_.end();) {
-    if (it->first.first == mb_id) {
+    if (it->first.first == pid) {
       it = mutable_cache_.erase(it);
     } else {
       ++it;

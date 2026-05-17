@@ -142,21 +142,21 @@ protected:
     switch (message.header().command_type) {
       case CommandType::FORWARD_JOB: {
         const Job &forward_job = message.get<Job>();
-        auto outputs = this->model_->forward({forward_job.data}, forward_job.mb_id);
-        Job output(outputs[0], forward_job.mb_id);
+        auto outputs = this->model_->forward({forward_job.data}, forward_job.pid);
+        Job output(outputs[0], forward_job.pid);
         message = Message(CommandType::FORWARD_JOB, std::move(output));
         communicator_->send_message(std::move(message), next_stage_endpoint_);
       } break;
       case CommandType::BACKWARD_JOB: {
         const Job &backward_job = message.get<Job>();
-        auto outputs = this->model_->backward({backward_job.data}, backward_job.mb_id);
+        auto outputs = this->model_->backward({backward_job.data}, backward_job.pid);
         if (prev_stage_endpoint_ == Endpoint::empty()) {
           // only send backward complete if there is no previous stage
           Message complete_msg(CommandType::BACKWARD_COMPLETE);
           communicator_->send_message(std::move(complete_msg), coordinator_endpoint_);
           break;
         }
-        Job output(outputs[0], backward_job.mb_id);
+        Job output(outputs[0], backward_job.pid);
         message = Message(CommandType::BACKWARD_JOB, std::move(output));
         communicator_->send_message(std::move(message), prev_stage_endpoint_);
       } break;

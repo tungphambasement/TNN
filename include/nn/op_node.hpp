@@ -17,12 +17,12 @@ public:
 
   Vec<ParamDescriptor> param_descriptors() const { return layer_->param_descriptors(); }
 
-  Vec<Tensor> forward(const Vec<ConstTensor> &inputs, size_t mb_id = 0) {
-    return layer_->forward(inputs, mb_id);
+  Vec<Tensor> forward(const Vec<ConstTensor> &inputs, size_t pid = 0) {
+    return layer_->forward(inputs, pid);
   }
 
-  Vec<Tensor> backward(const Vec<ConstTensor> &gradients, size_t mb_id = 0) {
-    return layer_->backward(gradients, mb_id);
+  Vec<Tensor> backward(const Vec<ConstTensor> &gradients, size_t pid = 0) {
+    return layer_->backward(gradients, pid);
   }
 
   void set_seed(size_t seed) { layer_->set_seed(seed); }

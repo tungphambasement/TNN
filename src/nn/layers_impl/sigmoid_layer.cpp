@@ -15,21 +15,21 @@ SigmoidLayer::SigmoidLayer(const std::string &name)
     : StatelessLayer(name),
       activation_(std::make_unique<Sigmoid>()) {}
 
-Tensor SigmoidLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
+Tensor SigmoidLayer::forward_impl(const ConstTensor &input, size_t pid) {
   Tensor output = get_output_tensor(input->shape());
   activation_->apply(input, output);
 
   if (this->is_training_) {
     // Cache output for efficient backward pass
     // sigmoid'(x) = sigmoid(x) * (1 - sigmoid(x))
-    set_immutable_cache(mb_id, "output", output);
+    set_immutable_cache(pid, "output", output);
   }
 
   return output;
 }
 
-Tensor SigmoidLayer::backward_impl(const ConstTensor &grad_output, size_t mb_id) {
-  const ConstTensor &output = this->get_immutable_cache(mb_id, "output");
+Tensor SigmoidLayer::backward_impl(const ConstTensor &grad_output, size_t pid) {
+  const ConstTensor &output = this->get_immutable_cache(pid, "output");
   if (!output) {
     throw std::runtime_error("No cached output found for backward pass in SigmoidLayer");
   }

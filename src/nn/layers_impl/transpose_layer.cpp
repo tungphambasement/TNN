@@ -44,7 +44,7 @@ std::unique_ptr<Task> TransposeLayer::permute(const ConstTensor &input, const Te
   return nullptr;
 }
 
-Tensor TransposeLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
+Tensor TransposeLayer::forward_impl(const ConstTensor &input, size_t pid) {
   if (input->dims() != 3) {
     throw std::runtime_error("TransposeLayer expects 3D input (Batch, D1, D2)");
   }
@@ -59,7 +59,7 @@ Tensor TransposeLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
   return output;
 }
 
-Tensor TransposeLayer::backward_impl(const ConstTensor &grad_output, size_t mb_id) {
+Tensor TransposeLayer::backward_impl(const ConstTensor &grad_output, size_t pid) {
   // Gradient is (B, H, L). We want (B, L, H).
   if (grad_output->dims() != 3) {
     throw std::runtime_error("TransposeLayer: Gradient must be 3D");

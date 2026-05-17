@@ -42,7 +42,7 @@ void LegacyBatchNormLayer::init_impl() {
   dummy_var_gradients_->fill(0.0f);
 }
 
-Tensor LegacyBatchNormLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
+Tensor LegacyBatchNormLayer::forward_impl(const ConstTensor &input, size_t pid) {
   if (input->dims() < 3) {
     throw std::invalid_argument("BatchNorm: Input tensor must have at least 3 dimensions");
   }
@@ -50,14 +50,14 @@ Tensor LegacyBatchNormLayer::forward_impl(const ConstTensor &input, size_t mb_id
     throw std::invalid_argument("BatchNorm: Input channels must match num_features");
   }
 
-  return def_forward(input, mb_id);
+  return def_forward(input, pid);
 }
 
-Tensor LegacyBatchNormLayer::backward_impl(const ConstTensor &grad_output, size_t mb_id) {
-  return def_backward(grad_output, mb_id);
+Tensor LegacyBatchNormLayer::backward_impl(const ConstTensor &grad_output, size_t pid) {
+  return def_backward(grad_output, pid);
 }
 
-Tensor LegacyBatchNormLayer::def_forward(const ConstTensor &input, size_t mb_id) {
+Tensor LegacyBatchNormLayer::def_forward(const ConstTensor &input, size_t pid) {
   size_t batch_size, channels, spatial_size;
   batch_size = input->dimension(0);
   channels = input->dimension(1);
@@ -73,9 +73,9 @@ Tensor LegacyBatchNormLayer::def_forward(const ConstTensor &input, size_t mb_id)
   Tensor batch_inv_std = this->get_cache_tensor({num_features_}, io_dtype_);
   Tensor batch_mean = this->get_cache_tensor({num_features_}, io_dtype_);
 
-  set_mutable_cache(mb_id, "norm", norm);
-  set_mutable_cache(mb_id, "inv_std", batch_inv_std);
-  set_mutable_cache(mb_id, "mean", batch_mean);
+  set_mutable_cache(pid, "norm", norm);
+  set_mutable_cache(pid, "inv_std", batch_inv_std);
+  set_mutable_cache(pid, "mean", batch_mean);
 
   if (this->is_training_) {
     DISPATCH_ON_3_DTYPES_TO_METHOD(run_forward, input, batch_mean, batch_inv_std, running_mean_,
@@ -89,9 +89,9 @@ Tensor LegacyBatchNormLayer::def_forward(const ConstTensor &input, size_t mb_id)
   return output;
 }
 
-Tensor LegacyBatchNormLayer::def_backward(const ConstTensor &grad_output, size_t mb_id) {
-  const Tensor &norm = this->get_mutable_cache(mb_id, "norm");
-  const Tensor &inv_std = this->get_mutable_cache(mb_id, "inv_std");
+Tensor LegacyBatchNormLayer::def_backward(const ConstTensor &grad_output, size_t pid) {
+  const Tensor &norm = this->get_mutable_cache(pid, "norm");
+  const Tensor &inv_std = this->get_mutable_cache(pid, "inv_std");
 
   const size_t batch_size = grad_output->dimension(0);
   const size_t channels = grad_output->dimension(1);

@@ -15,8 +15,8 @@ FlattenLayer::FlattenLayer(int start_dim, int end_dim, const std::string &name)
       start_dim_(start_dim),
       end_dim_(end_dim) {}
 
-Tensor FlattenLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
-  micro_batch_original_shapes_[mb_id] = input->shape();
+Tensor FlattenLayer::forward_impl(const ConstTensor &input, size_t pid) {
+  micro_batch_original_shapes_[pid] = input->shape();
 
   Vec<size_t> output_shape = compute_output_shape(input->shape());
   Tensor output = get_output_tensor(output_shape);
@@ -25,11 +25,11 @@ Tensor FlattenLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
   return output;
 }
 
-Tensor FlattenLayer::backward_impl(const ConstTensor &grad_output, size_t mb_id) {
-  auto it = micro_batch_original_shapes_.find(mb_id);
+Tensor FlattenLayer::backward_impl(const ConstTensor &grad_output, size_t pid) {
+  auto it = micro_batch_original_shapes_.find(pid);
   if (it == micro_batch_original_shapes_.end()) {
     throw std::runtime_error("No cached shape found for micro-batch ID in FlattenLayer: " +
-                             std::to_string(mb_id));
+                             std::to_string(pid));
   }
   const Vec<size_t> &original_shape = it->second;
   size_t expected_size =

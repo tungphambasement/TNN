@@ -58,7 +58,7 @@ FlashAttentionBlock::~FlashAttentionBlock() {
 #endif
 }
 
-Vec<Tensor> FlashAttentionBlock::forward_impl(const Vec<ConstTensor> &inputs, size_t mb_id) {
+Vec<Tensor> FlashAttentionBlock::forward_impl(const Vec<ConstTensor> &inputs, size_t pid) {
   const ConstTensor &input = inputs[0];
 
   if (input->dims() != 3) {
@@ -74,7 +74,7 @@ Vec<Tensor> FlashAttentionBlock::forward_impl(const Vec<ConstTensor> &inputs, si
 
 #ifdef USE_CUDNN
   if (get_engine_type() == EngineType::CUDA) {
-    return {cudnn_forward(input, mb_id)};
+    return {cudnn_forward(input, pid)};
   } else
 #endif
   {
@@ -129,7 +129,7 @@ std::unique_ptr<Task> FlashAttentionBlock::flash_attention_backward_task(
                           workspace->data());
 }
 
-Tensor FlashAttentionBlock::cudnn_forward(const ConstTensor &input, size_t mb_id) {
+Tensor FlashAttentionBlock::cudnn_forward(const ConstTensor &input, size_t pid) {
   const auto &input_shape = input->shape();
   size_t batch_size = input_shape[0];
   size_t seq_len = input_shape[1];
@@ -142,14 +142,14 @@ Tensor FlashAttentionBlock::cudnn_forward(const ConstTensor &input, size_t mb_id
   auto &stats = stats_cache[shape_key];
 
   if (this->is_training_) {
-    set_immutable_cache(mb_id, "input", input);
+    set_immutable_cache(pid, "input", input);
   }
 
   Tensor attn_out = this->get_cache_tensor({batch_size, seq_len, embed_dim_}, io_dtype_);
-  set_mutable_cache(mb_id, "attn_out", attn_out);
+  set_mutable_cache(pid, "attn_out", attn_out);
   // Allocate stats tensor (b, h, s, 1) in float
   Tensor stats_tensor = this->get_cache_tensor({batch_size, num_heads_, seq_len, 1}, DType_t::FP32);
-  set_mutable_cache(mb_id, "stats_tensor", stats_tensor);
+  set_mutable_cache(pid, "stats_tensor", stats_tensor);
 
   allocator_->flip();  // ensure workspace is on opposite side of output for algorithm 1
 
@@ -161,9 +161,9 @@ Tensor FlashAttentionBlock::cudnn_forward(const ConstTensor &input, size_t mb_id
   Tensor k_heads = this->get_workspace({batch_size, num_heads_, seq_len, head_dim_}, DType_t::BF16);
   Tensor v_heads = this->get_workspace({batch_size, num_heads_, seq_len, head_dim_}, DType_t::BF16);
 
-  Tensor q = q_proj_->forward({input}, mb_id)[0];
-  Tensor k = k_proj_->forward({input}, mb_id)[0];
-  Tensor v = v_proj_->forward({input}, mb_id)[0];
+  Tensor q = q_proj_->forward({input}, pid)[0];
+  Tensor k = k_proj_->forward({input}, pid)[0];
+  Tensor v = v_proj_->forward({input}, pid)[0];
 
   DISPATCH_DTYPE(io_dtype_, T, {
     create_cuda_task(defaultFlowHandle, cuda::permute_heads<T, bf16>, q->data_as<T>(),
@@ -193,11 +193,11 @@ Tensor FlashAttentionBlock::cudnn_forward(const ConstTensor &input, size_t mb_id
 
   allocator_->flip();  // flip back so attn_out is on opposite side as input for algorithm 1
 
-  Tensor output = out_proj_->forward({attn_out}, mb_id)[0];
+  Tensor output = out_proj_->forward({attn_out}, pid)[0];
   return output;
 }
 
-Tensor FlashAttentionBlock::cudnn_backward(const ConstTensor &grad_output, size_t mb_id) {
+Tensor FlashAttentionBlock::cudnn_backward(const ConstTensor &grad_output, size_t pid) {
   const auto &grad_shape = grad_output->shape();
   size_t batch_size = grad_shape[0];
   size_t seq_len = grad_shape[1];
@@ -208,9 +208,9 @@ Tensor FlashAttentionBlock::cudnn_backward(const ConstTensor &grad_output, size_
   auto &stats = stats_cache[shape_key];
 
   // Get cached forward tensors
-  ConstTensor &input = this->get_immutable_cache(mb_id, "input");
-  const Tensor &attn_out = this->get_mutable_cache(mb_id, "attn_out");
-  const Tensor &stats_tensor = this->get_mutable_cache(mb_id, "stats_tensor");
+  ConstTensor &input = this->get_immutable_cache(pid, "input");
+  const Tensor &attn_out = this->get_mutable_cache(pid, "attn_out");
+  const Tensor &stats_tensor = this->get_mutable_cache(pid, "stats_tensor");
 
   Tensor grad_input = this->get_output_tensor({batch_size, seq_len, embed_dim_});
 
@@ -224,7 +224,7 @@ Tensor FlashAttentionBlock::cudnn_backward(const ConstTensor &grad_output, size_
       this->get_workspace({batch_size, num_heads_, seq_len, head_dim_}, DType_t::BF16);
 
   {  // Backprop through out_proj
-    Tensor grad_attn_out = out_proj_->backward({grad_output}, mb_id)[0];
+    Tensor grad_attn_out = out_proj_->backward({grad_output}, pid)[0];
     // Convert to head layout and FP16
     DISPATCH_DTYPE(io_dtype_, T, {
       create_cuda_task(defaultFlowHandle, cuda::permute_heads<T, bf16>, grad_attn_out->data_as<T>(),
@@ -250,9 +250,9 @@ Tensor FlashAttentionBlock::cudnn_backward(const ConstTensor &grad_output, size_
 
   {
     // Recompute Q, K, V from cached input (trading compute for memory)
-    Tensor q = q_proj_->forward({input}, mb_id)[0];
-    Tensor k = k_proj_->forward({input}, mb_id)[0];
-    Tensor v = v_proj_->forward({input}, mb_id)[0];
+    Tensor q = q_proj_->forward({input}, pid)[0];
+    Tensor k = k_proj_->forward({input}, pid)[0];
+    Tensor v = v_proj_->forward({input}, pid)[0];
 
     DISPATCH_DTYPE(io_dtype_, T, {
       create_cuda_task(defaultFlowHandle, cuda::permute_heads<T, bf16>, q->data_as<T>(),
@@ -295,9 +295,9 @@ Tensor FlashAttentionBlock::cudnn_backward(const ConstTensor &grad_output, size_
   allocator_->flip();
 
   // Backprop through separate Q, K, V projections
-  Tensor grad_q_in = q_proj_->backward({grad_q}, mb_id)[0];
-  Tensor grad_k_in = k_proj_->backward({grad_k}, mb_id)[0];
-  Tensor grad_v_in = v_proj_->backward({grad_v}, mb_id)[0];
+  Tensor grad_q_in = q_proj_->backward({grad_q}, pid)[0];
+  Tensor grad_k_in = k_proj_->backward({grad_k}, pid)[0];
+  Tensor grad_v_in = v_proj_->backward({grad_v}, pid)[0];
 
   grad_q = grad_k = grad_v = nullptr;  // free up memory
 
@@ -313,12 +313,12 @@ Tensor FlashAttentionBlock::cudnn_backward(const ConstTensor &grad_output, size_
 }
 #endif
 
-Vec<Tensor> FlashAttentionBlock::backward_impl(const Vec<ConstTensor> &grad_outputs, size_t mb_id) {
+Vec<Tensor> FlashAttentionBlock::backward_impl(const Vec<ConstTensor> &grad_outputs, size_t pid) {
   const ConstTensor &grad_output = grad_outputs[0];
 
 #ifdef USE_CUDNN
   if (get_engine_type() == EngineType::CUDA) {
-    return {cudnn_backward(grad_output, mb_id)};
+    return {cudnn_backward(grad_output, pid)};
   } else
 #endif
   {

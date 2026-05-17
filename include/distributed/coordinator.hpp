@@ -202,7 +202,7 @@ public:
 
           Job &job = forward_msg.get<Job>();
           Tensor &predictions = job.data;
-          Tensor &targets = microbatch_labels[job.mb_id];
+          Tensor &targets = microbatch_labels[job.pid];
           Tensor device_targets = targets->to_device(predictions->device());
           float loss = 0.0f;
           criterion->compute_loss(predictions, device_targets, loss);
@@ -216,7 +216,7 @@ public:
               make_tensor(allocator, predictions->data_type(), predictions->shape());
           criterion->compute_gradient(predictions, device_targets, grad_output);
           grad_output->mul_scalar(1.0 / num_microbatches);
-          backward(std::move(grad_output), job.mb_id);
+          backward(std::move(grad_output), job.pid);
         } else {
           throw std::runtime_error("Unexpected message type in FORWARD_JOB");
         }
@@ -265,7 +265,7 @@ public:
 
           Job &job = forward_msg.get<Job>();
           Tensor &predictions = job.data;
-          Tensor &targets = microbatch_labels[job.mb_id];
+          Tensor &targets = microbatch_labels[job.pid];
           Tensor device_targets = targets->to_device(predictions->device());
           float loss = 0.0f;
           criterion->compute_loss(predictions, device_targets, loss);
@@ -318,7 +318,7 @@ public:
           if (!msg.has_type<Job>()) {
             throw std::runtime_error("Unexpected message type in sync_train_batch FORWARD_JOB");
           }
-          if (msg.get<Job>().mb_id == i && !found) {
+          if (msg.get<Job>().pid == i && !found) {
             forward_msg = std::move(msg);
             found = true;
           }
@@ -395,7 +395,7 @@ public:
           if (!msg.has_type<Job>()) {
             throw std::runtime_error("Unexpected message type in sync_val_batch FORWARD_JOB");
           }
-          if (msg.get<Job>().mb_id == i && !found) {
+          if (msg.get<Job>().pid == i && !found) {
             forward_msg = std::move(msg);
             found = true;
           }

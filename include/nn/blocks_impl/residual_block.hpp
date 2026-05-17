@@ -42,8 +42,8 @@ private:
     return all_layers;
   }
 
-  Vec<Tensor> forward_impl(const Vec<ConstTensor> &inputs, size_t mb_id = 0) override;
-  Vec<Tensor> backward_impl(const Vec<ConstTensor> &grad_outputs, size_t mb_id = 0) override;
+  Vec<Tensor> forward_impl(const Vec<ConstTensor> &inputs, size_t pid = 0) override;
+  Vec<Tensor> backward_impl(const Vec<ConstTensor> &grad_outputs, size_t pid = 0) override;
 
 public:
   /**

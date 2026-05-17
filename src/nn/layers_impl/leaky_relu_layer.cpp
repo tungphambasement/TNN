@@ -16,13 +16,13 @@ LeakyReLULayer::LeakyReLULayer(float negative_slope, const std::string &name)
       activation_(std::make_unique<LeakyReLU>(negative_slope)),
       negative_slope_(negative_slope) {}
 
-Tensor LeakyReLULayer::forward_impl(const ConstTensor &input, size_t mb_id) {
+Tensor LeakyReLULayer::forward_impl(const ConstTensor &input, size_t pid) {
   Tensor output = get_output_tensor(input->shape());
 
   if (this->is_training_) {
     // Cache boolean mask (1 byte per element) instead of full input
     Tensor mask = this->get_cache_tensor(input->shape(), DType_t::UINT8_T);
-    set_mutable_cache(mb_id, "mask", mask);
+    set_mutable_cache(pid, "mask", mask);
 
     // Compute LeakyReLU and mask
     activation_->apply(input, output);
@@ -48,8 +48,8 @@ Tensor LeakyReLULayer::forward_impl(const ConstTensor &input, size_t mb_id) {
   return output;
 }
 
-Tensor LeakyReLULayer::backward_impl(const ConstTensor &grad_output, size_t mb_id) {
-  const ConstTensor &mask = this->get_mutable_cache(mb_id, "mask");
+Tensor LeakyReLULayer::backward_impl(const ConstTensor &grad_output, size_t pid) {
+  const ConstTensor &mask = this->get_mutable_cache(pid, "mask");
   if (!mask) {
     throw std::runtime_error("No cached mask found for backward pass in LeakyReLULayer");
   }

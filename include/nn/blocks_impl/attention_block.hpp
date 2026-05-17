@@ -48,8 +48,8 @@ private:
     return {q_proj_.get(), k_proj_.get(), v_proj_.get(), out_proj_.get()};
   }
 
-  Vec<Tensor> forward_impl(const Vec<ConstTensor> &inputs, size_t mb_id = 0) override;
-  Vec<Tensor> backward_impl(const Vec<ConstTensor> &grad_outputs, size_t mb_id = 0) override;
+  Vec<Tensor> forward_impl(const Vec<ConstTensor> &inputs, size_t pid = 0) override;
+  Vec<Tensor> backward_impl(const Vec<ConstTensor> &grad_outputs, size_t pid = 0) override;
 
 public:
   AttentionBlock(size_t embed_dim, size_t num_heads, bool is_causal = true,

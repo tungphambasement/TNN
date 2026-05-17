@@ -43,26 +43,25 @@ private:
                                                   const ConstTensor &v, const Tensor &output,
                                                   size_t batch_size, size_t num_heads,
                                                   size_t seq_len, size_t head_dim,
-                                                  flowHandle_t handle, size_t mb_id) const;
+                                                  flowHandle_t handle, size_t pid) const;
 
   template <typename IO_T>
   std::unique_ptr<Task> compute_sdpa_backward_impl(
       const ConstTensor &q, const ConstTensor &k, const ConstTensor &v, const ConstTensor &output,
       const ConstTensor &grad_output, const Tensor &grad_q, const Tensor &grad_k,
       const Tensor &grad_v, size_t batch_size, size_t num_heads, size_t seq_len, size_t head_dim,
-      flowHandle_t handle, size_t mb_id) const;
+      flowHandle_t handle, size_t pid) const;
 
 #ifdef USE_CUDNN
   void cudnn_forward(const ConstTensor &q, const ConstTensor &k, const ConstTensor &v,
-                     const Tensor &output, size_t mb_id);
+                     const Tensor &output, size_t pid);
   void cudnn_backward(const ConstTensor &q, const ConstTensor &k, const ConstTensor &v,
                       const ConstTensor &output, const ConstTensor &grad_output,
-                      const Tensor &grad_q, const Tensor &grad_k, const Tensor &grad_v,
-                      size_t mb_id);
+                      const Tensor &grad_q, const Tensor &grad_k, const Tensor &grad_v, size_t pid);
 #endif
 
-  Vec<Tensor> forward_impl(const Vec<ConstTensor> &inputs, size_t mb_id = 0) override;
-  Vec<Tensor> backward_impl(const Vec<ConstTensor> &grad_outputs, size_t mb_id = 0) override;
+  Vec<Tensor> forward_impl(const Vec<ConstTensor> &inputs, size_t pid = 0) override;
+  Vec<Tensor> backward_impl(const Vec<ConstTensor> &grad_outputs, size_t pid = 0) override;
 
 public:
   static constexpr const char *TYPE_NAME = "sdpa";

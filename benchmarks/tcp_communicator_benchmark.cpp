@@ -172,7 +172,7 @@ int main(int argc, char *argv[]) {
     Tensor tensor = make_tensor<float>(master_tensor->shape(), getHost());
     master_tensor->copy_to(tensor);
     Job job;
-    job.mb_id = 10;
+    job.pid = 10;
     job.data = std::move(tensor);
     Message message(CommandType::FORWARD_JOB, std::move(job));
     communicator.send_message(std::move(message), peer_endpoint);

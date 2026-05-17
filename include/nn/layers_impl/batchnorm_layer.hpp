@@ -48,8 +48,8 @@ private:
 
 #ifdef USE_DNNL
   void build_dnnl_handle(const Vec<size_t> &input_shape) const;
-  Tensor dnnl_forward(const ConstTensor &input, size_t mb_id);
-  Tensor dnnl_backward(const ConstTensor &grad_output, size_t mb_id);
+  Tensor dnnl_forward(const ConstTensor &input, size_t pid);
+  Tensor dnnl_backward(const ConstTensor &grad_output, size_t pid);
 
   mutable std::unordered_map<size_t, cpu::dnnl_batchnorm::dnnlBNHandle_t *> dnnl_handle_cache;
   mutable std::unordered_map<size_t, BatchNormStats> dnnl_stats_cache;
@@ -87,8 +87,8 @@ private:
                                       const ConstTensor &batch_mean, const ConstTensor &batch_var,
                                       const Tensor &workspace, flowHandle_t handle);
 
-  Tensor cudnn_forward(const ConstTensor &input, size_t mb_id);
-  Tensor cudnn_backward(const ConstTensor &grad_output, size_t mb_id);
+  Tensor cudnn_forward(const ConstTensor &input, size_t pid);
+  Tensor cudnn_backward(const ConstTensor &grad_output, size_t pid);
 #endif
 
   Vec<ParamDescriptor> param_descriptors() override {
@@ -124,12 +124,12 @@ private:
     return descriptors;
   }
 
-  Tensor def_forward(const ConstTensor &input, size_t mb_id);
-  Tensor def_backward(const ConstTensor &grad_output, size_t mb_id);
+  Tensor def_forward(const ConstTensor &input, size_t pid);
+  Tensor def_backward(const ConstTensor &grad_output, size_t pid);
 
   void init_impl() override;
-  Tensor forward_impl(const ConstTensor &input, size_t mb_id = 0) override;
-  Tensor backward_impl(const ConstTensor &grad_output, size_t mb_id = 0) override;
+  Tensor forward_impl(const ConstTensor &input, size_t pid = 0) override;
+  Tensor backward_impl(const ConstTensor &grad_output, size_t pid = 0) override;
 
 public:
   explicit BatchNormLayer(size_t num_features, float epsilon = 1e-5f, float momentum = 0.1f,

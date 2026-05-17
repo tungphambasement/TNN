@@ -37,7 +37,7 @@ void GroupNormLayer::init_impl() {
   beta_gradients_->fill(0.0f);
 }
 
-Tensor GroupNormLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
+Tensor GroupNormLayer::forward_impl(const ConstTensor &input, size_t pid) {
   if (input->shape()[1] != num_channels_) {
     throw std::invalid_argument("Input channels must match num_channels in GroupNormLayer");
   }
@@ -53,31 +53,31 @@ Tensor GroupNormLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
   Tensor output = get_output_tensor(input->shape());
 
   Tensor norm = this->get_cache_tensor(input->shape(), io_dtype_);
-  set_mutable_cache(mb_id, "norm", norm);
+  set_mutable_cache(pid, "norm", norm);
 
   Tensor mean = this->get_cache_tensor({batch_size * num_groups_}, io_dtype_);
-  set_mutable_cache(mb_id, "mean", mean);
+  set_mutable_cache(pid, "mean", mean);
 
   Tensor inv_std = this->get_cache_tensor({batch_size * num_groups_}, io_dtype_);
-  set_mutable_cache(mb_id, "inv_std", inv_std);
+  set_mutable_cache(pid, "inv_std", inv_std);
 
   DISPATCH_ON_3_DTYPES_TO_METHOD(run_forward, input, mean, inv_std, gamma_, beta_, output, norm,
                                  batch_size, channels, spatial_size, this->flow_handle_);
 
   if (this->is_training_) {
-    this->set_immutable_cache(mb_id, "input", input);
+    this->set_immutable_cache(pid, "input", input);
   }
 
   return output;
 }
 
-Tensor GroupNormLayer::backward_impl(const ConstTensor &grad_output, size_t mb_id) {
-  Tensor &normalized = this->get_mutable_cache(mb_id, "norm");
-  Tensor &inv_std = this->get_mutable_cache(mb_id, "inv_std");
-  const ConstTensor &input = this->get_immutable_cache(mb_id, "input");
+Tensor GroupNormLayer::backward_impl(const ConstTensor &grad_output, size_t pid) {
+  Tensor &normalized = this->get_mutable_cache(pid, "norm");
+  Tensor &inv_std = this->get_mutable_cache(pid, "inv_std");
+  const ConstTensor &input = this->get_immutable_cache(pid, "input");
   if (!normalized || !inv_std || !input) {
     throw std::runtime_error("No cached tensors found for micro-batch ID in GroupNormLayer: " +
-                             std::to_string(mb_id));
+                             std::to_string(pid));
   }
 
   const size_t batch_size = input->dimension(0);

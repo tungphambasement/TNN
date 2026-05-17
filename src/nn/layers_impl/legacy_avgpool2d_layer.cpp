@@ -32,7 +32,7 @@ LegacyAvgPool2DLayer::LegacyAvgPool2DLayer(size_t pool_h, size_t pool_w, size_t 
   }
 }
 
-Tensor LegacyAvgPool2DLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
+Tensor LegacyAvgPool2DLayer::forward_impl(const ConstTensor &input, size_t pid) {
   if (input->dims() != 4) {
     throw std::invalid_argument("AvgPool2D: Input tensor must be 4-dimensional (NCHW)");
   }
@@ -43,7 +43,7 @@ Tensor LegacyAvgPool2DLayer::forward_impl(const ConstTensor &input, size_t mb_id
   const size_t input_h = shape[2];
   const size_t input_w = shape[3];
 
-  micro_batch_input_shapes_[mb_id] = {batch_size, channels, input_h, input_w};
+  micro_batch_input_shapes_[pid] = {batch_size, channels, input_h, input_w};
 
   const size_t output_h = (input_h + 2 * pad_h_ - pool_h_) / stride_h_ + 1;
   const size_t output_w = (input_w + 2 * pad_w_ - pool_w_) / stride_w_ + 1;
@@ -56,16 +56,16 @@ Tensor LegacyAvgPool2DLayer::forward_impl(const ConstTensor &input, size_t mb_id
   return output;
 }
 
-Tensor LegacyAvgPool2DLayer::backward_impl(const ConstTensor &grad_output, size_t mb_id) {
+Tensor LegacyAvgPool2DLayer::backward_impl(const ConstTensor &grad_output, size_t pid) {
   if (grad_output->dims() != 4) {
     throw std::invalid_argument("AvgPool2D: Gradient tensor must be 4-dimensional (NCHW)");
   }
-  auto it_shape = micro_batch_input_shapes_.find(mb_id);
+  auto it_shape = micro_batch_input_shapes_.find(pid);
 
   if (it_shape == micro_batch_input_shapes_.end()) {
     throw std::runtime_error(
         "No cached input shape found for micro-batch ID in LegacyAvgPool2DLayer: " +
-        std::to_string(mb_id));
+        std::to_string(pid));
   }
 
   const auto &input_shape = it_shape->second;

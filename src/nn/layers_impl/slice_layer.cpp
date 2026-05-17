@@ -20,8 +20,8 @@ SliceLayer::SliceLayer(size_t axis, size_t start, size_t length, const std::stri
       start_(start),
       length_(length) {}
 
-Tensor SliceLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
-  micro_batch_original_shapes_[mb_id] = input->shape();
+Tensor SliceLayer::forward_impl(const ConstTensor &input, size_t pid) {
+  micro_batch_original_shapes_[pid] = input->shape();
 
   Vec<size_t> output_shape = compute_output_shape(input->shape());
   Tensor output = get_output_tensor(output_shape);
@@ -30,8 +30,8 @@ Tensor SliceLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
   return output;
 }
 
-Tensor SliceLayer::backward_impl(const ConstTensor &grad_output, size_t mb_id) {
-  auto it = micro_batch_original_shapes_.find(mb_id);
+Tensor SliceLayer::backward_impl(const ConstTensor &grad_output, size_t pid) {
+  auto it = micro_batch_original_shapes_.find(pid);
   if (it == micro_batch_original_shapes_.end()) {
     throw std::runtime_error("No cached shape found for micro-batch ID in SliceLayer");
   }

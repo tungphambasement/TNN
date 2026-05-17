@@ -48,8 +48,8 @@ private:
   }
 
   void init_impl() override;
-  Tensor forward_impl(const ConstTensor &input, size_t mb_id = 0) override;
-  Tensor backward_impl(const ConstTensor &grad_output, size_t mb_id = 0) override;
+  Tensor forward_impl(const ConstTensor &input, size_t pid = 0) override;
+  Tensor backward_impl(const ConstTensor &grad_output, size_t pid = 0) override;
 
 public:
   EmbeddingLayer(size_t vocab_size, size_t embed_dim, const std::string &name = "embedding",

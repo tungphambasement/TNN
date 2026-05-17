@@ -106,7 +106,7 @@ std::unique_ptr<Task> ClassTokenLayer::backward_task(const ConstTensor &grad_out
   return nullptr;
 }
 
-Tensor ClassTokenLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
+Tensor ClassTokenLayer::forward_impl(const ConstTensor &input, size_t pid) {
   if (input->dims() != 3) {
     throw std::runtime_error(
         "ClassTokenLayer: Input tensor must have 3 dimensions (Batch, Seq, Embed)");
@@ -127,7 +127,7 @@ Tensor ClassTokenLayer::forward_impl(const ConstTensor &input, size_t mb_id) {
   return output;
 }
 
-Tensor ClassTokenLayer::backward_impl(const ConstTensor &grad_output, size_t mb_id) {
+Tensor ClassTokenLayer::backward_impl(const ConstTensor &grad_output, size_t pid) {
   if (grad_output->dims() != 3) {
     throw std::runtime_error(
         "ClassTokenLayer: Gradient tensor must have 3 dimensions (Batch, Seq, Embed)");
