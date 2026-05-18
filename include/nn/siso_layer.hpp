@@ -1,5 +1,6 @@
 #pragma once
 
+#include "nn/graph_api.hpp"
 #include "nn/layer.hpp"
 
 namespace tnn {
@@ -17,6 +18,15 @@ public:
       throw std::runtime_error("SISOLayer only supports single grad output");
     }
     return {backward_impl(grad_outputs[0], pid)};
+  }
+
+  IONode operator()(IONode &input) {
+    IONode output;
+    EdgePtr edge = std::make_shared<Edge>(this, Vec<IONodePtr>{std::make_shared<IONode>(input)},
+                                          Vec<IONodePtr>{std::make_shared<IONode>(output)});
+
+    output.set_producer(edge);
+    return output;
   }
 
   Vec<Vec<size_t>> output_shapes(const Vec<Vec<size_t>> &input_shapes) const override;
